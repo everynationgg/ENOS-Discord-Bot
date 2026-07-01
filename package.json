@@ -1,0 +1,19 @@
+{
+  "name": "enos",
+  "version": "1.0.0",
+  "description": "Every Nation Discord Bot & Dashboard Monorepo",
+  "private": true,
+  "workspaces": [
+    "bot",
+    "dashboard"
+  ],
+  "scripts": {
+    "bot": "npm run dev --workspace=bot",
+    "dashboard": "npm run dev --workspace=dashboard",
+    "dev": "concurrently \"npm run bot\" \"npm run dashboard\"",
+    "deploy-commands": "npm run deploy --workspace=bot"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}
