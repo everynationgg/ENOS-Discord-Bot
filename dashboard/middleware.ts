@@ -1,8 +1,8 @@
-import type { NextRequest } from 'next/server';
+import NextAuth from 'next-auth';
+import authConfig from './lib/auth.config';
 import { NextResponse } from 'next/server';
-import { auth } from '@/lib/auth';
 
-export default auth((req) => {
+export default NextAuth(authConfig).auth((req) => {
   const { pathname } = req.nextUrl;
 
   // Allow public paths
