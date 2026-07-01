@@ -1,0 +1,14 @@
+# fly.toml app configuration file for ENOS Discord Bot
+
+app = "enos-discord-bot"
+primary_region = "ams"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  NODE_ENV = "production"
+  BOT_TIMEZONE = "Asia/Manila"
+
+# A Discord bot operates on outbound gateway connections only.
+# No internal HTTP service, ports, or scaling triggers are required.
