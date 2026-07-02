@@ -11,7 +11,8 @@
     "bot": "npm run dev --workspace=bot",
     "dashboard": "npm run dev --workspace=dashboard",
     "dev": "concurrently \"npm run bot\" \"npm run dashboard\"",
-    "deploy-commands": "npm run deploy --workspace=bot"
+    "deploy-commands": "npm run deploy --workspace=bot",
+    "build": "npm run build --workspace=dashboard"
   },
   "devDependencies": {
     "concurrently": "^8.2.2"
