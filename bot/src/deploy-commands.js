@@ -20,15 +20,23 @@ const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
 
 (async () => {
   try {
-    logger.info(`[DEPLOY] Registering ${commands.length} slash command(s) to guild ${process.env.DISCORD_GUILD_ID}...`);
+    const clientId = process.env.DISCORD_CLIENT_ID;
+    const guildId = process.env.DISCORD_GUILD_ID;
+    const deployGlobal = process.env.DEPLOY_GLOBAL === 'true';
 
-    await rest.put(
-      Routes.applicationGuildCommands(
-        process.env.DISCORD_CLIENT_ID,
-        process.env.DISCORD_GUILD_ID
-      ),
-      { body: commands }
-    );
+    if (deployGlobal) {
+      logger.info(`[DEPLOY] Registering ${commands.length} slash command(s) GLOBALLY...`);
+      await rest.put(
+        Routes.applicationCommands(clientId),
+        { body: commands }
+      );
+    } else {
+      logger.info(`[DEPLOY] Registering ${commands.length} slash command(s) to guild ${guildId}...`);
+      await rest.put(
+        Routes.applicationGuildCommands(clientId, guildId),
+        { body: commands }
+      );
+    }
 
     logger.info('[DEPLOY] ✅ Slash commands registered successfully!');
   } catch (err) {

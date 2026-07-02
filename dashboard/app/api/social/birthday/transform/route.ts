@@ -2,8 +2,15 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { supabaseAdmin } from '@/lib/supabase';
 
-const GUILD_ID = process.env.DISCORD_GUILD_ID!;
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+
+function getGuildId(req: NextRequest, body?: any) {
+  return (
+    req.nextUrl.searchParams.get('guild_id') ||
+    body?.guild_id ||
+    process.env.DISCORD_GUILD_ID!
+  );
+}
 
 // POST /api/social/birthday/transform — Call Gemini API to polish admin notes
 export async function POST(req: NextRequest) {
@@ -17,6 +24,7 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const { user_id, ign, current_text } = body;
+    const guildId = getGuildId(req, body);
 
     if (!user_id || !ign) {
       return NextResponse.json({ error: 'Missing user_id or ign context' }, { status: 400 });
@@ -26,7 +34,7 @@ export async function POST(req: NextRequest) {
     const { data: settings } = await supabaseAdmin
       .from('guild_settings')
       .select('ai_prompt_formula')
-      .eq('guild_id', GUILD_ID)
+      .eq('guild_id', guildId)
       .maybeSingle();
 
     const formula = settings?.ai_prompt_formula || 'You are an enthusiastic gaming community bot. Write a short, fun, 2-sentence birthday wish. Keep it gaming-themed.';

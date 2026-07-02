@@ -9,8 +9,7 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
  * Runs the daily digest: scrapes configured channels, passes to Gemini, posts summary.
  * @param {import('discord.js').Client} client
  */
-async function runDailyDigest(client) {
-  const guildId = process.env.DISCORD_GUILD_ID;
+async function runDailyDigest(client, guildId = process.env.DISCORD_GUILD_ID) {
   if (!guildId) return;
 
   const featureConfig = await getFeatureConfig(guildId, 'digest');

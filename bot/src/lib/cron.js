@@ -24,9 +24,26 @@ function initCrons(client) {
     async () => {
       logger.info('[CRON] Running Daily Digest...');
       try {
-        await runDailyDigest(client);
+        const { data: configs } = await supabase
+          .from('guild_config')
+          .select('guild_id')
+          .eq('feature_key', 'digest')
+          .eq('enabled', true);
+
+        const guildIds = (configs || []).map(c => c.guild_id);
+        if (guildIds.length === 0 && process.env.DISCORD_GUILD_ID) {
+          guildIds.push(process.env.DISCORD_GUILD_ID);
+        }
+
+        for (const gId of guildIds) {
+          try {
+            await runDailyDigest(client, gId);
+          } catch (err) {
+            logger.error(`[CRON] Daily Digest failed for guild ${gId}:`, err.message);
+          }
+        }
       } catch (err) {
-        logger.error('[CRON] Daily Digest failed:', err.message);
+        logger.error('[CRON] Daily Digest scheduling failed:', err.message);
       }
     },
     { timezone: tz }
@@ -80,12 +97,20 @@ function initCrons(client) {
 
   // ─── Bot Health Heartbeat: Every 5 minutes ────────────────────────────────────
   cron.schedule('*/5 * * * *', async () => {
-    const guildId = process.env.DISCORD_GUILD_ID;
-    if (!guildId) return;
-    await supabase.from('bot_health').upsert(
-      { guild_id: guildId, last_seen: new Date().toISOString() },
-      { onConflict: 'guild_id' }
-    );
+    try {
+      const guilds = client.guilds.cache.map(g => g.id);
+      if (guilds.length === 0 && process.env.DISCORD_GUILD_ID) {
+        guilds.push(process.env.DISCORD_GUILD_ID);
+      }
+      for (const guildId of guilds) {
+        await supabase.from('bot_health').upsert(
+          { guild_id: guildId, last_seen: new Date().toISOString() },
+          { onConflict: 'guild_id' }
+        );
+      }
+    } catch (err) {
+      logger.error('[CRON] Health heartbeat failed:', err.message);
+    }
   });
 
   // ─── Birthday Queue Loader: Every day at midnight ─────────────────────────

@@ -2,7 +2,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { supabaseAdmin } from '@/lib/supabase';
 
-const GUILD_ID = process.env.DISCORD_GUILD_ID!;
+function getGuildId(req: NextRequest, body?: any) {
+  return (
+    req.nextUrl.searchParams.get('guild_id') ||
+    body?.guild_id ||
+    process.env.DISCORD_GUILD_ID!
+  );
+}
 
 // GET /api/social/birthday/config — Fetch server-specific birthday configuration
 export async function GET(req: NextRequest) {
@@ -10,17 +16,18 @@ export async function GET(req: NextRequest) {
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   try {
+    const guildId = getGuildId(req);
     const { data, error } = await supabaseAdmin
       .from('guild_settings')
       .select('*')
-      .eq('guild_id', GUILD_ID)
+      .eq('guild_id', guildId)
       .maybeSingle();
 
     if (error) throw new Error(error.message);
 
     // If no row exists yet, return default settings
     const config = data || {
-      guild_id: GUILD_ID,
+      guild_id: guildId,
       birthday_enabled: false,
       birthday_channel_id: null,
       log_channel_id: null,
@@ -42,6 +49,7 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const { birthday_enabled, birthday_channel_id, log_channel_id, announcement_time, ai_prompt_formula } = body;
+    const guildId = getGuildId(req, body);
 
     if (typeof birthday_enabled !== 'boolean') {
       return NextResponse.json({ error: 'Invalid birthday_enabled state' }, { status: 400 });
@@ -50,7 +58,7 @@ export async function POST(req: NextRequest) {
     const { error } = await supabaseAdmin
       .from('guild_settings')
       .upsert({
-        guild_id: GUILD_ID,
+        guild_id: guildId,
         birthday_enabled,
         birthday_channel_id: birthday_channel_id || null,
         log_channel_id: log_channel_id || null,
