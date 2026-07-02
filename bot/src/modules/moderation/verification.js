@@ -52,7 +52,7 @@ function getMonthName(value) {
 }
 
 // Temporary in-memory store for partial verification data (pending dropdowns)
-// Key: userId, Value: { indianName, ign, birthday, birthMonth, birthDay, step }
+// Key: userId, Value: { indianName, ign, ignList, birthday, birthMonth, birthDayGroup, birthDay, step }
 const pendingVerifications = new Map();
 
 /**
@@ -86,16 +86,101 @@ async function handleVerifyButton(interaction) {
     .setRequired(true)
     .setMaxLength(32);
 
+  modal.addComponents(
+    new ActionRowBuilder().addComponents(indianNameInput)
+  );
+
+  await interaction.showModal(modal);
+}
+
+/**
+ * Step 2 — Stores partial data, sends ephemeral IGN selection message
+ * @param {import('discord.js').ModalSubmitInteraction} interaction
+ */
+async function handleVerifyModalSubmit(interaction) {
+  const indianName = interaction.fields.getTextInputValue('indian_name').trim();
+
+  // Store partial data, starting with IGN setup step
+  const pending = {
+    indianName,
+    ignList: [],
+    ign: null,
+    birthday: null,
+    birthMonth: null,
+    birthDayGroup: null,
+    birthDay: null,
+    step: 'ign',
+  };
+  pendingVerifications.set(interaction.user.id, pending);
+
+  await sendIGNStep(interaction, pending);
+}
+
+/**
+ * Renders the IGN list step (ephemeral message with buttons to add or proceed)
+ */
+async function sendIGNStep(interaction, pending) {
+  const listContent = pending.ignList.length > 0
+    ? pending.ignList.map(item => `• **${item.game}**: ${item.ign}`).join('\n')
+    : '• *None added yet*';
+
+  const addButton = new ButtonBuilder()
+    .setCustomId('verify_ign_add')
+    .setLabel('➕ Add Game IGN')
+    .setStyle(ButtonStyle.Primary);
+
+  const nextButton = new ButtonBuilder()
+    .setCustomId('verify_ign_next')
+    .setLabel('⏭️ Next / Done')
+    .setStyle(ButtonStyle.Success);
+
+  const row = new ActionRowBuilder().addComponents(addButton, nextButton);
+  const content = `🎮 **Step 2 of 5 — In-Game Names (IGNs)**
+*Add your in-game names for the games you play so they can be logged in our database.*
+
+**Current IGNs:**
+${listContent}`;
+
+  if (interaction.isModalSubmit() && interaction.customId === 'verify_modal') {
+    await interaction.reply({
+      content,
+      components: [row],
+      ephemeral: true,
+    });
+  } else {
+    await interaction.update({
+      content,
+      components: [row],
+    });
+  }
+}
+
+/**
+ * Responds to "Add Game IGN" button click by showing the IGN modal
+ */
+async function handleIGNAddClick(interaction) {
+  const modal = new ModalBuilder()
+    .setCustomId('verify_ign_modal')
+    .setTitle('Add In-Game Name (IGN)');
+
+  const gameInput = new TextInputBuilder()
+    .setCustomId('ign_game')
+    .setLabel('Game Name *')
+    .setStyle(TextInputStyle.Short)
+    .setPlaceholder('e.g. Valorant, Wuwa, Minecraft')
+    .setRequired(true)
+    .setMaxLength(32);
+
   const ignInput = new TextInputBuilder()
-    .setCustomId('ign')
-    .setLabel('In-Game Name(s) (IGN)')
-    .setStyle(TextInputStyle.Paragraph)
-    .setPlaceholder('Optional — one per line, e.g.:\nValorant: Nickname#1234\nWuwa: Rover#5678')
-    .setRequired(false)
-    .setMaxLength(500);
+    .setCustomId('ign_name')
+    .setLabel('In-Game Name (IGN) *')
+    .setStyle(TextInputStyle.Short)
+    .setPlaceholder('e.g. Player#1234, MyName')
+    .setRequired(true)
+    .setMaxLength(64);
 
   modal.addComponents(
-    new ActionRowBuilder().addComponents(indianNameInput),
+    new ActionRowBuilder().addComponents(gameInput),
     new ActionRowBuilder().addComponents(ignInput)
   );
 
@@ -103,22 +188,42 @@ async function handleVerifyButton(interaction) {
 }
 
 /**
- * Step 2 — Stores partial data, sends ephemeral Birthday selection dropdowns
- * @param {import('discord.js').ModalSubmitInteraction} interaction
+ * Handles adding the new IGN from the modal and refreshes the step message
  */
-async function handleVerifyModalSubmit(interaction) {
-  const indianName = interaction.fields.getTextInputValue('indian_name').trim();
-  const ign = interaction.fields.getTextInputValue('ign').trim() || null;
+async function handleIGNModalSubmit(interaction) {
+  const game = interaction.fields.getTextInputValue('ign_game').trim();
+  const ign = interaction.fields.getTextInputValue('ign_name').trim();
 
-  // Store partial data pending dropdown selections, start with birthday step
-  const pending = { indianName, ign, birthday: null, birthMonth: null, birthDay: null, step: 'birthday' };
+  const pending = pendingVerifications.get(interaction.user.id);
+  if (!pending) {
+    return interaction.reply({ content: '❌ Session expired. Please click Verify Here again.', ephemeral: true });
+  }
+
+  pending.ignList.push({ game, ign });
+  pendingVerifications.set(interaction.user.id, pending);
+
+  await sendIGNStep(interaction, pending);
+}
+
+/**
+ * Processes completed IGN list and moves to the birthday step
+ */
+async function handleIGNNext(interaction) {
+  const pending = pendingVerifications.get(interaction.user.id);
+  if (!pending) {
+    return interaction.reply({ content: '❌ Session expired. Please click Verify Here again.', ephemeral: true });
+  }
+
+  // Format IGN list into string for database storage
+  pending.ign = pending.ignList.map(item => `${item.game}: ${item.ign}`).join('\n') || null;
+  pending.step = 'birthday';
   pendingVerifications.set(interaction.user.id, pending);
 
   await sendBirthdayStep(interaction, pending);
 }
 
 /**
- * Renders the birthday selection step (ephemeral message with select menus)
+ * Renders the birthday selection step (ephemeral message with dynamic select menus)
  */
 async function sendBirthdayStep(interaction, pending) {
   const monthSelect = new StringSelectMenuBuilder()
@@ -128,19 +233,29 @@ async function sendBirthdayStep(interaction, pending) {
       MONTHS.map(m => new StringSelectMenuOptionBuilder().setLabel(m.name).setValue(m.value))
     );
 
-  const day1Select = new StringSelectMenuBuilder()
-    .setCustomId('verify_birth_day_1')
-    .setPlaceholder(pending.birthDay && parseInt(pending.birthDay) <= 15 ? `Day: ${pending.birthDay}` : '📅 Select Day (1-15)')
-    .addOptions(
-      DAYS_1_15.map(d => new StringSelectMenuOptionBuilder().setLabel(`Day ${d}`).setValue(d))
-    );
+  const dayGroupSelect = new StringSelectMenuBuilder()
+    .setCustomId('verify_birth_day_group')
+    .setPlaceholder(pending.birthDayGroup ? `Day Range: ${pending.birthDayGroup}` : '📅 Select Day Range')
+    .addOptions([
+      new StringSelectMenuOptionBuilder().setLabel('Days 1-15').setValue('1-15'),
+      new StringSelectMenuOptionBuilder().setLabel('Days 16-31').setValue('16-31'),
+    ]);
 
-  const day2Select = new StringSelectMenuBuilder()
-    .setCustomId('verify_birth_day_2')
-    .setPlaceholder(pending.birthDay && parseInt(pending.birthDay) > 15 ? `Day: ${pending.birthDay}` : '📅 Select Day (16-31)')
-    .addOptions(
-      DAYS_16_31.map(d => new StringSelectMenuOptionBuilder().setLabel(`Day ${d}`).setValue(d))
-    );
+  const rows = [];
+  rows.push(new ActionRowBuilder().addComponents(monthSelect));
+  rows.push(new ActionRowBuilder().addComponents(dayGroupSelect));
+
+  // Dynamically show the specific day selector only when a range group is selected
+  if (pending.birthDayGroup) {
+    const days = pending.birthDayGroup === '1-15' ? DAYS_1_15 : DAYS_16_31;
+    const daySelect = new StringSelectMenuBuilder()
+      .setCustomId('verify_birth_day')
+      .setPlaceholder(pending.birthDay ? `Day: ${pending.birthDay}` : `📅 Select Day (${pending.birthDayGroup})`)
+      .addOptions(
+        days.map(d => new StringSelectMenuOptionBuilder().setLabel(`Day ${d}`).setValue(d))
+      );
+    rows.push(new ActionRowBuilder().addComponents(daySelect));
+  }
 
   const confirmButton = new ButtonBuilder()
     .setCustomId('verify_birthday_confirm')
@@ -153,27 +268,17 @@ async function sendBirthdayStep(interaction, pending) {
     .setLabel('⏭️ Skip Birthday')
     .setStyle(ButtonStyle.Secondary);
 
-  const row1 = new ActionRowBuilder().addComponents(monthSelect);
-  const row2 = new ActionRowBuilder().addComponents(day1Select);
-  const row3 = new ActionRowBuilder().addComponents(day2Select);
-  const row4 = new ActionRowBuilder().addComponents(confirmButton, skipButton);
+  rows.push(new ActionRowBuilder().addComponents(confirmButton, skipButton));
 
-  const content = `📅 **Step 2 of 4** — Please select your Birthday (Month & Day):
+  const content = `📅 **Step 3 of 5** — Please select your Birthday (Month & Day):
 ${pending.birthMonth ? `• **Month**: ${getMonthName(pending.birthMonth)}` : '• *Month not selected*'}
+${pending.birthDayGroup ? `• **Day Range**: ${pending.birthDayGroup}` : '• *Day range not selected*'}
 ${pending.birthDay ? `• **Day**: ${pending.birthDay}` : '• *Day not selected*'}`;
 
-  if (interaction.isModalSubmit()) {
-    await interaction.reply({
-      content,
-      components: [row1, row2, row3, row4],
-      ephemeral: true,
-    });
-  } else {
-    await interaction.update({
-      content,
-      components: [row1, row2, row3, row4],
-    });
-  }
+  await interaction.update({
+    content,
+    components: rows,
+  });
 }
 
 async function handleBirthMonthSelect(interaction) {
@@ -183,6 +288,22 @@ async function handleBirthMonthSelect(interaction) {
   }
 
   pending.birthMonth = interaction.values[0];
+  pendingVerifications.set(interaction.user.id, pending);
+
+  await sendBirthdayStep(interaction, pending);
+}
+
+async function handleBirthDayGroupSelect(interaction) {
+  const pending = pendingVerifications.get(interaction.user.id);
+  if (!pending) {
+    return interaction.reply({ content: '❌ Session expired. Please click Verify Here again.', ephemeral: true });
+  }
+
+  const newGroup = interaction.values[0];
+  if (pending.birthDayGroup !== newGroup) {
+    pending.birthDayGroup = newGroup;
+    pending.birthDay = null; // Clear day if switching groups
+  }
   pendingVerifications.set(interaction.user.id, pending);
 
   await sendBirthdayStep(interaction, pending);
@@ -227,7 +348,7 @@ async function handleBirthdaySkip(interaction) {
 }
 
 /**
- * Step 3 — Sends discovery source dropdown
+ * Step 4 — Sends discovery source dropdown
  */
 async function sendDiscoveryStep(interaction) {
   const discoverySelect = new StringSelectMenuBuilder()
@@ -240,13 +361,13 @@ async function sendDiscoveryStep(interaction) {
     );
 
   await interaction.update({
-    content: '🔍 **Step 3 of 4** — Where did you find us?',
+    content: '🔍 **Step 4 of 5** — Where did you find us?',
     components: [new ActionRowBuilder().addComponents(discoverySelect)],
   });
 }
 
 /**
- * Step 3a — Stores discovery source, sends game branch dropdown
+ * Step 4a — Stores discovery source, sends game branch dropdown
  * @param {import('discord.js').StringSelectMenuInteraction} interaction
  */
 async function handleDiscoverySelect(interaction) {
@@ -269,13 +390,13 @@ async function handleDiscoverySelect(interaction) {
     );
 
   await interaction.update({
-    content: '🌿 **Step 4 of 4** — Select your Primary Game Branch:',
+    content: '🌿 **Step 5 of 5** — Select your Primary Game Branch:',
     components: [new ActionRowBuilder().addComponents(gameBranchSelect)],
   });
 }
 
 /**
- * Step 4 — Completes verification: writes DB, grants roles, syncs nickname
+ * Step 5 — Completes verification: writes DB, grants roles, syncs nickname
  * @param {import('discord.js').StringSelectMenuInteraction} interaction
  */
 async function handleGameBranchSelect(interaction) {
@@ -403,7 +524,11 @@ module.exports = {
   handleDiscoverySelect,
   handleGameBranchSelect,
   handleBirthMonthSelect,
+  handleBirthDayGroupSelect,
   handleBirthDaySelect,
   handleBirthdayConfirm,
   handleBirthdaySkip,
+  handleIGNAddClick,
+  handleIGNModalSubmit,
+  handleIGNNext,
 };

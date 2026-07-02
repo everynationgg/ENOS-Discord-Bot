@@ -5,9 +5,13 @@ const {
   handleDiscoverySelect,
   handleGameBranchSelect,
   handleBirthMonthSelect,
+  handleBirthDayGroupSelect,
   handleBirthDaySelect,
   handleBirthdayConfirm,
   handleBirthdaySkip,
+  handleIGNAddClick,
+  handleIGNModalSubmit,
+  handleIGNNext,
 } = require('../modules/moderation/verification');
 const { handleLFGJoin, handleLFGLeave } = require('../modules/gaming/lfg');
 
@@ -35,6 +39,12 @@ module.exports = {
         if (interaction.customId === 'verify_here') {
           return handleVerifyButton(interaction);
         }
+        if (interaction.customId === 'verify_ign_add') {
+          return handleIGNAddClick(interaction);
+        }
+        if (interaction.customId === 'verify_ign_next') {
+          return handleIGNNext(interaction);
+        }
         if (interaction.customId === 'verify_birthday_confirm') {
           return handleBirthdayConfirm(interaction);
         }
@@ -53,9 +63,11 @@ module.exports = {
       // ─── Modal Submissions ────────────────────────────────────────────────────
       if (interaction.isModalSubmit()) {
         if (interaction.customId === 'verify_modal') {
-          // Pass to verification module — returns ephemeral dropdown message
           const { handleVerifyModalSubmit } = require('../modules/moderation/verification');
           return handleVerifyModalSubmit(interaction);
+        }
+        if (interaction.customId === 'verify_ign_modal') {
+          return handleIGNModalSubmit(interaction);
         }
         if (interaction.customId.startsWith('lfg_modal:')) {
           const { handleLFGModalSubmit } = require('../modules/gaming/lfg');
@@ -69,7 +81,10 @@ module.exports = {
         if (interaction.customId === 'verify_birth_month') {
           return handleBirthMonthSelect(interaction);
         }
-        if (interaction.customId === 'verify_birth_day_1' || interaction.customId === 'verify_birth_day_2') {
+        if (interaction.customId === 'verify_birth_day_group') {
+          return handleBirthDayGroupSelect(interaction);
+        }
+        if (interaction.customId === 'verify_birth_day') {
           return handleBirthDaySelect(interaction);
         }
         if (interaction.customId === 'verify_discovery') {
