@@ -103,7 +103,7 @@ async function handleVerifyButton(interaction) {
 }
 
 /**
- * Step 2 — Stores partial data, sends ephemeral Birthday selection message
+ * Step 2 — Stores partial data, sends ephemeral Birthday selection dropdowns
  * @param {import('discord.js').ModalSubmitInteraction} interaction
  */
 async function handleVerifyModalSubmit(interaction) {
