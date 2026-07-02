@@ -430,6 +430,28 @@ async function handleGameBranchSelect(interaction) {
 
     if (dbError) throw new Error(dbError.message);
 
+    // 1.5. Write optional birthday to member_birthdays for the birthday reminder system
+    if (birthday) {
+      const birthDate = birthday.replace('/', '-'); // Convert MM/DD to MM-DD
+      
+      // Ensure guild_settings has a row for this guild to satisfy references (FK constraint)
+      await supabase.from('guild_settings').upsert({ guild_id: guildId }, { onConflict: 'guild_id' });
+
+      const { error: bdayError } = await supabase.from('member_birthdays').upsert(
+        {
+          guild_id: guildId,
+          user_id: userId,
+          ign: ign || null,
+          birth_date: birthDate,
+        },
+        { onConflict: 'guild_id,user_id' }
+      );
+
+      if (bdayError) {
+        logger.error(`[VERIFICATION] Failed to write member_birthdays: ${bdayError.message}`);
+      }
+    }
+
     // 2. Fetch feature config for role IDs
     const featureConfig = await getFeatureConfig(guildId, 'gatekeeper');
     const config = featureConfig?.config || {};

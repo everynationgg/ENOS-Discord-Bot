@@ -8,6 +8,7 @@ const { checkYouTubeLive } = require('../modules/social/youtube');
 const { pruneOldRecords } = require('../modules/system/pruner');
 const { resetDailyQuests } = require('../modules/gaming/vault');
 const { expireOldLFGSessions } = require('../modules/gaming/lfg');
+const { loadBirthdayQueue, dispatchBirthdays } = require('../modules/social/birthdays');
 
 /**
  * Initializes all scheduled cron jobs.
@@ -85,6 +86,28 @@ function initCrons(client) {
       { guild_id: guildId, last_seen: new Date().toISOString() },
       { onConflict: 'guild_id' }
     );
+  });
+
+  // ─── Birthday Queue Loader: Every day at midnight ─────────────────────────
+  cron.schedule(
+    '0 0 * * *',
+    async () => {
+      try {
+        await loadBirthdayQueue(client);
+      } catch (err) {
+        logger.error('[CRON] Birthday queue loading failed:', err.message);
+      }
+    },
+    { timezone: tz }
+  );
+
+  // ─── Birthday Announcement Dispatcher: Every 5 minutes ────────────────────
+  cron.schedule('*/5 * * * *', async () => {
+    try {
+      await dispatchBirthdays(client);
+    } catch (err) {
+      logger.error('[CRON] Birthday dispatcher failed:', err.message);
+    }
   });
 
   logger.info('[CRON] All scheduled jobs initialized.');
