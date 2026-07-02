@@ -57,9 +57,9 @@ async function handleVerifyButton(interaction) {
 
   const indianNameInput = new TextInputBuilder()
     .setCustomId('indian_name')
-    .setLabel('INDIAN NAME (Verifiable Handle) *')
+    .setLabel('Discord Nickname *')
     .setStyle(TextInputStyle.Short)
-    .setPlaceholder('Your preferred community handle')
+    .setPlaceholder('Enter your preferred server nickname')
     .setRequired(true)
     .setMaxLength(32);
 
@@ -96,6 +96,17 @@ async function handleVerifyModalSubmit(interaction) {
   const indianName = interaction.fields.getTextInputValue('indian_name').trim();
   const ign = interaction.fields.getTextInputValue('ign').trim() || null;
   const birthday = interaction.fields.getTextInputValue('birthday').trim() || null;
+
+  // Validate birthday format if provided (MM/DD/YYYY)
+  if (birthday) {
+    const dateRegex = /^(0[1-9]|1[0-2])\/(0[1-9]|[12]\d|3[01])\/(19|20)\d{2}$/;
+    if (!dateRegex.test(birthday)) {
+      return interaction.reply({
+        content: '❌ Invalid birthday format! Please use **MM/DD/YYYY** (e.g. 01/15/2000).',
+        ephemeral: true,
+      });
+    }
+  }
 
   // Store partial data pending dropdown selections
   pendingVerifications.set(interaction.user.id, { indianName, ign, birthday, step: 'discovery' });
@@ -211,6 +222,36 @@ async function handleGameBranchSelect(interaction) {
 
     // 7. Log event
     await logBotEvent(guildId, 'verification', userId, { indianName, gameBranch, discoverySource });
+
+    // 7.5. Send verification details to log channel
+    const logChannelId = config.log_channel_id;
+    if (logChannelId) {
+      try {
+        const logChannel = await interaction.guild.channels.fetch(logChannelId).catch(() => null);
+        if (logChannel && logChannel.isTextBased()) {
+          const logEmbed = new EmbedBuilder()
+            .setColor(0x8B5CF6)
+            .setTitle('📥 Member Verified')
+            .setDescription(`Member <@${userId}> has successfully verified!`)
+            .addFields(
+              { name: '👤 Discord Nickname', value: indianName, inline: true },
+              { name: '🎮 In-Game Name (IGN)', value: ign || 'Not provided', inline: true },
+              { name: '🎂 Birthday', value: birthday || 'Not provided', inline: true },
+              { name: '🌿 Primary Game Branch', value: gameBranch, inline: true },
+              { name: '🔍 Discovery Source', value: discoverySource, inline: true }
+            )
+            .setThumbnail(member.user.displayAvatarURL({ forceStatic: false }))
+            .setFooter({ text: `ID: ${userId}` })
+            .setTimestamp();
+
+          await logChannel.send({ embeds: [logEmbed] });
+        } else {
+          logger.warn(`[VERIFICATION] Log channel ${logChannelId} not found or is not text-based.`);
+        }
+      } catch (logErr) {
+        logger.error(`[VERIFICATION] Failed to send log to channel ${logChannelId}:`, logErr.message);
+      }
+    }
 
     // 8. Success response
     const successEmbed = new EmbedBuilder()

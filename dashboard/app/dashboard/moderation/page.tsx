@@ -68,6 +68,19 @@ export default function ModerationPage() {
               </div>
 
               <div className="form-group">
+                <label className="form-label">Verification Log Channel ID</label>
+                <input
+                  id="gatekeeper-log-channel"
+                  className="form-input"
+                  placeholder="e.g. 1234567890123456789"
+                  value={config.log_channel_id || ''}
+                  onChange={(e) => setConfig('log_channel_id', e.target.value)}
+                />
+                <span className="form-hint">Channel where the bot will post submitted user details</span>
+              </div>
+
+
+              <div className="form-group">
                 <label className="form-label">Entry (Restricted) Role ID</label>
                 <input
                   id="gatekeeper-entry-role"
