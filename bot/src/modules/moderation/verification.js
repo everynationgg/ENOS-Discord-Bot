@@ -88,11 +88,11 @@ async function handleVerifyButton(interaction) {
 
   const ignInput = new TextInputBuilder()
     .setCustomId('ign')
-    .setLabel('In-Game Name (IGN)')
-    .setStyle(TextInputStyle.Short)
-    .setPlaceholder('Optional — your primary in-game name')
+    .setLabel('In-Game Name(s) (IGN)')
+    .setStyle(TextInputStyle.Paragraph)
+    .setPlaceholder('Optional — one per line, e.g.:\nValorant: Nickname#1234\nWuwa: Rover#5678')
     .setRequired(false)
-    .setMaxLength(64);
+    .setMaxLength(500);
 
   modal.addComponents(
     new ActionRowBuilder().addComponents(indianNameInput),
@@ -353,10 +353,10 @@ async function handleGameBranchSelect(interaction) {
             .setDescription(`Member <@${userId}> has successfully verified!`)
             .addFields(
               { name: '👤 Discord Nickname', value: indianName, inline: true },
-              { name: '🎮 In-Game Name (IGN)', value: ign || 'Not provided', inline: true },
               { name: '🎂 Birthday', value: birthday || 'Not provided', inline: true },
               { name: '🌿 Primary Game Branch', value: gameBranch, inline: true },
-              { name: '🔍 Discovery Source', value: discoverySource, inline: true }
+              { name: '🔍 Discovery Source', value: discoverySource, inline: true },
+              { name: '🎮 In-Game Name(s) (IGN)', value: ign || 'Not provided', inline: false }
             )
             .setThumbnail(member.user.displayAvatarURL({ forceStatic: false }))
             .setFooter({ text: `ID: ${userId}` })
