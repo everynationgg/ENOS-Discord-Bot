@@ -36,15 +36,14 @@ const pendingVerifications = new Map();
  * @param {import('discord.js').ButtonInteraction} interaction
  */
 async function handleVerifyButton(interaction) {
-  // Check if already verified
-  const { data: existing } = await supabase
-    .from('verified_members')
-    .select('id')
-    .eq('discord_id', interaction.user.id)
-    .eq('guild_id', interaction.guild.id)
-    .maybeSingle();
+  // Check if already verified in Discord (checks if they have the verified role)
+  const featureConfig = await getFeatureConfig(interaction.guild.id, 'gatekeeper');
+  const config = featureConfig?.config || {};
+  const verifiedRoleId = config.verified_role_id;
 
-  if (existing) {
+  const hasVerifiedRole = verifiedRoleId && interaction.member.roles.cache.has(verifiedRoleId);
+
+  if (hasVerifiedRole) {
     return interaction.reply({
       content: '✅ You are already verified!',
       ephemeral: true,
