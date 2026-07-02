@@ -1,6 +1,14 @@
 const { Events } = require('discord.js');
 const logger = require('../lib/logger');
-const { handleVerifyButton, handleDiscoverySelect, handleGameBranchSelect } = require('../modules/moderation/verification');
+const {
+  handleVerifyButton,
+  handleDiscoverySelect,
+  handleGameBranchSelect,
+  handleBirthMonthSelect,
+  handleBirthDaySelect,
+  handleBirthdayConfirm,
+  handleBirthdaySkip,
+} = require('../modules/moderation/verification');
 const { handleLFGJoin, handleLFGLeave } = require('../modules/gaming/lfg');
 
 module.exports = {
@@ -27,6 +35,12 @@ module.exports = {
         if (interaction.customId === 'verify_here') {
           return handleVerifyButton(interaction);
         }
+        if (interaction.customId === 'verify_birthday_confirm') {
+          return handleBirthdayConfirm(interaction);
+        }
+        if (interaction.customId === 'verify_birthday_skip') {
+          return handleBirthdaySkip(interaction);
+        }
         if (interaction.customId.startsWith('lfg_join:')) {
           return handleLFGJoin(interaction);
         }
@@ -52,6 +66,12 @@ module.exports = {
 
       // ─── String Select Menus ──────────────────────────────────────────────────
       if (interaction.isStringSelectMenu()) {
+        if (interaction.customId === 'verify_birth_month') {
+          return handleBirthMonthSelect(interaction);
+        }
+        if (interaction.customId === 'verify_birth_day_1' || interaction.customId === 'verify_birth_day_2') {
+          return handleBirthDaySelect(interaction);
+        }
         if (interaction.customId === 'verify_discovery') {
           return handleDiscoverySelect(interaction);
         }
