@@ -68,10 +68,20 @@ async function handleVerifyButton(interaction) {
   const hasVerifiedRole = verifiedRoleId && interaction.member.roles.cache.has(verifiedRoleId);
 
   if (hasVerifiedRole) {
-    return interaction.reply({
-      content: '✅ You are already verified!',
-      ephemeral: true,
-    });
+    // Check if they are registered in the database
+    const { data: dbUser } = await supabase
+      .from('verified_members')
+      .select('discord_id')
+      .eq('discord_id', interaction.user.id)
+      .eq('guild_id', interaction.guild.id)
+      .maybeSingle();
+
+    if (dbUser) {
+      return interaction.reply({
+        content: '✅ You are already verified! If you need to change your registered IGNs or birthday, please contact an administrator.',
+        ephemeral: true,
+      });
+    }
   }
 
   const modal = new ModalBuilder()
