@@ -483,10 +483,8 @@ export default function SocialPage() {
           )}
         </FeatureCard>
 
-      </div>
-
-      {/* Dynamic Birthday Reminder card using Custom Elements */}
-      <div className={`feature-card ${birthdayEnabled ? 'is-active' : ''}`} id="feature-card-birthday">
+        {/* Dynamic Birthday Reminder card using Custom Elements */}
+        <div className={`feature-card ${birthdayEnabled ? 'is-active' : ''}`} id="feature-card-birthday">
           
           <div className="feature-card-header">
             <div className="feature-card-meta">
@@ -608,8 +606,10 @@ export default function SocialPage() {
           </div>
         </div>
 
-        {/* Birthday Approval Queue Workspace */}
-        {birthdayEnabled && (
+      </div>
+
+      {/* Birthday Approval Queue Workspace */}
+      {birthdayEnabled && (
           <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-lg)', padding: '1.5rem', boxShadow: 'var(--shadow-card)' }}>
             <div style={{ borderBottom: '1px solid var(--border-subtle)', paddingBottom: '0.75rem', marginBottom: '1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
@@ -628,7 +628,7 @@ export default function SocialPage() {
                 🎉 No birthdays coming up in the next 3 days!
               </div>
             ) : (
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '1.25rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(380px, 1fr))', gap: '1.25rem' }}>
                 {queue.map((item) => {
                   const id = item.id;
                   const isTransforming = transformingIds[id] || false;
