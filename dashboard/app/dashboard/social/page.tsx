@@ -734,15 +734,15 @@ export default function SocialPage() {
               </div>
 
               <div className="form-group">
-                <label className="form-label">Allowed Role ID (Optional)</label>
+                <label className="form-label">Allowed Role ID(s) (Optional)</label>
                 <input
                   id="translator-allowed-role"
                   className="form-input"
-                  placeholder="Leave blank for Everyone"
+                  placeholder="e.g. roleId1, roleId2 (Leave blank for Everyone)"
                   value={config.allowed_role_id || ''}
                   onChange={(e) => setConfig('allowed_role_id', e.target.value)}
                 />
-                <span className="form-hint">Restrict usage to a specific role. Leave blank to allow everyone on the server to use it.</span>
+                <span className="form-hint">Restrict usage to specific role IDs (comma-separated). Leave blank to allow everyone. Admins and Server Owners bypass this restriction automatically.</span>
               </div>
             </>
           )}

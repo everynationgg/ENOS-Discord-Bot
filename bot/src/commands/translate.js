@@ -3,6 +3,7 @@ const {
   ApplicationCommandType,
   ActionRowBuilder,
   StringSelectMenuBuilder,
+  PermissionFlagsBits,
 } = require('discord.js');
 const { getFeatureConfig } = require('../lib/supabase');
 const { cooldowns } = require('../modules/utility/translator');
@@ -44,13 +45,20 @@ module.exports = {
     const allowedRoleId = config.allowed_role_id;
 
     // 1.5. Validate allowed role restriction (if configured)
-    if (allowedRoleId && allowedRoleId.trim()) {
-      const hasRole = interaction.member.roles.cache.has(allowedRoleId);
-      if (!hasRole) {
-        return interaction.reply({
-          content: `❌ Only users with the <@&${allowedRoleId}> role are permitted to use the message translation feature.`,
-          ephemeral: true,
-        });
+    const isOwner = interaction.guild.ownerId === interaction.user.id;
+    const isAdmin = interaction.member.permissions.has(PermissionFlagsBits.Administrator);
+
+    if (!isOwner && !isAdmin && allowedRoleId && allowedRoleId.trim()) {
+      const allowedRoleIds = allowedRoleId.split(',').map(id => id.trim()).filter(Boolean);
+      if (allowedRoleIds.length > 0) {
+        const hasAllowedRole = interaction.member.roles.cache.some(role => allowedRoleIds.includes(role.id));
+        if (!hasAllowedRole) {
+          const roleMentions = allowedRoleIds.map(id => `<@&${id}>`).join(', ');
+          return interaction.reply({
+            content: `❌ Only users with one of the configured roles (${roleMentions}) are permitted to use the message translation feature.`,
+            ephemeral: true,
+          });
+        }
       }
     }
 
