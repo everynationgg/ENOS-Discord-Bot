@@ -98,6 +98,18 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: true, sent: true });
     }
 
+    if (action === 'delete') {
+      const { error: dbError } = await supabaseAdmin
+        .from('birthday_queue')
+        .delete()
+        .eq('id', id)
+        .eq('guild_id', guildId);
+
+      if (dbError) throw new Error(dbError.message);
+
+      return NextResponse.json({ success: true, deleted: true });
+    }
+
     const { error } = await supabaseAdmin
       .from('birthday_queue')
       .update({

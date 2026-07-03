@@ -217,6 +217,35 @@ export default function SocialPage() {
     }
   };
 
+  // Handle Delete / Dismiss
+  const handleDelete = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this birthday queue item?')) return;
+    setCardStatus(prev => ({ ...prev, [id]: 'saving' }));
+    try {
+      const res = await fetch('/api/social/birthday/queue', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id,
+          action: 'delete',
+        }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Delete failed');
+      }
+
+      setCardStatus(prev => ({ ...prev, [id]: 'saved' }));
+      // Reload queue to remove this item since it is now deleted
+      loadQueue();
+      setTimeout(() => setCardStatus(prev => ({ ...prev, [id]: 'idle' })), 2500);
+    } catch (err: any) {
+      alert(`Delete failed: ${err.message}`);
+      setCardStatus(prev => ({ ...prev, [id]: 'error' }));
+    }
+  };
+
   if (loading) {
     return (
       <div className="page-wrapper">
@@ -620,6 +649,16 @@ export default function SocialPage() {
                             }
                           </span>
                           
+                          <button
+                            id={`delete-btn-${id}`}
+                            className="btn btn-danger btn-sm"
+                            onClick={() => handleDelete(id)}
+                            disabled={isTransforming || status === 'saving'}
+                            style={{ padding: '0.25rem 0.5rem' }}
+                          >
+                            🗑️ Delete
+                          </button>
+
                           <button
                             id={`send-now-btn-${id}`}
                             className="btn btn-secondary btn-sm"
