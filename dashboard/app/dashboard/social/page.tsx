@@ -263,7 +263,7 @@ export default function SocialPage() {
         <p>Configure live stream alerts and manage community member birthday announcements.</p>
       </div>
 
-      <div className="feature-grid" style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+      <div className="feature-grid-settings" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(450px, 1fr))', gap: '2rem', alignItems: 'start', marginBottom: '2rem' }}>
         
         {/* Twitch & YouTube live alerts feature card */}
         <FeatureCard
@@ -424,8 +424,69 @@ export default function SocialPage() {
           }}
         </FeatureCard>
 
-        {/* Dynamic Birthday Reminder card using Custom Elements */}
-        <div className={`feature-card ${birthdayEnabled ? 'is-active' : ''}`} id="feature-card-birthday">
+        {/* Translation Assistant feature card */}
+        <FeatureCard
+          id="translator"
+          icon="🌍"
+          title="Social Sync — Translation Assistant"
+          description="Enables a context menu in Discord to translate message text into 10 target languages using Google Gemini AI."
+          featureKey="translator"
+          initialEnabled={configs['translator']?.enabled ?? false}
+          initialConfig={configs['translator']?.config ?? { character_limit: 1000, cooldown_seconds: 10 }}
+        >
+          {(config, setConfig) => (
+            <>
+              <div className="section-divider">
+                <div className="section-divider-line" />
+                <span className="section-divider-text">Usage Constraints</span>
+                <div className="section-divider-line" />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Max Character Limit</label>
+                <input
+                  id="translator-char-limit"
+                  type="number"
+                  className="form-input"
+                  placeholder="e.g. 1000"
+                  value={config.character_limit ?? 1000}
+                  onChange={(e) => setConfig('character_limit', parseInt(e.target.value) || 0)}
+                />
+                <span className="form-hint">Restricts the maximum characters allowed per translation request (helps control Gemini API usage).</span>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">User Cooldown (Seconds)</label>
+                <input
+                  id="translator-cooldown"
+                  type="number"
+                  className="form-input"
+                  placeholder="e.g. 10"
+                  value={config.cooldown_seconds ?? 10}
+                  onChange={(e) => setConfig('cooldown_seconds', parseInt(e.target.value) || 0)}
+                />
+                <span className="form-hint">Spam protection: seconds a user must wait between translation requests.</span>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Allowed Role ID(s) (Optional)</label>
+                <input
+                  id="translator-allowed-role"
+                  className="form-input"
+                  placeholder="e.g. roleId1, roleId2 (Leave blank for Everyone)"
+                  value={config.allowed_role_id || ''}
+                  onChange={(e) => setConfig('allowed_role_id', e.target.value)}
+                />
+                <span className="form-hint">Restrict usage to specific role IDs (comma-separated). Leave blank to allow everyone. Admins and Server Owners bypass this restriction automatically.</span>
+              </div>
+            </>
+          )}
+        </FeatureCard>
+
+      </div>
+
+      {/* Dynamic Birthday Reminder card using Custom Elements */}
+      <div className={`feature-card ${birthdayEnabled ? 'is-active' : ''}`} id="feature-card-birthday">
           
           <div className="feature-card-header">
             <div className="feature-card-meta">
@@ -688,67 +749,6 @@ export default function SocialPage() {
             )}
           </div>
         )}
-
-        {/* Translation Assistant feature card */}
-        <FeatureCard
-          id="translator"
-          icon="🌍"
-          title="Social Sync — Translation Assistant"
-          description="Enables a context menu in Discord to translate message text into 10 target languages using Google Gemini AI."
-          featureKey="translator"
-          initialEnabled={configs['translator']?.enabled ?? false}
-          initialConfig={configs['translator']?.config ?? { character_limit: 1000, cooldown_seconds: 10 }}
-        >
-          {(config, setConfig) => (
-            <>
-              <div className="section-divider">
-                <div className="section-divider-line" />
-                <span className="section-divider-text">Usage Constraints</span>
-                <div className="section-divider-line" />
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">Max Character Limit</label>
-                <input
-                  id="translator-char-limit"
-                  type="number"
-                  className="form-input"
-                  placeholder="e.g. 1000"
-                  value={config.character_limit ?? 1000}
-                  onChange={(e) => setConfig('character_limit', parseInt(e.target.value) || 0)}
-                />
-                <span className="form-hint">Restricts the maximum characters allowed per translation request (helps control Gemini API usage).</span>
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">User Cooldown (Seconds)</label>
-                <input
-                  id="translator-cooldown"
-                  type="number"
-                  className="form-input"
-                  placeholder="e.g. 10"
-                  value={config.cooldown_seconds ?? 10}
-                  onChange={(e) => setConfig('cooldown_seconds', parseInt(e.target.value) || 0)}
-                />
-                <span className="form-hint">Spam protection: seconds a user must wait between translation requests.</span>
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">Allowed Role ID(s) (Optional)</label>
-                <input
-                  id="translator-allowed-role"
-                  className="form-input"
-                  placeholder="e.g. roleId1, roleId2 (Leave blank for Everyone)"
-                  value={config.allowed_role_id || ''}
-                  onChange={(e) => setConfig('allowed_role_id', e.target.value)}
-                />
-                <span className="form-hint">Restrict usage to specific role IDs (comma-separated). Leave blank to allow everyone. Admins and Server Owners bypass this restriction automatically.</span>
-              </div>
-            </>
-          )}
-        </FeatureCard>
-
-      </div>
     </div>
   );
 }
