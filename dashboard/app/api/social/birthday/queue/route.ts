@@ -38,6 +38,7 @@ export async function POST(req: NextRequest) {
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   try {
+    const body = await req.json();
     const { id, scratchpad_text, is_approved, action } = body;
     const guildId = getGuildId(req, body);
 
