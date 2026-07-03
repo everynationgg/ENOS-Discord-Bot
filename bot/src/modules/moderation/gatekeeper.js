@@ -36,18 +36,6 @@ async function postLandingMessage(client, guildId) {
     .setColor(0x8B5CF6)
     .setTitle('🏰 Welcome to Every Nation')
     .setDescription(welcomeText)
-    .addFields(
-      {
-        name: '📋 Before You Begin',
-        value:
-          'To gain full access to the server, please click the **Verify Here** button below and complete a short registration form.\n\nThis takes less than a minute!',
-      },
-      {
-        name: '🔒 What Happens After Verification?',
-        value:
-          '• Your restricted role is removed\n• You gain access to all server channels\n• Your nickname is synced to your handle\n• You join the Every Nation roster!',
-      }
-    )
     .setFooter({
       text: 'Every Nation — Powered by ENOS',
     })
@@ -76,11 +64,17 @@ async function postLandingMessage(client, guildId) {
 const DEFAULT_WELCOME_TEXT = `
 **Welcome to Every Nation!** 🎮
 
-We are a passionate community of gamers united across multiple game branches, from casual explorers to competitive veterans.
+We are a passionate community of gamers united across multiple game branches.
 
-Please take a moment to verify your membership below. Your information helps us personalize your experience and keep our community organized.
+To gain full access to the server, please click the **Verify Here** button below and complete the verification form.
 
-*By verifying, you acknowledge that AI-powered features (such as our daily digest) may process non-identifiable aggregated chat content.*
+🔒 **WHAT HAPPENS AFTER VERIFICATION:**
+• Your restricted role is removed.
+• You gain access to all server channels and game branches.
+• Your nickname will be updated to your Discord handle.
+• You join the Every Nation member roster.
+
+*Takes less than a minute! See you on the other side!* 🚀
 `.trim();
 
 module.exports = { postLandingMessage, DEFAULT_WELCOME_TEXT };
