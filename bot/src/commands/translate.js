@@ -41,6 +41,18 @@ module.exports = {
     const config = featureConfig.config || {};
     const charLimit = parseInt(config.character_limit || '1000', 10);
     const cooldownSeconds = parseInt(config.cooldown_seconds || '10', 10);
+    const allowedRoleId = config.allowed_role_id;
+
+    // 1.5. Validate allowed role restriction (if configured)
+    if (allowedRoleId && allowedRoleId.trim()) {
+      const hasRole = interaction.member.roles.cache.has(allowedRoleId);
+      if (!hasRole) {
+        return interaction.reply({
+          content: `❌ Only users with the <@&${allowedRoleId}> role are permitted to use the message translation feature.`,
+          ephemeral: true,
+        });
+      }
+    }
 
     // 2. Validate content length
     const sourceText = targetMessage.content;

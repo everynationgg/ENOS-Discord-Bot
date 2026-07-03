@@ -732,6 +732,18 @@ export default function SocialPage() {
                 />
                 <span className="form-hint">Spam protection: seconds a user must wait between translation requests.</span>
               </div>
+
+              <div className="form-group">
+                <label className="form-label">Allowed Role ID (Optional)</label>
+                <input
+                  id="translator-allowed-role"
+                  className="form-input"
+                  placeholder="Leave blank for Everyone"
+                  value={config.allowed_role_id || ''}
+                  onChange={(e) => setConfig('allowed_role_id', e.target.value)}
+                />
+                <span className="form-hint">Restrict usage to a specific role. Leave blank to allow everyone on the server to use it.</span>
+              </div>
             </>
           )}
         </FeatureCard>
