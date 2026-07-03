@@ -689,6 +689,53 @@ export default function SocialPage() {
           </div>
         )}
 
+        {/* Translation Assistant feature card */}
+        <FeatureCard
+          id="translator"
+          icon="🌍"
+          title="Social Sync — Translation Assistant"
+          description="Enables a context menu in Discord to translate message text into 10 target languages using Google Gemini AI."
+          featureKey="translator"
+          initialEnabled={configs['translator']?.enabled ?? false}
+          initialConfig={configs['translator']?.config ?? { character_limit: 1000, cooldown_seconds: 10 }}
+        >
+          {(config, setConfig) => (
+            <>
+              <div className="section-divider">
+                <div className="section-divider-line" />
+                <span className="section-divider-text">Usage Constraints</span>
+                <div className="section-divider-line" />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Max Character Limit</label>
+                <input
+                  id="translator-char-limit"
+                  type="number"
+                  className="form-input"
+                  placeholder="e.g. 1000"
+                  value={config.character_limit ?? 1000}
+                  onChange={(e) => setConfig('character_limit', parseInt(e.target.value) || 0)}
+                />
+                <span className="form-hint">Restricts the maximum characters allowed per translation request (helps control Gemini API usage).</span>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">User Cooldown (Seconds)</label>
+                <input
+                  id="translator-cooldown"
+                  type="number"
+                  className="form-input"
+                  placeholder="e.g. 10"
+                  value={config.cooldown_seconds ?? 10}
+                  onChange={(e) => setConfig('cooldown_seconds', parseInt(e.target.value) || 0)}
+                />
+                <span className="form-hint">Spam protection: seconds a user must wait between translation requests.</span>
+              </div>
+            </>
+          )}
+        </FeatureCard>
+
       </div>
     </div>
   );

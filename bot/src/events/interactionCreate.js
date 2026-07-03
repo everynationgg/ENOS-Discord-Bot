@@ -24,7 +24,7 @@ module.exports = {
   async execute(interaction, client) {
     try {
       // ─── Slash Commands ──────────────────────────────────────────────────────
-      if (interaction.isChatInputCommand()) {
+      if (interaction.isCommand()) {
         const command = client.commands.get(interaction.commandName);
         if (!command) {
           logger.warn(`[INTERACTION] Unknown command: ${interaction.commandName}`);
@@ -78,6 +78,10 @@ module.exports = {
 
       // ─── String Select Menus ──────────────────────────────────────────────────
       if (interaction.isStringSelectMenu()) {
+        if (interaction.customId.startsWith('translate_select_')) {
+          const { handleTranslationSelection } = require('../modules/utility/translator');
+          return handleTranslationSelection(interaction);
+        }
         if (interaction.customId === 'verify_birth_month') {
           return handleBirthMonthSelect(interaction);
         }
