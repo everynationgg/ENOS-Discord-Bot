@@ -188,6 +188,35 @@ export default function SocialPage() {
     }
   };
 
+  // Handle Send Now
+  const handleSendNow = async (id: string) => {
+    setCardStatus(prev => ({ ...prev, [id]: 'saving' }));
+    try {
+      const res = await fetch('/api/social/birthday/queue', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id,
+          scratchpad_text: drafts[id] || '',
+          action: 'send_now',
+        }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Send failed');
+      }
+
+      setCardStatus(prev => ({ ...prev, [id]: 'saved' }));
+      // Reload queue to remove this item since it is now sent
+      loadQueue();
+      setTimeout(() => setCardStatus(prev => ({ ...prev, [id]: 'idle' })), 2500);
+    } catch (err: any) {
+      alert(`Send failed: ${err.message}`);
+      setCardStatus(prev => ({ ...prev, [id]: 'error' }));
+    }
+  };
+
   if (loading) {
     return (
       <div className="page-wrapper">
@@ -584,12 +613,23 @@ export default function SocialPage() {
                             {
                               {
                                 idle: '',
-                                saving: '⏳ Saving approval...',
-                                saved: '✅ Approved successfully!',
-                                error: '❌ Failed to approve',
+                                saving: '⏳ Processing...',
+                                saved: '✅ Success!',
+                                error: '❌ Error occurred',
                               }[status]
                             }
                           </span>
+                          
+                          <button
+                            id={`send-now-btn-${id}`}
+                            className="btn btn-secondary btn-sm"
+                            onClick={() => handleSendNow(id)}
+                            disabled={isTransforming || status === 'saving'}
+                            style={{ border: '1px solid var(--border-subtle)' }}
+                          >
+                            📣 Send Now
+                          </button>
+
                           <button
                             id={`approve-btn-${id}`}
                             className="btn btn-primary btn-sm"
