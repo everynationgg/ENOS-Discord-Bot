@@ -69,11 +69,19 @@ module.exports = {
         if (interaction.customId === 'verify_ign_modal') {
           return handleIGNModalSubmit(interaction);
         }
+        if (interaction.customId.startsWith('lfg_modal:')) {
+          const { handleLFGModalSubmit } = require('../modules/gaming/lfg');
+          return handleLFGModalSubmit(interaction);
+        }
         return;
       }
 
       // ─── String Select Menus ──────────────────────────────────────────────────
       if (interaction.isStringSelectMenu()) {
+        if (interaction.customId.startsWith('lfg_game_select:')) {
+          const { handleLFGGameSelect } = require('../modules/gaming/lfg');
+          return handleLFGGameSelect(interaction);
+        }
         if (interaction.customId.startsWith('translate_select_')) {
           const { handleTranslationSelection } = require('../modules/utility/translator');
           return handleTranslationSelection(interaction);

@@ -34,28 +34,6 @@ module.exports = {
       sub
         .setName('create')
         .setDescription('Create a new LFG party session')
-        .addStringOption(opt =>
-          opt
-            .setName('game')
-            .setDescription('Select the game for this session')
-            .setRequired(true)
-            .addChoices(...GAME_CHOICES)
-        )
-        .addStringOption(opt =>
-          opt
-            .setName('description')
-            .setDescription('Short description / requirements for this session')
-            .setRequired(false)
-            .setMaxLength(200)
-        )
-        .addIntegerOption(opt =>
-          opt
-            .setName('max_size')
-            .setDescription('Max party size (2-10, default 4)')
-            .setRequired(false)
-            .setMinValue(2)
-            .setMaxValue(10)
-        )
         .addRoleOption(opt =>
           opt
             .setName('role')
