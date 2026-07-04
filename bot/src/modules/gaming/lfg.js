@@ -71,7 +71,7 @@ function buildLFGButtons(sessionId, isClosed = false) {
 }
 
 /**
- * /lfg create — shows modal for session creation
+ * /lfg create — creates a new LFG party session directly from slash command options
  * @param {import('discord.js').ChatInputCommandInteraction} interaction
  */
 async function handleLFGCreate(interaction) {
@@ -80,55 +80,25 @@ async function handleLFGCreate(interaction) {
     return interaction.reply({ content: '❌ LFG system is not enabled on this server.', ephemeral: true });
   }
 
-  const modal = new ModalBuilder()
-    .setCustomId(`lfg_modal:create`)
-    .setTitle('Create LFG Session');
-
-  modal.addComponents(
-    new ActionRowBuilder().addComponents(
-      new TextInputBuilder()
-        .setCustomId('lfg_game')
-        .setLabel('Game')
-        .setStyle(TextInputStyle.Short)
-        .setPlaceholder('e.g. Minecraft, Valorant, Phasmo...')
-        .setRequired(true)
-        .setMaxLength(50)
-    ),
-    new ActionRowBuilder().addComponents(
-      new TextInputBuilder()
-        .setCustomId('lfg_description')
-        .setLabel('Description')
-        .setStyle(TextInputStyle.Paragraph)
-        .setPlaceholder('What are you doing? Casual? Ranked? Any requirements?')
-        .setRequired(false)
-        .setMaxLength(200)
-    ),
-    new ActionRowBuilder().addComponents(
-      new TextInputBuilder()
-        .setCustomId('lfg_max_size')
-        .setLabel('Max Party Size (2–10)')
-        .setStyle(TextInputStyle.Short)
-        .setPlaceholder('e.g. 4')
-        .setRequired(true)
-        .setMaxLength(2)
-    )
-  );
-
-  await interaction.showModal(modal);
-}
-
-/**
- * Modal submit handler for LFG session creation
- * @param {import('discord.js').ModalSubmitInteraction} interaction
- */
-async function handleLFGModalSubmit(interaction) {
-  await interaction.deferReply();
+  await interaction.deferReply({ ephemeral: true });
 
   const guildId = interaction.guild.id;
-  const game = interaction.fields.getTextInputValue('lfg_game').trim();
-  const description = interaction.fields.getTextInputValue('lfg_description').trim() || null;
-  const rawSize = parseInt(interaction.fields.getTextInputValue('lfg_max_size').trim(), 10);
-  const maxSize = Math.min(Math.max(rawSize || 4, 2), 10);
+  const game = interaction.options.getString('game', true);
+  const description = interaction.options.getString('description') || null;
+  const maxSize = interaction.options.getInteger('max_size') || 4;
+  const role = interaction.options.getRole('role');
+  const invite = interaction.options.getUser('invite');
+
+  // Validate matching role if provided
+  if (role) {
+    const isMatched = role.name.toLowerCase().includes(game.toLowerCase()) || 
+                      game.toLowerCase().includes(role.name.toLowerCase()) ||
+                      role.name.toLowerCase() === 'everyone' || 
+                      role.name.toLowerCase() === 'here';
+    if (!isMatched) {
+      return interaction.editReply(`❌ You can only select a role that matches the game **${game}** (the role name must contain **${game}**).`);
+    }
+  }
 
   // Fetch config for voice channel mapping and LFG channel
   const featureConfig = await getFeatureConfig(guildId, 'lfg');
@@ -174,7 +144,17 @@ async function handleLFGModalSubmit(interaction) {
     if (ch) targetChannel = ch;
   }
 
-  const sentMessage = await targetChannel.send({ embeds: [embed], components: [buttons] });
+  // Build mentions
+  const contentParts = [];
+  if (role) contentParts.push(`<@&${role.id}>`);
+  if (invite) contentParts.push(`<@${invite.id}>, you've been invited by <@${interaction.user.id}> to join this party!`);
+  const mentionContent = contentParts.length > 0 ? contentParts.join(' ') : undefined;
+
+  const sentMessage = await targetChannel.send({
+    content: mentionContent,
+    embeds: [embed],
+    components: [buttons]
+  });
 
   // Store message reference
   await supabase
@@ -184,6 +164,7 @@ async function handleLFGModalSubmit(interaction) {
 
   await logBotEvent(guildId, 'lfg_create', interaction.user.id, { game, sessionId: session.id });
 
+  // Try to automatically move host to voice channel
   const voiceMoved = await tryMoveToVoiceChannel(interaction.member, voiceChannelId);
 
   let replyText = `✅ LFG session posted in <#${targetChannel.id}>!`;
@@ -398,7 +379,6 @@ async function tryMoveToVoiceChannel(member, voiceChannelId) {
 
 module.exports = {
   handleLFGCreate,
-  handleLFGModalSubmit,
   handleLFGJoin,
   handleLFGLeave,
   expireOldLFGSessions,

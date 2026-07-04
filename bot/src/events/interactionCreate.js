@@ -69,10 +69,6 @@ module.exports = {
         if (interaction.customId === 'verify_ign_modal') {
           return handleIGNModalSubmit(interaction);
         }
-        if (interaction.customId.startsWith('lfg_modal:')) {
-          const { handleLFGModalSubmit } = require('../modules/gaming/lfg');
-          return handleLFGModalSubmit(interaction);
-        }
         return;
       }
 
