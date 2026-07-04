@@ -20,7 +20,7 @@ export async function GET(req: NextRequest) {
     const configs = await getGuildConfigs(guildId);
     // Convert to a keyed map for easy frontend access
     const configMap = configs.reduce((acc: Record<string, any>, row: any) => {
-      acc[row.feature_key] = { enabled: row.enabled, config: row.config };
+      acc[row.feature_key] = { enabled: row.enabled, config: row.config, updated_at: row.updated_at };
       return acc;
     }, {});
     return NextResponse.json(configMap);

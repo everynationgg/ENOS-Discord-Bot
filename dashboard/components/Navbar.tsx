@@ -23,7 +23,7 @@ export default function Navbar() {
       <Link href="/dashboard" className="navbar-logo">
         <div className="navbar-logo-icon">🏰</div>
         <span className="navbar-logo-text">
-          Every<span>Nation</span>
+          <span style={{ color: 'var(--accent-primary)' }}>Every</span><span style={{ color: 'var(--accent-secondary)' }}>Nation</span>
         </span>
       </Link>
 
