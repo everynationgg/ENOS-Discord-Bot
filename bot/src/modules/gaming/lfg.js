@@ -41,7 +41,7 @@ function buildLFGEmbed(session, voiceChannelMention) {
 }
 
 // ─── Build LFG Action Row ─────────────────────────────────────────────────────
-function buildLFGButtons(guildId, voiceChannelId, isClosed = false) {
+function buildLFGButtons(guildId, voiceChannelId, inviteUrl = null, isClosed = false) {
   if (isClosed || !voiceChannelId) {
     return new ActionRowBuilder().addComponents(
       new ButtonBuilder()
@@ -52,11 +52,12 @@ function buildLFGButtons(guildId, voiceChannelId, isClosed = false) {
     );
   }
 
+  const targetUrl = inviteUrl || `https://discord.com/channels/${guildId}/${voiceChannelId}`;
   return new ActionRowBuilder().addComponents(
     new ButtonBuilder()
       .setLabel('Join Voice Channel')
       .setStyle(ButtonStyle.Link)
-      .setURL(`https://discord.com/channels/${guildId}/${voiceChannelId}`)
+      .setURL(targetUrl)
       .setEmoji('🔊')
   );
 }
