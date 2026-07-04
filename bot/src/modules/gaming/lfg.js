@@ -80,6 +80,15 @@ async function handleLFGCreate(interaction) {
     return interaction.reply({ content: '❌ LFG system is not enabled on this server.', ephemeral: true });
   }
 
+  // Block command usage if not in any voice channel
+  const memberVoiceChannelId = interaction.member.voice?.channelId;
+  if (!memberVoiceChannelId) {
+    return interaction.reply({
+      content: '❌ You must join a voice channel first before you can create an LFG party session.',
+      ephemeral: true
+    });
+  }
+
   const modal = new ModalBuilder()
     .setCustomId(`lfg_modal:create`)
     .setTitle('Create LFG Session');
