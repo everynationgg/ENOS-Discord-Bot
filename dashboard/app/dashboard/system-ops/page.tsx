@@ -1,24 +1,21 @@
 'use client';
 
-import FeatureCard from '@/components/FeatureCard';
 import { useEffect, useState } from 'react';
 
 export default function SystemOpsPage() {
-  const [configs, setConfigs] = useState<Record<string, any>>({});
   const [health, setHealth] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [pruneStatus, setPruneStatus] = useState<'idle' | 'running' | 'done' | 'error'>('idle');
   const [activeTab, setActiveTab] = useState('overview');
 
   useEffect(() => {
-    Promise.all([
-      fetch('/api/config').then((r) => r.json()),
-      fetch('/api/system/health').then((r) => r.json()).catch(() => null),
-    ]).then(([cfg, h]) => {
-      setConfigs(cfg);
-      setHealth(h);
-      setLoading(false);
-    });
+    fetch('/api/system/health')
+      .then((r) => r.json())
+      .then((h) => {
+        setHealth(h);
+        setLoading(false);
+      })
+      .catch(() => setLoading(false));
   }, []);
 
   const triggerPrune = async () => {
@@ -28,7 +25,6 @@ export default function SystemOpsPage() {
     setTimeout(() => setPruneStatus('idle'), 4000);
   };
 
-  const digestConfig = configs['digest'] || {};
   const isOnline = health?.last_seen
     ? Date.now() - new Date(health.last_seen).getTime() < 10 * 60 * 1000
     : false;
@@ -53,7 +49,7 @@ export default function SystemOpsPage() {
     <div className="page-wrapper">
       <div className="page-header">
         <h1>⚙️ System Ops</h1>
-        <p>Monitor bot health, manage scheduled jobs, and configure the AI daily digest.</p>
+        <p>Monitor bot health, manage scheduled jobs, and configure the database cleanup pruner.</p>
       </div>
 
       <div className="dashboard-layout" style={{ padding: 0 }}>
@@ -73,13 +69,6 @@ export default function SystemOpsPage() {
             id="sidebar-sys-health"
           >
             ⚡ Bot Health & Heartbeat
-          </button>
-          <button
-            className={`sidebar-item ${activeTab === 'digest' ? 'active' : ''}`}
-            onClick={() => setActiveTab('digest')}
-            id="sidebar-sys-digest"
-          >
-            📋 Daily Digest Settings
           </button>
           <button
             className={`sidebar-item ${activeTab === 'pruner' ? 'active' : ''}`}
@@ -102,11 +91,6 @@ export default function SystemOpsPage() {
               <div className="overview-item">
                 <h3>⚡ Bot Health & Heartbeat</h3>
                 <p>Monitor status heartbeats, check client version metadata, and trace automated cron job flags.</p>
-              </div>
-
-              <div className="overview-item">
-                <h3>📋 Daily Digest Settings</h3>
-                <p>Configure channel scraper parameters, set daily release timing, and save Gemini API keys to generate summary digests.</p>
               </div>
 
               <div className="overview-item">
@@ -162,126 +146,13 @@ export default function SystemOpsPage() {
             </div>
           )}
 
-          {activeTab === 'digest' && (
-            <div className="split-layout-detail">
-              <div className="feature-instructions">
-                <h3>Daily Digest Guidelines</h3>
-                <p>The daily digest scans pre-selected channels every 24 hours, summarizes conversations using AI, and outputs a daily report.</p>
-                <ol>
-                  <li>Create an output channel (e.g. <code>#daily-digest</code>) and copy the ID into <strong>Digest Output Channel ID</strong>.</li>
-                  <li>Configure the daily posting time (in Manila/PST timezone) for the digest summary.</li>
-                  <li>Under <strong>Source Channel IDs</strong>, paste the IDs of channels you wish the bot to scrape, one ID per line.</li>
-                  <li>Provide a valid <strong>Gemini API Key</strong> to process summaries.</li>
-                </ol>
-                <div className="tip-box">
-                  <strong>💡 Active testing:</strong><br />
-                  After saving configurations, run <code>/admin run-digest</code> in Discord to trigger a test summary immediately.
-                </div>
-              </div>
-
-              <div className="feature-form-card">
-                <FeatureCard
-                  id="digest"
-                  icon="📋"
-                  title="Multilingual Daily Digest"
-                  description="Reads the past 24h of community chat and generates a Taglish-aware Gemini summary in your digest channel."
-                  featureKey="digest"
-                  initialEnabled={digestConfig.enabled ?? false}
-                  initialConfig={digestConfig.config ?? {}}
-                >
-                  {(config, setConfig) => (
-                    <>
-                      <div className="section-divider">
-                        <div className="section-divider-line" />
-                        <span className="section-divider-text">Digest Channel</span>
-                        <div className="section-divider-line" />
-                      </div>
-
-                      <div className="form-group">
-                        <label className="form-label">Digest Output Channel ID</label>
-                        <input
-                          id="digest-channel"
-                          className="form-input"
-                          placeholder="#daily-digest-hub channel ID"
-                          value={config.digest_channel_id || ''}
-                          onChange={(e) => setConfig('digest_channel_id', e.target.value)}
-                        />
-                      </div>
-
-                      <div className="form-group">
-                        <label className="form-label">Post Time (24h, PST/Manila)</label>
-                        <input
-                          id="digest-time"
-                          className="form-input"
-                          type="time"
-                          value={config.post_time || '08:00'}
-                          onChange={(e) => setConfig('post_time', e.target.value)}
-                        />
-                      </div>
-
-                      <div className="section-divider">
-                        <div className="section-divider-line" />
-                        <span className="section-divider-text">Source Channels</span>
-                        <div className="section-divider-line" />
-                      </div>
-
-                      <div className="form-group">
-                        <label className="form-label">Source Channel IDs (one per line)</label>
-                        <textarea
-                          id="digest-source-channels"
-                          className="form-textarea"
-                          rows={4}
-                          placeholder={'1234567890123456789\n9876543210987654321'}
-                          value={(config.source_channel_ids || []).join('\n')}
-                          onChange={(e) =>
-                            setConfig(
-                              'source_channel_ids',
-                              e.target.value.split('\n').map((s: string) => s.trim()).filter(Boolean)
-                            )
-                          }
-                        />
-                        <span className="form-hint">Channels to scrape for the daily summary</span>
-                      </div>
-
-                      <div className="form-group">
-                        <label className="form-label">Gemini API Key</label>
-                        <input
-                          id="gemini-api-key"
-                          className="form-input"
-                          type="password"
-                          placeholder="AIza••••••••••"
-                          value={config.gemini_api_key || ''}
-                          onChange={(e) => setConfig('gemini_api_key', e.target.value)}
-                        />
-                        <span className="form-hint">Uses Gemini 1.5 Flash — low cost at daily cadence</span>
-                      </div>
-
-                      <div
-                        style={{
-                          padding: '0.75rem 1rem',
-                          background: 'var(--accent-primary-dim)',
-                          border: '1px solid var(--border-subtle)',
-                          borderRadius: 'var(--radius-sm)',
-                          fontSize: '0.8125rem',
-                          color: 'var(--text-secondary)',
-                        }}
-                      >
-                        💡 Run <code style={{ color: 'var(--accent-primary)' }}>/admin run-digest</code> in Discord to trigger a test digest immediately.
-                      </div>
-                    </>
-                  )}
-                </FeatureCard>
-              </div>
-            </div>
-          )}
-
           {activeTab === 'pruner' && (
             <div className="split-layout-detail">
               <div className="feature-instructions">
                 <h3>Database Pruning Operations</h3>
                 <p>Optimize storage records and comply with data retention limits.</p>
                 <ul>
-                  <li><strong>Auto Pruning</strong>: Configured as a background task. Deletes expired chat traces older than 30 days automatically.</li>
+                  <li><strong>Auto Pruning</strong>: Deletes expired chat traces older than 30 days automatically.</li>
                   <li><strong>Manual Prune</strong>: Forcing a manual prune instantly scans database logs and clears expired items.</li>
                 </ul>
               </div>
