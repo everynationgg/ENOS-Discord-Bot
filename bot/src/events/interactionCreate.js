@@ -78,10 +78,6 @@ module.exports = {
 
       // ─── String Select Menus ──────────────────────────────────────────────────
       if (interaction.isStringSelectMenu()) {
-        if (interaction.customId.startsWith('lfg_game_select:')) {
-          const { handleLFGGameSelect } = require('../modules/gaming/lfg');
-          return handleLFGGameSelect(interaction);
-        }
         if (interaction.customId.startsWith('translate_select_')) {
           const { handleTranslationSelection } = require('../modules/utility/translator');
           return handleTranslationSelection(interaction);

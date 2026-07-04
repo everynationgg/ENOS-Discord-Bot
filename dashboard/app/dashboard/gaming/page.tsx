@@ -191,8 +191,9 @@ export default function GamingPage() {
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                         {GAME_BRANCHES.map((game) => {
                           const voiceMappings = config.voice_mappings || {};
+                          const roleMappings = config.role_mappings || {};
                           return (
-                            <div key={game} style={{ display: 'grid', gridTemplateColumns: '140px 1fr', gap: '0.5rem', alignItems: 'center' }}>
+                            <div key={game} style={{ display: 'grid', gridTemplateColumns: '130px 1fr 1fr', gap: '0.5rem', alignItems: 'center' }}>
                               <span style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', fontWeight: 500 }}>
                                 {game}
                               </span>
@@ -202,6 +203,14 @@ export default function GamingPage() {
                                 placeholder="Voice Channel ID"
                                 value={voiceMappings[game] || ''}
                                 onChange={(e) => setConfig('voice_mappings', { ...voiceMappings, [game]: e.target.value })}
+                                style={{ padding: '0.375rem 0.625rem', fontSize: '0.8125rem' }}
+                              />
+                              <input
+                                id={`lfg-role-${game.toLowerCase().replace(/\s+/g, '-')}`}
+                                className="form-input"
+                                placeholder="Allowed Role ID"
+                                value={roleMappings[game] || ''}
+                                onChange={(e) => setConfig('role_mappings', { ...roleMappings, [game]: e.target.value })}
                                 style={{ padding: '0.375rem 0.625rem', fontSize: '0.8125rem' }}
                               />
                             </div>

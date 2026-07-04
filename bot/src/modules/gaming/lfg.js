@@ -71,7 +71,7 @@ function buildLFGButtons(sessionId, isClosed = false) {
 }
 
 /**
- * /lfg create — sends a select menu of games to start the creation flow
+ * /lfg create — shows modal for session creation immediately
  * @param {import('discord.js').ChatInputCommandInteraction} interaction
  */
 async function handleLFGCreate(interaction) {
@@ -80,73 +80,26 @@ async function handleLFGCreate(interaction) {
     return interaction.reply({ content: '❌ LFG system is not enabled on this server.', ephemeral: true });
   }
 
-  const role = interaction.options.getRole('role');
-  const invite = interaction.options.getUser('invite');
-
-  const roleId = role ? role.id : 'none';
-  const inviteId = invite ? invite.id : 'none';
-
-  // Build the game selection dropdown menu options
-  const selectMenuOptions = GAME_BRANCHES.map(gameName => 
-    new StringSelectMenuOptionBuilder()
-      .setLabel(gameName)
-      .setValue(gameName)
-      .setDescription(`Host a party for ${gameName}`)
-  );
-
-  const selectMenu = new StringSelectMenuBuilder()
-    .setCustomId(`lfg_game_select:${roleId}:${inviteId}`)
-    .setPlaceholder('🎮 Choose a game from the dropdown...')
-    .addOptions(selectMenuOptions);
-
-  const row = new ActionRowBuilder().addComponents(selectMenu);
-
-  await interaction.reply({
-    content: '🎮 **Select the game you want to host:**',
-    components: [row],
-    ephemeral: true,
-  });
-}
-
-/**
- * Handles the game select menu interaction to open the creation modal.
- * @param {import('discord.js').StringSelectMenuInteraction} interaction
- */
-async function handleLFGGameSelect(interaction) {
-  const customIdParts = interaction.customId.split(':');
-  const roleId = customIdParts[1];
-  const inviteId = customIdParts[2];
-  const game = interaction.values[0];
-
-  // If a role was selected, check if it matches the selected game
-  if (roleId && roleId !== 'none') {
-    const role = interaction.guild.roles.cache.get(roleId);
-    if (role) {
-      const isMatched = role.name.toLowerCase().includes(game.toLowerCase()) || 
-                        game.toLowerCase().includes(role.name.toLowerCase()) ||
-                        role.name.toLowerCase() === 'everyone' || 
-                        role.name.toLowerCase() === 'here';
-      if (!isMatched) {
-        return interaction.reply({
-          content: `❌ You can only select a role that matches the game **${game}** (the role name must contain **${game}**). Please run \`/lfg create\` again and select a matching role.`,
-          ephemeral: true
-        });
-      }
-    }
-  }
-
-  // Open the modal for the remaining details
   const modal = new ModalBuilder()
-    .setCustomId(`lfg_modal:${game}:${roleId}:${inviteId}`)
-    .setTitle(`Create LFG — ${game}`);
+    .setCustomId(`lfg_modal:create`)
+    .setTitle('Create LFG Session');
 
   modal.addComponents(
     new ActionRowBuilder().addComponents(
       new TextInputBuilder()
+        .setCustomId('lfg_game')
+        .setLabel('Game')
+        .setStyle(TextInputStyle.Short)
+        .setPlaceholder('e.g. Valorant, POE, Minecraft...')
+        .setRequired(true)
+        .setMaxLength(50)
+    ),
+    new ActionRowBuilder().addComponents(
+      new TextInputBuilder()
         .setCustomId('lfg_description')
-        .setLabel('Description / Requirements')
+        .setLabel('Description')
         .setStyle(TextInputStyle.Paragraph)
-        .setPlaceholder('What are you doing? Casual? Ranked? Any requirements?')
+        .setPlaceholder('e.g. Ranked, competitive, farming...')
         .setRequired(false)
         .setMaxLength(200)
     ),
@@ -156,9 +109,27 @@ async function handleLFGGameSelect(interaction) {
         .setLabel('Max Party Size (2–10)')
         .setStyle(TextInputStyle.Short)
         .setPlaceholder('e.g. 4')
-        .setRequired(true)
         .setValue('4')
+        .setRequired(true)
         .setMaxLength(2)
+    ),
+    new ActionRowBuilder().addComponents(
+      new TextInputBuilder()
+        .setCustomId('lfg_role')
+        .setLabel('Allowed Ping Role (Name or ID)')
+        .setStyle(TextInputStyle.Short)
+        .setPlaceholder('Optional matching role name or ID to notify')
+        .setRequired(false)
+        .setMaxLength(100)
+    ),
+    new ActionRowBuilder().addComponents(
+      new TextInputBuilder()
+        .setCustomId('lfg_invite')
+        .setLabel('Invite Friends (Username or ID)')
+        .setStyle(TextInputStyle.Short)
+        .setPlaceholder('Optional friend to invite')
+        .setRequired(false)
+        .setMaxLength(100)
     )
   );
 
@@ -172,26 +143,88 @@ async function handleLFGGameSelect(interaction) {
 async function handleLFGModalSubmit(interaction) {
   await interaction.deferReply({ ephemeral: true });
 
-  const customIdParts = interaction.customId.split(':');
-  const game = customIdParts[1];
-  const roleId = customIdParts[2];
-  const inviteId = customIdParts[3];
-
+  const guildId = interaction.guild.id;
+  const gameInput = interaction.fields.getTextInputValue('lfg_game').trim();
   const description = interaction.fields.getTextInputValue('lfg_description').trim() || null;
   const rawSize = parseInt(interaction.fields.getTextInputValue('lfg_max_size').trim(), 10);
   const maxSize = Math.min(Math.max(rawSize || 4, 2), 10);
+  const roleInput = interaction.fields.getTextInputValue('lfg_role').trim();
+  const inviteInput = interaction.fields.getTextInputValue('lfg_invite').trim();
 
-  const guildId = interaction.guild.id;
+  // 1. Game Name Fuzzy Resolution
+  const normalizedInput = gameInput.toLowerCase();
+  let matchedGame = GAME_BRANCHES.find(branch => 
+    branch.toLowerCase() === normalizedInput ||
+    branch.toLowerCase().replace(/\s+/g, '').includes(normalizedInput.replace(/\s+/g, '')) ||
+    normalizedInput.replace(/\s+/g, '').includes(branch.toLowerCase().replace(/\s+/g, ''))
+  );
 
-  // Fetch config for voice channel mapping and LFG channel
+  if (!matchedGame) {
+    matchedGame = 'Others';
+  }
+
+  // Fetch config for voice channel mapping, LFG channel, and role mappings
   const featureConfig = await getFeatureConfig(guildId, 'lfg');
   const config = featureConfig?.config || {};
   const lfgChannelId = config.lfg_channel_id;
   const voiceMappings = config.voice_mappings || {};
+  const roleMappings = config.role_mappings || {};
   const sessionTTLMinutes = config.session_ttl_minutes || 120;
 
-  const voiceChannelId = voiceMappings[game] || voiceMappings['Others'] || null;
+  const voiceChannelId = voiceMappings[matchedGame] || voiceMappings['Others'] || null;
   const voiceChannelMention = voiceChannelId ? `<#${voiceChannelId}>` : 'Not configured';
+
+  // 2. Role Resolution & Validation
+  let resolvedRole = null;
+  if (roleInput) {
+    if (/^\d+$/.test(roleInput)) {
+      resolvedRole = interaction.guild.roles.cache.get(roleInput);
+    } else {
+      resolvedRole = interaction.guild.roles.cache.find(r => 
+        r.name.toLowerCase() === roleInput.toLowerCase() ||
+        r.name.toLowerCase().includes(roleInput.toLowerCase())
+      );
+    }
+
+    if (!resolvedRole) {
+      return interaction.editReply(`❌ Role **"${roleInput}"** not found on this server. Please enter a valid role name or role ID.`);
+    }
+
+    // Check configured role mapping for this matched game
+    const allowedRoleId = roleMappings[matchedGame];
+    if (allowedRoleId) {
+      if (resolvedRole.id !== allowedRoleId) {
+        return interaction.editReply(`❌ You are not allowed to tag **${resolvedRole.name}** for **${matchedGame}**. The allowed tag role configured on the website is <@&${allowedRoleId}>.`);
+      }
+    } else {
+      // If not configured, ensure the role contains the game name
+      const isMatched = resolvedRole.name.toLowerCase().includes(matchedGame.toLowerCase()) || 
+                        matchedGame.toLowerCase().includes(resolvedRole.name.toLowerCase()) ||
+                        resolvedRole.name.toLowerCase() === 'everyone' || 
+                        resolvedRole.name.toLowerCase() === 'here';
+      if (!isMatched) {
+        return interaction.editReply(`❌ You can only mention a role that matches the game **${matchedGame}** (the role name must contain **${matchedGame}**).`);
+      }
+    }
+  }
+
+  // 3. Friend Invitation Resolution
+  let resolvedInvitedUser = null;
+  if (inviteInput) {
+    if (/^\d+$/.test(inviteInput)) {
+      resolvedInvitedUser = await interaction.guild.members.fetch(inviteInput).catch(() => null);
+    } else {
+      // Search by username or display name
+      const searchRes = await interaction.guild.members.search({ query: inviteInput, limit: 1 }).catch(() => null);
+      if (searchRes && searchRes.size > 0) {
+        resolvedInvitedUser = searchRes.first();
+      }
+    }
+
+    if (!resolvedInvitedUser) {
+      return interaction.editReply(`❌ User **"${inviteInput}"** not found on this server. Please enter a valid username or user ID.`);
+    }
+  }
 
   const expiresAt = new Date(Date.now() + sessionTTLMinutes * 60 * 1000).toISOString();
 
@@ -201,7 +234,7 @@ async function handleLFGModalSubmit(interaction) {
     .insert({
       guild_id: guildId,
       host_id: interaction.user.id,
-      game,
+      game: matchedGame,
       description,
       voice_channel_id: voiceChannelId,
       max_size: maxSize,
@@ -229,8 +262,8 @@ async function handleLFGModalSubmit(interaction) {
 
   // Build mentions
   const contentParts = [];
-  if (roleId && roleId !== 'none') contentParts.push(`<@&${roleId}>`);
-  if (inviteId && inviteId !== 'none') contentParts.push(`<@${inviteId}>, you've been invited by <@${interaction.user.id}> to join this party!`);
+  if (resolvedRole) contentParts.push(`<@&${resolvedRole.id}>`);
+  if (resolvedInvitedUser) contentParts.push(`<@${resolvedInvitedUser.id}>, you've been invited by <@${interaction.user.id}> to join this party!`);
   const mentionContent = contentParts.length > 0 ? contentParts.join(' ') : undefined;
 
   const sentMessage = await targetChannel.send({
@@ -245,7 +278,7 @@ async function handleLFGModalSubmit(interaction) {
     .update({ message_id: sentMessage.id, channel_id: targetChannel.id })
     .eq('id', session.id);
 
-  await logBotEvent(guildId, 'lfg_create', interaction.user.id, { game, sessionId: session.id });
+  await logBotEvent(guildId, 'lfg_create', interaction.user.id, { game: matchedGame, sessionId: session.id });
 
   // Try to automatically move host to voice channel
   const voiceMoved = await tryMoveToVoiceChannel(interaction.member, voiceChannelId);
