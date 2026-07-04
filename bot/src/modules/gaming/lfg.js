@@ -323,12 +323,6 @@ async function handleLFGJoin(interaction) {
 
   await interaction.deferReply({ ephemeral: true });
 
-  // Block joining if not in any voice channel
-  const memberVoiceChannelId = interaction.member.voice?.channelId;
-  if (!memberVoiceChannelId) {
-    return interaction.editReply('❌ You must join a voice channel first before you can join an LFG party session.');
-  }
-
   // Fetch session
   const { data: session, error } = await supabase
     .from('lfg_sessions')
@@ -401,7 +395,7 @@ async function handleLFGJoin(interaction) {
     if (voiceMoved) {
       replyText += `\n🔊 Automatically transferred you to <#${session.voice_channel_id}>.`;
     } else {
-      replyText += `\n⚠️ Connect to a voice channel first to enable auto-transfer.`;
+      replyText += `\n⚠️ You're not in a voice channel. Click <#${session.voice_channel_id}> to join the game voice channel!`;
     }
   }
 
