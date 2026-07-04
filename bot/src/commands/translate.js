@@ -6,7 +6,7 @@ const {
   PermissionFlagsBits,
 } = require('discord.js');
 const { getFeatureConfig } = require('../lib/supabase');
-const { cooldowns } = require('../modules/utility/translator');
+const { cooldowns, translateText } = require('../modules/utility/translator');
 
 module.exports = {
   data: new ContextMenuCommandBuilder()
@@ -95,7 +95,48 @@ module.exports = {
     // Apply cooldown lock immediately
     cooldowns.set(cooldownKey, now);
 
-    // 4. Create language select dropdown
+    // 4. Check if user has a saved language preference in guild_config
+    const userLanguages = config.user_languages || {};
+    const savedLanguage = userLanguages[interaction.user.id];
+
+    if (savedLanguage) {
+      await interaction.deferReply({ ephemeral: true });
+
+      try {
+        const translation = await translateText(sourceText, savedLanguage);
+
+        const selectMenu = new StringSelectMenuBuilder()
+          .setCustomId(`translate_select_${targetMessage.id}`)
+          .setPlaceholder(`Change target language (current: ${savedLanguage})...`)
+          .addOptions([
+            { label: 'English 🇺🇸', value: 'English' },
+            { label: 'Chinese 🇨🇳', value: 'Chinese' },
+            { label: 'Indonesian 🇮🇩', value: 'Indonesian' },
+            { label: 'Filipino 🇵🇭', value: 'Filipino' },
+            { label: 'German 🇩🇪', value: 'German' },
+            { label: 'Polish 🇵🇱', value: 'Polish' },
+            { label: 'Thai 🇹🇭', value: 'Thai' },
+            { label: 'Japanese 🇯🇵', value: 'Japanese' },
+            { label: 'Malaysian 🇲🇾', value: 'Malaysian' },
+            { label: 'Turkish 🇹🇷', value: 'Turkish' },
+          ]);
+
+        const row = new ActionRowBuilder().addComponents(selectMenu);
+
+        await interaction.editReply({
+          content: `**Translation to ${savedLanguage}:**\n${translation}`,
+          components: [row],
+        });
+      } catch (err) {
+        logger.error(`[TRANSLATOR] Auto-translation failed:`, err.message);
+        await interaction.editReply({
+          content: `❌ Translation failed: ${err.message}`,
+        });
+      }
+      return;
+    }
+
+    // 5. Create language select dropdown (fallback if no saved language preference)
     const selectMenu = new StringSelectMenuBuilder()
       .setCustomId(`translate_select_${targetMessage.id}`)
       .setPlaceholder('Select target language...')
@@ -114,7 +155,6 @@ module.exports = {
 
     const row = new ActionRowBuilder().addComponents(selectMenu);
 
-    // 5. Reply to user ephemerally
     await interaction.reply({
       content: '🌍 Select a target language to translate this message:',
       components: [row],

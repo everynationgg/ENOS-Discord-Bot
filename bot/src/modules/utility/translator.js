@@ -43,6 +43,7 @@ async function handleTranslationSelection(interaction) {
   const parts = interaction.customId.split('_');
   const originalMessageId = parts[2];
   const targetLang = interaction.values[0];
+  const guildId = interaction.guildId;
 
   try {
     if (!originalMessageId) {
@@ -74,16 +75,55 @@ async function handleTranslationSelection(interaction) {
     // 3. Edit message to show translation in progress
     await interaction.editReply({
       content: `⚙️ Translating message to **${targetLang}**...`,
-      components: [], // Remove select menu dropdown
+      components: [], // Remove select menu dropdown temporarily
     });
 
     // 4. Run translation
     const translation = await translateText(sourceText, targetLang);
 
-    // 5. Update user with final translation text
+    // 5. Cache the user's language preference in database
+    const { getFeatureConfig } = require('../../lib/supabase');
+    const featureConfig = await getFeatureConfig(guildId, 'translator');
+    if (featureConfig) {
+      const config = featureConfig.config || {};
+      const userLanguages = config.user_languages || {};
+      if (userLanguages[interaction.user.id] !== targetLang) {
+        userLanguages[interaction.user.id] = targetLang;
+        config.user_languages = userLanguages;
+
+        const { supabase } = require('../../lib/supabase');
+        await supabase
+          .from('guild_config')
+          .update({ config })
+          .eq('guild_id', guildId)
+          .eq('feature_key', 'translator');
+      }
+    }
+
+    // 6. Build persistent select menu for changing language
+    const { ActionRowBuilder, StringSelectMenuBuilder } = require('discord.js');
+    const selectMenu = new StringSelectMenuBuilder()
+      .setCustomId(`translate_select_${originalMessageId}`)
+      .setPlaceholder(`Change target language (current: ${targetLang})...`)
+      .addOptions([
+        { label: 'English 🇺🇸', value: 'English' },
+        { label: 'Chinese 🇨🇳', value: 'Chinese' },
+        { label: 'Indonesian 🇮🇩', value: 'Indonesian' },
+        { label: 'Filipino 🇵🇭', value: 'Filipino' },
+        { label: 'German 🇩🇪', value: 'German' },
+        { label: 'Polish 🇵🇱', value: 'Polish' },
+        { label: 'Thai 🇹🇭', value: 'Thai' },
+        { label: 'Japanese 🇯🇵', value: 'Japanese' },
+        { label: 'Malaysian 🇲🇾', value: 'Malaysian' },
+        { label: 'Turkish 🇹🇷', value: 'Turkish' },
+      ]);
+
+    const row = new ActionRowBuilder().addComponents(selectMenu);
+
+    // 7. Update user with final translation text and persistence menu
     await interaction.editReply({
       content: `**Translation to ${targetLang}:**\n${translation}`,
-      components: [],
+      components: [row],
     });
   } catch (err) {
     logger.error(`[TRANSLATOR] Translation failed:`, err.message);
