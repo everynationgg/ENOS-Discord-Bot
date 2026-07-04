@@ -12,6 +12,23 @@ const {
 const { supabase, getFeatureConfig, isFeatureEnabled, logBotEvent } = require('../../lib/supabase');
 const logger = require('../../lib/logger');
 
+// Ephemeral auto-deletion helper functions (15 seconds timeout)
+async function replyEphemeralAndAutoDelete(interaction, options) {
+  const reply = await interaction.reply(options);
+  setTimeout(() => {
+    interaction.deleteReply().catch(() => {});
+  }, 15000);
+  return reply;
+}
+
+async function editEphemeralAndAutoDelete(interaction, contentOrOptions) {
+  const reply = await interaction.editReply(contentOrOptions);
+  setTimeout(() => {
+    interaction.deleteReply().catch(() => {});
+  }, 15000);
+  return reply;
+}
+
 const GAME_BRANCHES = [
   'Where Winds Meet', 'Palworld', 'Wuwa', 'Hoyoverse', 'Enfi',
   'POE', 'BG3', 'D4', 'Minecraft', 'Phasmo', 'REPO', 'PEAK',
@@ -69,13 +86,13 @@ function buildLFGButtons(guildId, voiceChannelId, inviteUrl = null, isClosed = f
 async function handleLFGCreate(interaction) {
   const enabled = await isFeatureEnabled(interaction.guild.id, 'lfg');
   if (!enabled) {
-    return interaction.reply({ content: '❌ LFG system is not enabled on this server.', ephemeral: true });
+    return replyEphemeralAndAutoDelete(interaction, { content: '❌ LFG system is not enabled on this server.', ephemeral: true });
   }
 
   // Block command usage if not in any voice channel
   const memberVoiceChannelId = interaction.member.voice?.channelId;
   if (!memberVoiceChannelId) {
-    return interaction.reply({
+    return replyEphemeralAndAutoDelete(interaction, {
       content: '❌ You must join a voice channel first before you can create an LFG party session.',
       ephemeral: true
     });
@@ -192,14 +209,14 @@ async function handleLFGModalSubmit(interaction) {
     }
 
     if (!resolvedRole) {
-      return interaction.editReply(`❌ Role **"${roleInput}"** not found on this server. Please enter a valid role name, role mention, or role ID.`);
+      return editEphemeralAndAutoDelete(interaction, `❌ Role **"${roleInput}"** not found on this server. Please enter a valid role name, role mention, or role ID.`);
     }
 
     // Check configured role mapping for this matched game
     const allowedRoleId = roleMappings[matchedGame];
     if (allowedRoleId) {
       if (resolvedRole.id !== allowedRoleId) {
-        return interaction.editReply(`❌ You are not allowed to tag **${resolvedRole.name}** for **${matchedGame}**. The allowed tag role configured on the website is <@&${allowedRoleId}>.`);
+        return editEphemeralAndAutoDelete(interaction, `❌ You are not allowed to tag **${resolvedRole.name}** for **${matchedGame}**. The allowed tag role configured on the website is <@&${allowedRoleId}>.`);
       }
     } else {
       // If not configured, ensure the role contains the game name
@@ -208,7 +225,7 @@ async function handleLFGModalSubmit(interaction) {
                         resolvedRole.name.toLowerCase() === 'everyone' || 
                         resolvedRole.name.toLowerCase() === 'here';
       if (!isMatched) {
-        return interaction.editReply(`❌ You can only mention a role that matches the game **${matchedGame}** (the role name must contain **${matchedGame}**).`);
+        return editEphemeralAndAutoDelete(interaction, `❌ You can only mention a role that matches the game **${matchedGame}** (the role name must contain **${matchedGame}**).`);
       }
     }
   }
@@ -231,7 +248,7 @@ async function handleLFGModalSubmit(interaction) {
     }
 
     if (!resolvedInvitedUser) {
-      return interaction.editReply(`❌ User **"${inviteInput}"** not found on this server. Please enter a valid username, user mention, or user ID.`);
+      return editEphemeralAndAutoDelete(interaction, `❌ User **"${inviteInput}"** not found on this server. Please enter a valid username, user mention, or user ID.`);
     }
   }
 
@@ -256,7 +273,7 @@ async function handleLFGModalSubmit(interaction) {
 
   if (error) {
     logger.error('[LFG] Failed to create session:', error.message);
-    return interaction.editReply('❌ Failed to create LFG session. Please try again.');
+    return editEphemeralAndAutoDelete(interaction, '❌ Failed to create LFG session. Please try again.');
   }
 
   // Create auto-joining voice channel invite link
@@ -316,7 +333,7 @@ async function handleLFGModalSubmit(interaction) {
     }
   }
 
-  await interaction.editReply(replyText);
+  await editEphemeralAndAutoDelete(interaction, replyText);
 }
 
 /**
