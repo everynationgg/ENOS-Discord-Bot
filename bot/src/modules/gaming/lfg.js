@@ -323,6 +323,12 @@ async function handleLFGJoin(interaction) {
 
   await interaction.deferReply({ ephemeral: true });
 
+  // Block joining if not in any voice channel
+  const memberVoiceChannelId = interaction.member.voice?.channelId;
+  if (!memberVoiceChannelId) {
+    return interaction.editReply('❌ You must join a voice channel first before you can join an LFG party session.');
+  }
+
   // Fetch session
   const { data: session, error } = await supabase
     .from('lfg_sessions')
