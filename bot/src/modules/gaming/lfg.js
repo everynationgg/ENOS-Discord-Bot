@@ -21,13 +21,8 @@ const GAME_BRANCHES = [
 
 // ─── Build LFG Embed ──────────────────────────────────────────────────────────
 function buildLFGEmbed(session, voiceChannelMention) {
-  const memberCount = session.current_members?.length || 0;
-  const maxSize = session.max_size;
-  const filledBars = Math.round((memberCount / maxSize) * 10);
-  const progressBar = '█'.repeat(filledBars) + '░'.repeat(10 - filledBars);
-
-  const statusColor = session.status === 'open' ? 0x8B5CF6 : session.status === 'full' ? 0xFACC15 : 0x6B7280;
-  const statusText = session.status === 'open' ? '🟢 Open' : session.status === 'full' ? '🟡 Full' : '🔴 Closed';
+  const statusColor = session.status === 'open' ? 0x8B5CF6 : 0x6B7280;
+  const statusText = session.status === 'open' ? '🟢 Active' : '🔴 Closed';
 
   const embed = new EmbedBuilder()
     .setColor(statusColor)
@@ -37,14 +32,7 @@ function buildLFGEmbed(session, voiceChannelMention) {
       { name: '👑 Host', value: `<@${session.host_id}>`, inline: true },
       { name: '📊 Status', value: statusText, inline: true },
       { name: '🔊 Voice Channel', value: voiceChannelMention || 'Not set', inline: true },
-      {
-        name: `👥 Party [${memberCount}/${maxSize}]`,
-        value: `\`${progressBar}\`\n${
-          session.current_members?.length
-            ? session.current_members.map(id => `<@${id}>`).join(' ')
-            : '*Empty*'
-        }`,
-      }
+      { name: '👥 Target Party Size', value: `${session.max_size} Players`, inline: true }
     )
     .setFooter({ text: `Session ID: ${session.id.substring(0, 8)} • Every Nation LFG` })
     .setTimestamp(new Date(session.created_at));
@@ -53,20 +41,23 @@ function buildLFGEmbed(session, voiceChannelMention) {
 }
 
 // ─── Build LFG Action Row ─────────────────────────────────────────────────────
-function buildLFGButtons(sessionId, isClosed = false) {
+function buildLFGButtons(guildId, voiceChannelId, isClosed = false) {
+  if (isClosed || !voiceChannelId) {
+    return new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId('lfg_closed_btn')
+        .setLabel('Session Closed')
+        .setStyle(ButtonStyle.Secondary)
+        .setDisabled(true)
+    );
+  }
+
   return new ActionRowBuilder().addComponents(
     new ButtonBuilder()
-      .setCustomId(`lfg_join:${sessionId}`)
-      .setLabel('Join Session')
-      .setStyle(ButtonStyle.Primary)
-      .setEmoji('🎮')
-      .setDisabled(isClosed),
-    new ButtonBuilder()
-      .setCustomId(`lfg_leave:${sessionId}`)
-      .setLabel('Leave Session')
-      .setStyle(ButtonStyle.Secondary)
-      .setEmoji('🚪')
-      .setDisabled(isClosed)
+      .setLabel('Join Voice Channel')
+      .setStyle(ButtonStyle.Link)
+      .setURL(`https://discord.com/channels/${guildId}/${voiceChannelId}`)
+      .setEmoji('🔊')
   );
 }
 
@@ -269,7 +260,7 @@ async function handleLFGModalSubmit(interaction) {
 
   // Post embed
   const embed = buildLFGEmbed(session, voiceChannelMention);
-  const buttons = buildLFGButtons(session.id);
+  const buttons = buildLFGButtons(guildId, voiceChannelId);
 
   let targetChannel = interaction.channel;
   if (lfgChannelId) {
@@ -313,125 +304,6 @@ async function handleLFGModalSubmit(interaction) {
 }
 
 /**
- * Button: Join LFG session
- * @param {import('discord.js').ButtonInteraction} interaction
- */
-async function handleLFGJoin(interaction) {
-  const sessionId = interaction.customId.split(':')[1];
-  const userId = interaction.user.id;
-  const guildId = interaction.guild.id;
-
-  await interaction.deferReply({ ephemeral: true });
-
-  // Fetch session
-  const { data: session, error } = await supabase
-    .from('lfg_sessions')
-    .select('*')
-    .eq('id', sessionId)
-    .maybeSingle();
-
-  if (!session || error) {
-    return interaction.editReply('❌ Session not found.');
-  }
-
-  if (session.status !== 'open') {
-    return interaction.editReply('❌ This session is no longer open.');
-  }
-
-  const members = session.current_members || [];
-
-  if (members.includes(userId)) {
-    return interaction.editReply('⚠️ You are already in this session.');
-  }
-
-  // Check cooldown
-  const featureConfig = await getFeatureConfig(guildId, 'lfg');
-  const cooldownMinutes = featureConfig?.config?.cooldown_minutes || 5;
-
-  const { data: cooldown } = await supabase
-    .from('lfg_cooldowns')
-    .select('cooldown_until')
-    .eq('discord_id', userId)
-    .eq('session_id', sessionId)
-    .maybeSingle();
-
-  if (cooldown && new Date(cooldown.cooldown_until) > new Date()) {
-    const remaining = Math.ceil((new Date(cooldown.cooldown_until) - new Date()) / 60000);
-    return interaction.editReply(`⏳ Cooldown active. Try again in **${remaining} minute(s)**.`);
-  }
-
-  // Check max size
-  if (members.length >= session.max_size) {
-    return interaction.editReply('❌ This session is full.');
-  }
-
-  const newMembers = [...members, userId];
-  const newStatus = newMembers.length >= session.max_size ? 'full' : 'open';
-
-  // Update session
-  await supabase
-    .from('lfg_sessions')
-    .update({ current_members: newMembers, status: newStatus, updated_at: new Date().toISOString() })
-    .eq('id', sessionId);
-
-  // Set/reset cooldown
-  await supabase.from('lfg_cooldowns').upsert(
-    {
-      guild_id: guildId,
-      discord_id: userId,
-      session_id: sessionId,
-      cooldown_until: new Date(Date.now() + cooldownMinutes * 60 * 1000).toISOString(),
-    },
-    { onConflict: 'discord_id,session_id' }
-  );
-
-  // Update embed
-  await refreshLFGEmbed(interaction.guild, { ...session, current_members: newMembers, status: newStatus });
-
-  const voiceMoved = await tryMoveToVoiceChannel(interaction.member, session.voice_channel_id);
-
-  let replyText = `✅ You've joined the **${session.game}** session!`;
-  if (session.voice_channel_id) {
-    if (voiceMoved) {
-      replyText += `\n🔊 Automatically transferred you to <#${session.voice_channel_id}>.`;
-    } else {
-      replyText += `\n⚠️ You're not in a voice channel. Click <#${session.voice_channel_id}> to join the game voice channel!`;
-    }
-  }
-
-  await interaction.editReply(replyText);
-}
-
-/**
- * Button: Leave LFG session
- * @param {import('discord.js').ButtonInteraction} interaction
- */
-async function handleLFGLeave(interaction) {
-  const sessionId = interaction.customId.split(':')[1];
-  const userId = interaction.user.id;
-
-  await interaction.deferReply({ ephemeral: true });
-
-  const { data: session } = await supabase
-    .from('lfg_sessions')
-    .select('*')
-    .eq('id', sessionId)
-    .maybeSingle();
-
-  if (!session) return interaction.editReply('❌ Session not found.');
-
-  const members = (session.current_members || []).filter(id => id !== userId);
-
-  await supabase
-    .from('lfg_sessions')
-    .update({ current_members: members, status: 'open', updated_at: new Date().toISOString() })
-    .eq('id', sessionId);
-
-  await refreshLFGEmbed(interaction.guild, { ...session, current_members: members, status: 'open' });
-  await interaction.editReply(`✅ You've left the **${session.game}** session.`);
-}
-
-/**
  * Updates the LFG embed in Discord to reflect current session state.
  */
 async function refreshLFGEmbed(guild, session) {
@@ -442,12 +314,11 @@ async function refreshLFGEmbed(guild, session) {
     const message = await channel.messages.fetch(session.message_id);
 
     const featureConfig = await getFeatureConfig(guild.id, 'lfg');
-    const voiceMappings = featureConfig?.config?.voice_mappings || {};
     const voiceChannelId = session.voice_channel_id;
     const voiceChannelMention = voiceChannelId ? `<#${voiceChannelId}>` : 'Not configured';
 
     const embed = buildLFGEmbed(session, voiceChannelMention);
-    const buttons = buildLFGButtons(session.id, session.status === 'closed');
+    const buttons = buildLFGButtons(guild.id, voiceChannelId, session.status === 'closed');
 
     await message.edit({ embeds: [embed], components: [buttons] });
   } catch (err) {
@@ -513,7 +384,5 @@ async function tryMoveToVoiceChannel(member, voiceChannelId) {
 module.exports = {
   handleLFGCreate,
   handleLFGModalSubmit,
-  handleLFGJoin,
-  handleLFGLeave,
   expireOldLFGSessions,
 };

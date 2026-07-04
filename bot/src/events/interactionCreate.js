@@ -13,7 +13,6 @@ const {
   handleIGNModalSubmit,
   handleIGNNext,
 } = require('../modules/moderation/verification');
-const { handleLFGJoin, handleLFGLeave } = require('../modules/gaming/lfg');
 
 module.exports = {
   name: Events.InteractionCreate,
@@ -50,12 +49,6 @@ module.exports = {
         }
         if (interaction.customId === 'verify_birthday_skip') {
           return handleBirthdaySkip(interaction);
-        }
-        if (interaction.customId.startsWith('lfg_join:')) {
-          return handleLFGJoin(interaction);
-        }
-        if (interaction.customId.startsWith('lfg_leave:')) {
-          return handleLFGLeave(interaction);
         }
         return;
       }
