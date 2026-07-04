@@ -495,6 +495,7 @@ async function tryMoveToVoiceChannel(member, voiceChannelId) {
 
 module.exports = {
   handleLFGCreate,
+  handleLFGModalSubmit,
   handleLFGJoin,
   handleLFGLeave,
   expireOldLFGSessions,
