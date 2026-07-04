@@ -258,9 +258,24 @@ async function handleLFGModalSubmit(interaction) {
     return interaction.editReply('❌ Failed to create LFG session. Please try again.');
   }
 
+  // Create auto-joining voice channel invite link
+  const voiceChannel = voiceChannelId ? await interaction.guild.channels.fetch(voiceChannelId).catch(() => null) : null;
+  let inviteUrl = null;
+  if (voiceChannel) {
+    const invite = await voiceChannel.createInvite({
+      maxAge: 3600 * 2, // 2 hours
+      maxUses: 0,
+      unique: false,
+      reason: 'LFG Voice Channel Link'
+    }).catch(() => null);
+    if (invite) {
+      inviteUrl = invite.url;
+    }
+  }
+
   // Post embed
   const embed = buildLFGEmbed(session, voiceChannelMention);
-  const buttons = buildLFGButtons(guildId, voiceChannelId);
+  const buttons = buildLFGButtons(guildId, voiceChannelId, inviteUrl);
 
   let targetChannel = interaction.channel;
   if (lfgChannelId) {
@@ -313,12 +328,26 @@ async function refreshLFGEmbed(guild, session) {
     const channel = await guild.channels.fetch(session.channel_id);
     const message = await channel.messages.fetch(session.message_id);
 
-    const featureConfig = await getFeatureConfig(guild.id, 'lfg');
     const voiceChannelId = session.voice_channel_id;
     const voiceChannelMention = voiceChannelId ? `<#${voiceChannelId}>` : 'Not configured';
 
+    // Generate auto-joining voice channel invite link if not closed
+    const voiceChannel = voiceChannelId ? await guild.channels.fetch(voiceChannelId).catch(() => null) : null;
+    let inviteUrl = null;
+    if (voiceChannel && session.status !== 'closed') {
+      const invite = await voiceChannel.createInvite({
+        maxAge: 3600 * 2,
+        maxUses: 0,
+        unique: false,
+        reason: 'LFG Voice Channel Link'
+      }).catch(() => null);
+      if (invite) {
+        inviteUrl = invite.url;
+      }
+    }
+
     const embed = buildLFGEmbed(session, voiceChannelMention);
-    const buttons = buildLFGButtons(guild.id, voiceChannelId, session.status === 'closed');
+    const buttons = buildLFGButtons(guild.id, voiceChannelId, inviteUrl, session.status === 'closed');
 
     await message.edit({ embeds: [embed], components: [buttons] });
   } catch (err) {
