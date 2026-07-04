@@ -184,11 +184,18 @@ async function handleLFGModalSubmit(interaction) {
 
   await logBotEvent(guildId, 'lfg_create', interaction.user.id, { game, sessionId: session.id });
 
-  if (targetChannel.id !== interaction.channel.id) {
-    await interaction.editReply(`✅ LFG session posted in <#${targetChannel.id}>!`);
-  } else {
-    await interaction.deleteReply().catch(() => {});
+  const voiceMoved = await tryMoveToVoiceChannel(interaction.member, voiceChannelId);
+
+  let replyText = `✅ LFG session posted in <#${targetChannel.id}>!`;
+  if (voiceChannelId) {
+    if (voiceMoved) {
+      replyText += `\n🔊 Automatically transferred you to <#${voiceChannelId}>.`;
+    } else {
+      replyText += `\n⚠️ Connect to a voice channel first to enable auto-transfer.`;
+    }
   }
+
+  await interaction.editReply(replyText);
 }
 
 /**
@@ -267,7 +274,18 @@ async function handleLFGJoin(interaction) {
   // Update embed
   await refreshLFGEmbed(interaction.guild, { ...session, current_members: newMembers, status: newStatus });
 
-  await interaction.editReply(`✅ You've joined the **${session.game}** session!`);
+  const voiceMoved = await tryMoveToVoiceChannel(interaction.member, session.voice_channel_id);
+
+  let replyText = `✅ You've joined the **${session.game}** session!`;
+  if (session.voice_channel_id) {
+    if (voiceMoved) {
+      replyText += `\n🔊 Automatically transferred you to <#${session.voice_channel_id}>.`;
+    } else {
+      replyText += `\n⚠️ Connect to a voice channel first to enable auto-transfer.`;
+    }
+  }
+
+  await interaction.editReply(replyText);
 }
 
 /**
@@ -349,6 +367,33 @@ async function expireOldLFGSessions(client) {
   }
 
   logger.info(`[LFG] Expired ${expiredSessions.length} session(s).`);
+}
+
+/**
+ * Helper to dynamically move a member to the configured LFG Voice Channel.
+ * Requires the user to be connected to any voice channel in the guild first.
+ * @param {import('discord.js').GuildMember} member
+ * @param {string|null} voiceChannelId
+ */
+async function tryMoveToVoiceChannel(member, voiceChannelId) {
+  if (!voiceChannelId || !member) return false;
+  
+  const currentVoiceState = member.voice;
+  if (!currentVoiceState?.channelId) {
+    return false;
+  }
+
+  if (currentVoiceState.channelId === voiceChannelId) {
+    return true;
+  }
+
+  try {
+    await currentVoiceState.setChannel(voiceChannelId, 'Joined LFG Session');
+    return true;
+  } catch (err) {
+    logger.error(`[LFG] Failed to move member ${member.id} to voice ${voiceChannelId}:`, err.message);
+    return false;
+  }
 }
 
 module.exports = {
