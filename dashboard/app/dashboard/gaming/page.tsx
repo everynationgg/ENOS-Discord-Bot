@@ -79,7 +79,7 @@ export default function GamingPage() {
               <div className="overview-item">
                 <h3>🔍 LFG — Group Finder</h3>
                 <p>
-                  Allows members to post looking-for-group party cards with interactive Join/Leave buttons that reference pre-configured voice channels.
+                  Allows members to post LFG invite cards with a direct Link Button to connect players instantly to game voice channels.
                 </p>
               </div>
 
@@ -97,13 +97,12 @@ export default function GamingPage() {
               <div className="feature-instructions">
                 <h3>LFG Configuration Guide</h3>
                 <p>
-                  The Looking-For-Group (LFG) finder helps players form parties. Members click buttons to coordinate voice lobbies.
+                  The Looking-For-Group (LFG) finder helps players invite others to connect directly to server voice channels.
                 </p>
                 <ol>
                   <li>Create a text channel (e.g. <code>#lfg-posts</code>) and copy its ID into <strong>LFG Post Channel ID</strong>.</li>
-                  <li>Configure <strong>Join Cooldown</strong> to limit how frequently members can trigger LFG requests.</li>
-                  <li>Set <strong>Session TTL</strong> (Time To Live) to define how long an active lobby card is displayed before auto-expiring.</li>
-                  <li>In the <strong>Voice Channel Mappings</strong> section, input the voice channel ID matching each game branch to route players directly into a voice call when they join a party card.</li>
+                  <li>Set <strong>Session TTL</strong> (Time To Live) to define how long an active LFG invite card remains active before auto-expiring.</li>
+                  <li>In the <strong>Voice Channel Mappings</strong> section, input the voice channel ID matching each game branch to generate direct invite buttons routing players into their voice calls.</li>
                 </ol>
                 <div className="tip-box">
                   <strong>💡 Copying voice IDs:</strong><br />
@@ -116,7 +115,7 @@ export default function GamingPage() {
                   id="lfg"
                   icon="🔍"
                   title="LFG — Group Finder"
-                  description="Dynamic party cards with join/leave buttons. References pre-existing voice channels. No VC creation."
+                  description="Dynamic party cards with a direct VC invite button. References pre-existing voice channels."
                   featureKey="lfg"
                   initialEnabled={lfgConfig.enabled ?? false}
                   initialConfig={lfgConfig.config ?? {}}
@@ -144,24 +143,6 @@ export default function GamingPage() {
                         <div className="section-divider-line" />
                         <span className="section-divider-text">Session Settings</span>
                         <div className="section-divider-line" />
-                      </div>
-
-                      <div className="form-group">
-                        <label className="form-label">
-                          Join Cooldown: <strong style={{ color: 'var(--accent-primary)' }}>{config.cooldown_minutes ?? 5} min</strong>
-                        </label>
-                        <input
-                          id="lfg-cooldown"
-                          type="range"
-                          className="form-slider"
-                          min={1} max={60} step={1}
-                          value={config.cooldown_minutes ?? 5}
-                          onChange={(e) => setConfig('cooldown_minutes', parseInt(e.target.value))}
-                        />
-                        <div className="slider-labels">
-                          <span className="form-hint">1 min</span>
-                          <span className="form-hint">60 min</span>
-                        </div>
                       </div>
 
                       <div className="form-group">
