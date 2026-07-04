@@ -186,17 +186,21 @@ async function handleLFGModalSubmit(interaction) {
   // 2. Role Resolution & Validation
   let resolvedRole = null;
   if (roleInput) {
-    if (/^\d+$/.test(roleInput)) {
+    const mentionMatch = roleInput.match(/^<@&(\d+)>$/);
+    if (mentionMatch) {
+      resolvedRole = interaction.guild.roles.cache.get(mentionMatch[1]);
+    } else if (/^\d+$/.test(roleInput)) {
       resolvedRole = interaction.guild.roles.cache.get(roleInput);
     } else {
+      const cleanRoleName = roleInput.startsWith('@') ? roleInput.slice(1) : roleInput;
       resolvedRole = interaction.guild.roles.cache.find(r => 
-        r.name.toLowerCase() === roleInput.toLowerCase() ||
-        r.name.toLowerCase().includes(roleInput.toLowerCase())
+        r.name.toLowerCase() === cleanRoleName.toLowerCase() ||
+        r.name.toLowerCase().includes(cleanRoleName.toLowerCase())
       );
     }
 
     if (!resolvedRole) {
-      return interaction.editReply(`❌ Role **"${roleInput}"** not found on this server. Please enter a valid role name or role ID.`);
+      return interaction.editReply(`❌ Role **"${roleInput}"** not found on this server. Please enter a valid role name, role mention, or role ID.`);
     }
 
     // Check configured role mapping for this matched game
@@ -220,18 +224,22 @@ async function handleLFGModalSubmit(interaction) {
   // 3. Friend Invitation Resolution
   let resolvedInvitedUser = null;
   if (inviteInput) {
-    if (/^\d+$/.test(inviteInput)) {
+    const userMentionMatch = inviteInput.match(/^<@!?(\d+)>$/);
+    if (userMentionMatch) {
+      resolvedInvitedUser = await interaction.guild.members.fetch(userMentionMatch[1]).catch(() => null);
+    } else if (/^\d+$/.test(inviteInput)) {
       resolvedInvitedUser = await interaction.guild.members.fetch(inviteInput).catch(() => null);
     } else {
+      const cleanUsername = inviteInput.startsWith('@') ? inviteInput.slice(1) : inviteInput;
       // Search by username or display name
-      const searchRes = await interaction.guild.members.search({ query: inviteInput, limit: 1 }).catch(() => null);
+      const searchRes = await interaction.guild.members.search({ query: cleanUsername, limit: 1 }).catch(() => null);
       if (searchRes && searchRes.size > 0) {
         resolvedInvitedUser = searchRes.first();
       }
     }
 
     if (!resolvedInvitedUser) {
-      return interaction.editReply(`❌ User **"${inviteInput}"** not found on this server. Please enter a valid username or user ID.`);
+      return interaction.editReply(`❌ User **"${inviteInput}"** not found on this server. Please enter a valid username, user mention, or user ID.`);
     }
   }
 
