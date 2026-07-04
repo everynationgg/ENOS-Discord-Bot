@@ -7,21 +7,7 @@ module.exports = {
     .setName('lfg')
     .setDescription('Looking For Group commands')
     .addSubcommand(sub =>
-      sub
-        .setName('create')
-        .setDescription('Create a new LFG party session')
-        .addRoleOption(opt =>
-          opt
-            .setName('role')
-            .setDescription('Optional: Role to ping/mention')
-            .setRequired(false)
-        )
-        .addUserOption(opt =>
-          opt
-            .setName('invite')
-            .setDescription('Optional: Friend to invite')
-            .setRequired(false)
-        )
+      sub.setName('create').setDescription('Create a new LFG party session')
     ),
 
   /**

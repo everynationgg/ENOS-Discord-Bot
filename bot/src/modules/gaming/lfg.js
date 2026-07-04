@@ -89,14 +89,8 @@ async function handleLFGCreate(interaction) {
     });
   }
 
-  const role = interaction.options.getRole('role');
-  const invite = interaction.options.getUser('invite');
-
-  const roleId = role ? role.id : 'none';
-  const inviteId = invite ? invite.id : 'none';
-
   const modal = new ModalBuilder()
-    .setCustomId(`lfg_modal:${roleId}:${inviteId}`)
+    .setCustomId(`lfg_modal:create`)
     .setTitle('Create LFG Session');
 
   modal.addComponents(
@@ -127,6 +121,24 @@ async function handleLFGCreate(interaction) {
         .setValue('4')
         .setRequired(true)
         .setMaxLength(2)
+    ),
+    new ActionRowBuilder().addComponents(
+      new TextInputBuilder()
+        .setCustomId('lfg_role')
+        .setLabel('Allowed Ping Role (Name or ID)')
+        .setStyle(TextInputStyle.Short)
+        .setPlaceholder('Optional matching role name or ID to notify')
+        .setRequired(false)
+        .setMaxLength(100)
+    ),
+    new ActionRowBuilder().addComponents(
+      new TextInputBuilder()
+        .setCustomId('lfg_invite')
+        .setLabel('Invite Friends (Username or ID)')
+        .setStyle(TextInputStyle.Short)
+        .setPlaceholder('Optional friend to invite')
+        .setRequired(false)
+        .setMaxLength(100)
     )
   );
 
@@ -140,15 +152,13 @@ async function handleLFGCreate(interaction) {
 async function handleLFGModalSubmit(interaction) {
   await interaction.deferReply({ ephemeral: true });
 
-  const customIdParts = interaction.customId.split(':');
-  const roleId = customIdParts[1];
-  const inviteId = customIdParts[2];
-
   const guildId = interaction.guild.id;
   const gameInput = interaction.fields.getTextInputValue('lfg_game').trim();
   const description = interaction.fields.getTextInputValue('lfg_description').trim() || null;
   const rawSize = parseInt(interaction.fields.getTextInputValue('lfg_max_size').trim(), 10);
   const maxSize = Math.min(Math.max(rawSize || 4, 2), 10);
+  const roleInput = interaction.fields.getTextInputValue('lfg_role').trim();
+  const inviteInput = interaction.fields.getTextInputValue('lfg_invite').trim();
 
   // 1. Game Name Fuzzy Resolution
   const normalizedInput = gameInput.toLowerCase();
@@ -173,12 +183,24 @@ async function handleLFGModalSubmit(interaction) {
   const voiceChannelId = voiceMappings[matchedGame] || voiceMappings['Others'] || null;
   const voiceChannelMention = voiceChannelId ? `<#${voiceChannelId}>` : 'Not configured';
 
-  // 2. Role Validation
+  // 2. Role Resolution & Validation
   let resolvedRole = null;
-  if (roleId && roleId !== 'none') {
-    resolvedRole = interaction.guild.roles.cache.get(roleId);
+  if (roleInput) {
+    const mentionMatch = roleInput.match(/^<@&(\d+)>$/);
+    if (mentionMatch) {
+      resolvedRole = interaction.guild.roles.cache.get(mentionMatch[1]);
+    } else if (/^\d+$/.test(roleInput)) {
+      resolvedRole = interaction.guild.roles.cache.get(roleInput);
+    } else {
+      const cleanRoleName = roleInput.startsWith('@') ? roleInput.slice(1) : roleInput;
+      resolvedRole = interaction.guild.roles.cache.find(r => 
+        r.name.toLowerCase() === cleanRoleName.toLowerCase() ||
+        r.name.toLowerCase().includes(cleanRoleName.toLowerCase())
+      );
+    }
+
     if (!resolvedRole) {
-      return interaction.editReply(`❌ The selected role is no longer available on this server.`);
+      return interaction.editReply(`❌ Role **"${roleInput}"** not found on this server. Please enter a valid role name, role mention, or role ID.`);
     }
 
     // Check configured role mapping for this matched game
@@ -201,10 +223,23 @@ async function handleLFGModalSubmit(interaction) {
 
   // 3. Friend Invitation Resolution
   let resolvedInvitedUser = null;
-  if (inviteId && inviteId !== 'none') {
-    resolvedInvitedUser = await interaction.guild.members.fetch(inviteId).catch(() => null);
+  if (inviteInput) {
+    const userMentionMatch = inviteInput.match(/^<@!?(\d+)>$/);
+    if (userMentionMatch) {
+      resolvedInvitedUser = await interaction.guild.members.fetch(userMentionMatch[1]).catch(() => null);
+    } else if (/^\d+$/.test(inviteInput)) {
+      resolvedInvitedUser = await interaction.guild.members.fetch(inviteInput).catch(() => null);
+    } else {
+      const cleanUsername = inviteInput.startsWith('@') ? inviteInput.slice(1) : inviteInput;
+      // Search by username or display name
+      const searchRes = await interaction.guild.members.search({ query: cleanUsername, limit: 1 }).catch(() => null);
+      if (searchRes && searchRes.size > 0) {
+        resolvedInvitedUser = searchRes.first();
+      }
+    }
+
     if (!resolvedInvitedUser) {
-      return interaction.editReply(`❌ The invited user is no longer available on this server.`);
+      return interaction.editReply(`❌ User **"${inviteInput}"** not found on this server. Please enter a valid username, user mention, or user ID.`);
     }
   }
 
