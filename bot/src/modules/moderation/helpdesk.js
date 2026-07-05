@@ -177,14 +177,18 @@ async function handleHelpDeskChatMessage(message) {
       guildContext += `- Server Owner: ${owner.user.tag} (ID: ${owner.user.id})\n`;
     }
 
-    // List server text/announcement channels for context referencing
-    const textChannels = guild.channels.cache
-      .filter(c => c.type === 0 || c.type === 5)
-      .map(c => `  * #${c.name}: <#${c.id}>`)
-      .slice(0, 30)
+    // List server text, announcement, and voice channels for context referencing
+    const channelList = guild.channels.cache
+      .filter(c => c.type === 0 || c.type === 2 || c.type === 5)
+      .map(c => {
+        const typeStr = c.type === 2 ? 'Voice' : 'Text';
+        const prefix = c.type === 2 ? '🔊 ' : '#';
+        return `  * ${prefix}${c.name} (${typeStr}): <#${c.id}>`;
+      })
+      .slice(0, 150) // High limit to cover all channels without truncation
       .join('\n');
-    if (textChannels) {
-      guildContext += `- Available Text Channels list (you should mention channels using the exact format <#channel_id> so they render as clickable links in Discord):\n${textChannels}\n`;
+    if (channelList) {
+      guildContext += `- Available Channels list (you should mention channels in your response using the exact format <#channel_id> so they render as clickable channel links in Discord):\n${channelList}\n`;
     }
 
     // Retrieve active configuration contexts
