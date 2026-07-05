@@ -50,6 +50,14 @@ module.exports = {
         if (interaction.customId === 'verify_birthday_skip') {
           return handleBirthdaySkip(interaction);
         }
+        if (interaction.customId === 'helpdesk_start') {
+          const { handleHelpDeskStart } = require('../modules/moderation/helpdesk');
+          return handleHelpDeskStart(interaction);
+        }
+        if (interaction.customId === 'helpdesk_close') {
+          const { handleHelpDeskClose } = require('../modules/moderation/helpdesk');
+          return handleHelpDeskClose(interaction);
+        }
         return;
       }
 

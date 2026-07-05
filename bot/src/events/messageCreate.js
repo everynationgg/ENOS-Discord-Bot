@@ -1,7 +1,8 @@
 const { Events } = require('discord.js');
 const { awardMessageCoins } = require('../modules/gaming/vault');
-const { isFeatureEnabled } = require('../lib/supabase');
+const { isFeatureEnabled, getFeatureConfig } = require('../lib/supabase');
 const { handleMessageAutoReactions } = require('../modules/social/autoReaction');
+const { handleHelpDeskChatMessage } = require('../modules/moderation/helpdesk');
 
 module.exports = {
   name: Events.MessageCreate,
@@ -14,6 +15,20 @@ module.exports = {
     if (message.author.bot || !message.guild || message.system) return;
 
     const guildId = message.guild.id;
+
+    // AI Support Help Desk: process support thread conversations
+    if (message.channel.isThread()) {
+      const helpDeskEnabled = await isFeatureEnabled(guildId, 'help_desk');
+      if (helpDeskEnabled) {
+        const config = await getFeatureConfig(guildId, 'help_desk');
+        const launcherChannelId = config?.config?.launcher_channel_id;
+
+        if (launcherChannelId && message.channel.parentId === launcherChannelId) {
+          await handleHelpDeskChatMessage(message).catch(() => {});
+          return; // Skip vault coins and other message listeners in support rooms
+        }
+      }
+    }
 
     // Vault Economy: award coins for messages
     const vaultEnabled = await isFeatureEnabled(guildId, 'vault');
