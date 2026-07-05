@@ -419,8 +419,13 @@ async function expireOldLFGSessions(client) {
           .eq('status', 'open');
 
         if (!activeSessions || activeSessions.length === 0) {
+          // Fetch default status config for this game
+          const lfgConfig = await getFeatureConfig(session.guild_id, 'lfg');
+          const defaultStatuses = lfgConfig?.config?.default_statuses || {};
+          const defaultStatus = defaultStatuses[session.game] || '';
+
           await client.rest.put(`/channels/${session.voice_channel_id}/voice-status`, {
-            body: { status: '' }
+            body: { status: defaultStatus }
           }).catch(() => {});
         }
       } catch (err) {

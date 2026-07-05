@@ -169,12 +169,20 @@ export default function GamingPage() {
                         <div className="section-divider-line" />
                       </div>
 
+                      <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr 1fr 1fr', gap: '0.5rem', marginBottom: '0.5rem', paddingRight: '0.25rem' }}>
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 'bold' }}>Game</span>
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 'bold' }}>Voice Channel ID</span>
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 'bold' }}>Allowed Role ID</span>
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 'bold' }}>Default Voice Status</span>
+                      </div>
+
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                         {GAME_BRANCHES.map((game) => {
                           const voiceMappings = config.voice_mappings || {};
                           const roleMappings = config.role_mappings || {};
+                          const defaultStatuses = config.default_statuses || {};
                           return (
-                            <div key={game} style={{ display: 'grid', gridTemplateColumns: '130px 1fr 1fr', gap: '0.5rem', alignItems: 'center' }}>
+                            <div key={game} style={{ display: 'grid', gridTemplateColumns: '120px 1fr 1fr 1fr', gap: '0.5rem', alignItems: 'center' }}>
                               <span style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', fontWeight: 500 }}>
                                 {game}
                               </span>
@@ -192,6 +200,14 @@ export default function GamingPage() {
                                 placeholder="Allowed Role ID"
                                 value={roleMappings[game] || ''}
                                 onChange={(e) => setConfig('role_mappings', { ...roleMappings, [game]: e.target.value })}
+                                style={{ padding: '0.375rem 0.625rem', fontSize: '0.8125rem' }}
+                              />
+                              <input
+                                id={`lfg-status-${game.toLowerCase().replace(/\s+/g, '-')}`}
+                                className="form-input"
+                                placeholder="e.g. Chilling"
+                                value={defaultStatuses[game] || ''}
+                                onChange={(e) => setConfig('default_statuses', { ...defaultStatuses, [game]: e.target.value })}
                                 style={{ padding: '0.375rem 0.625rem', fontSize: '0.8125rem' }}
                               />
                             </div>
