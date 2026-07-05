@@ -60,7 +60,7 @@ async function handleHelpDeskStart(interaction) {
     await thread.send({ embeds: [welcomeEmbed], components: [row] });
 
     // Confirm to the user
-    await interaction.editReply({ content: `✅ Private support thread created here: <#${thread.id}>!` });
+    await interaction.editReply({ content: `➡️ **Click here to join your private support room: <#${thread.id}>**` });
 
     // Auto-delete the ephemeral reply after 15 seconds
     setTimeout(() => {
@@ -273,25 +273,58 @@ async function handleHelpDeskChatMessage(message) {
 
     const replyText = response.response.text();
 
+    // Remove the Close button from any previous bot messages in this thread
+    const threadMessages = await thread.messages.fetch({ limit: 20 });
+    const lastBotMsgWithComponents = threadMessages.find(m => m.author.id === message.client.user.id && m.components.length > 0);
+    if (lastBotMsgWithComponents) {
+      await lastBotMsgWithComponents.edit({ components: [] }).catch(() => {});
+    }
+
+    const row = new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId('helpdesk_close')
+        .setLabel('Close Chat')
+        .setStyle(ButtonStyle.Danger)
+        .setEmoji('🔒')
+    );
+
     if (replyText && replyText.trim()) {
       if (replyText.length > 2000) {
         const chunks = replyText.match(/[\s\S]{1,1950}/g) || [replyText];
-        for (const chunk of chunks) {
-          await thread.send(chunk);
+        for (let i = 0; i < chunks.length; i++) {
+          const isLast = i === chunks.length - 1;
+          await thread.send({
+            content: chunks[i],
+            components: isLast ? [row] : []
+          });
         }
       } else {
-        await thread.send(replyText);
+        await thread.send({ content: replyText, components: [row] });
       }
     } else {
-      await thread.send('I am here to help. What else can I assist you with?');
+      await thread.send({ content: 'I am here to help. What else can I assist you with?', components: [row] });
     }
 
   } catch (err) {
     logger.error('[HELPDESK] Chatbot error:', err.message);
+    const errorRow = new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId('helpdesk_close')
+        .setLabel('Close Chat')
+        .setStyle(ButtonStyle.Danger)
+        .setEmoji('🔒')
+    );
+
     if (err.message.includes('quota') || err.message.includes('429') || err.message.includes('Quota')) {
-      await thread.send('⚠️ **Gemini API Limit Reached**: The bot has temporarily exceeded the Google Gemini API free-tier request quota. Please wait a bit before asking again, or contact an administrator to link a pay-as-you-go key (which is extremely low cost!).');
+      await thread.send({
+        content: '⚠️ **Gemini API Limit Reached**: The bot has temporarily exceeded the Google Gemini API free-tier request quota. Please wait a bit before asking again, or contact an administrator to link a pay-as-you-go key (which is extremely low cost!).',
+        components: [errorRow]
+      });
     } else {
-      await thread.send('⚠️ I encountered an error formulating a reply. Please try again or ask an admin.');
+      await thread.send({
+        content: '⚠️ I encountered an error formulating a reply. Please try again or ask an admin.',
+        components: [errorRow]
+      });
     }
   }
 }
