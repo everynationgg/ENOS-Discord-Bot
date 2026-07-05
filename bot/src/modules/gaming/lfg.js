@@ -324,6 +324,17 @@ async function handleLFGModalSubmit(interaction) {
   // Try to automatically move host to voice channel
   const voiceMoved = await tryMoveToVoiceChannel(interaction.member, voiceChannelId);
 
+  // Set the voice channel status to match the LFG game
+  if (voiceChannelId) {
+    try {
+      await interaction.client.rest.put(`/channels/${voiceChannelId}/voice-status`, {
+        body: { status: `LFG: ${matchedGame}`.slice(0, 38) }
+      });
+    } catch (statusErr) {
+      logger.warn(`[LFG] Failed to set voice status for channel ${voiceChannelId}:`, statusErr.message);
+    }
+  }
+
   let replyText = `✅ LFG session posted in <#${targetChannel.id}>!`;
   if (voiceChannelId) {
     if (voiceMoved) {
@@ -395,6 +406,26 @@ async function expireOldLFGSessions(client) {
     const guild = client.guilds.cache.get(session.guild_id);
     if (guild) {
       await refreshLFGEmbed(guild, { ...session, status: 'closed' });
+    }
+
+    // Reset voice channel status if no other active LFG sessions are open on it
+    if (session.voice_channel_id) {
+      try {
+        const { data: activeSessions } = await supabase
+          .from('lfg_sessions')
+          .select('id')
+          .eq('guild_id', session.guild_id)
+          .eq('voice_channel_id', session.voice_channel_id)
+          .eq('status', 'open');
+
+        if (!activeSessions || activeSessions.length === 0) {
+          await client.rest.put(`/channels/${session.voice_channel_id}/voice-status`, {
+            body: { status: '' }
+          }).catch(() => {});
+        }
+      } catch (err) {
+        logger.warn(`[LFG] Failed to clean up voice status on expiration:`, err.message);
+      }
     }
   }
 
