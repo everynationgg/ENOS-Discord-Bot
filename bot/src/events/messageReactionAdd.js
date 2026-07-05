@@ -11,6 +11,10 @@ module.exports = {
    */
   async execute(reaction, user, client) {
     // Rule 1 (Loop Shield): If the user who added the reaction is the bot itself, instantly return and do nothing.
+    if (!user || !user.id) {
+      logger.warn('[REACTION] MessageReactionAdd event emitted with undefined user/id.');
+      return;
+    }
     if (user.id === client.user.id) return;
 
     // Check if the reaction is partial (e.g. from an uncached message) and fetch it
