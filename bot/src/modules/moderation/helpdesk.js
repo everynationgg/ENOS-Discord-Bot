@@ -191,6 +191,15 @@ async function handleHelpDeskChatMessage(message) {
       guildContext += `- Available Channels list (you should mention channels in your response using the exact format <#channel_id> so they render as clickable channel links in Discord):\n${channelList}\n`;
     }
 
+    // Retrieve available slash commands for ENOS bot
+    const client = message.client;
+    if (client.commands && client.commands.size > 0) {
+      const commandHelp = client.commands
+        .map(cmd => `  * /${cmd.data.name}: ${cmd.data.description || 'No description.'}`)
+        .join('\n');
+      guildContext += `- Available ENOS Slash Commands:\n${commandHelp}\n`;
+    }
+
     // Retrieve active configuration contexts
     const gatekeeperConfig = await getFeatureConfig(guildId, 'gatekeeper');
     if (gatekeeperConfig?.enabled) {
