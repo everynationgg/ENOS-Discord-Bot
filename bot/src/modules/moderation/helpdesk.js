@@ -240,17 +240,37 @@ async function handleHelpDeskChatMessage(message) {
       });
     }
 
-    // Initialize Gemini model with instructions
-    const model = genAI.getGenerativeModel({
-      model: 'gemini-2.5-flash',
+    let modelName = 'gemini-2.5-flash';
+    let model = genAI.getGenerativeModel({
+      model: modelName,
       systemInstruction: systemPrompt
     });
 
-    const chat = model.startChat({
+    let chat = model.startChat({
       history: formattedHistory
     });
 
-    const response = await chat.sendMessage(message.content);
+    let response;
+    try {
+      response = await chat.sendMessage(message.content);
+    } catch (apiErr) {
+      const isQuotaErr = apiErr.message.includes('quota') || apiErr.message.includes('429') || apiErr.message.includes('Quota');
+      if (isQuotaErr) {
+        logger.warn('[HELPDESK] gemini-2.5-flash quota exceeded. Attempting self-healing fallback to gemini-1.5-flash...');
+        modelName = 'gemini-1.5-flash';
+        model = genAI.getGenerativeModel({
+          model: modelName,
+          systemInstruction: systemPrompt
+        });
+        chat = model.startChat({
+          history: formattedHistory
+        });
+        response = await chat.sendMessage(message.content);
+      } else {
+        throw apiErr;
+      }
+    }
+
     const replyText = response.response.text();
 
     if (replyText && replyText.trim()) {
@@ -268,7 +288,11 @@ async function handleHelpDeskChatMessage(message) {
 
   } catch (err) {
     logger.error('[HELPDESK] Chatbot error:', err.message);
-    await thread.send('⚠️ I encountered an error formulating a reply. Please try again or ask an admin.');
+    if (err.message.includes('quota') || err.message.includes('429') || err.message.includes('Quota')) {
+      await thread.send('⚠️ **Gemini API Limit Reached**: The bot has temporarily exceeded the Google Gemini API free-tier request quota. Please wait a bit before asking again, or contact an administrator to link a pay-as-you-go key (which is extremely low cost!).');
+    } else {
+      await thread.send('⚠️ I encountered an error formulating a reply. Please try again or ask an admin.');
+    }
   }
 }
 
