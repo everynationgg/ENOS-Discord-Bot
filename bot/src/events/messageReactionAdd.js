@@ -15,7 +15,7 @@ module.exports = {
       logger.warn('[REACTION] MessageReactionAdd event emitted with undefined user/id.');
       return;
     }
-    if (user.id === client.user.id) return;
+    if (client.user && user.id === client.user.id) return;
 
     // Check if the reaction is partial (e.g. from an uncached message) and fetch it
     if (reaction.partial) {
@@ -28,8 +28,20 @@ module.exports = {
     }
 
     const message = reaction.message;
+    // Fetch partial message if needed to make sure it's fully cached before reacting
+    if (message.partial) {
+      try {
+        await message.fetch();
+      } catch (err) {
+        logger.error('[REACTION] Failed to fetch partial message:', err.message);
+        return;
+      }
+    }
+
     const guild = message.guild;
     if (!guild) return; // DMs are ignored
+
+    logger.info(`[REACTION] Event received: emoji=${reaction.emoji.name}, user=${user.tag || user.id}, msgId=${message.id}`);
 
     try {
       // Rule 2 (Database Check): Check if 'reaction_mirroring' is set to True for that server. If False, return.
