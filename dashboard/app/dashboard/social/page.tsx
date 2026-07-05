@@ -32,6 +32,25 @@ export default function SocialPage() {
 
   const [configSaveStatus, setConfigSaveStatus] = useState<SaveStatus>('idle');
 
+  // Auto-Reaction System state
+  const [autoReactions, setAutoReactions] = useState<any[]>([]);
+  const [newTriggerWord, setNewTriggerWord] = useState('');
+  const [newTriggerEmoji, setNewTriggerEmoji] = useState('');
+  const [loadingReactions, setLoadingReactions] = useState(false);
+
+  useEffect(() => {
+    if (activeTab === 'auto_reactions') {
+      setLoadingReactions(true);
+      fetch('/api/social/auto-reactions')
+        .then((r) => r.json())
+        .then((data) => {
+          setAutoReactions(Array.isArray(data) ? data : []);
+          setLoadingReactions(false);
+        })
+        .catch(() => setLoadingReactions(false));
+    }
+  }, [activeTab]);
+
   // Load existing alerts configurations
   useEffect(() => {
     fetch('/api/config')
@@ -259,6 +278,13 @@ export default function SocialPage() {
             🌍 Translation Assistant
           </button>
           <button
+            className={`sidebar-item ${activeTab === 'auto_reactions' ? 'active' : ''}`}
+            onClick={() => setActiveTab('auto_reactions')}
+            id="sidebar-social-reactions"
+          >
+            ⭐ Auto-Reaction Manager
+          </button>
+          <button
             className={`sidebar-item ${activeTab === 'birthday_settings' ? 'active' : ''}`}
             onClick={() => setActiveTab('birthday_settings')}
             id="sidebar-social-birthdays"
@@ -294,6 +320,11 @@ export default function SocialPage() {
               </div>
 
               <div className="overview-item">
+                <h3>⭐ Auto-Reaction Manager</h3>
+                <p>Automatically reacts to configured trigger words/phrases with specific emojis, and option to mirror reactions.</p>
+              </div>
+
+              <div className="overview-item">
                 <h3>🎂 AI Birthday Announcement Settings</h3>
                 <p>Configure target channels, release schedules, and prompt formulas to release personalized AI-polished birthday announcements.</p>
               </div>
@@ -301,6 +332,170 @@ export default function SocialPage() {
               <div className="overview-item">
                 <h3>🎉 Birthday Queue Workspace</h3>
                 <p>Manage and authorize upcoming birthday cards, transform rough member facts into polished greetings, and release them to Discord.</p>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'auto_reactions' && (
+            <div className="split-layout-detail">
+              <div className="feature-instructions">
+                <h3>Auto-Reaction Guidelines</h3>
+                <p>
+                  Create automatic reactions to boost community expression and drive engagement:
+                </p>
+                <ol>
+                  <li>Input a <strong>Trigger Word or Phrase</strong> (e.g. <code>gg</code>, <code>hype</code>).</li>
+                  <li>Provide the <strong>Reaction Emoji</strong>. This can be a standard Unicode emoji or a custom Discord emoji.</li>
+                  <li>Enable <strong>Reaction Mirroring</strong> to double standard reaction counts when server members react to messages.</li>
+                </ol>
+                <div className="tip-box">
+                  <strong>💡 Unicode vs Custom Emojis:</strong><br />
+                  For standard emojis, paste the raw emoji (like 🔥). For custom emojis, ensure the bot has access to the server/emoji.
+                </div>
+              </div>
+
+              <div className="feature-form-card">
+                <FeatureCard
+                  id="auto_reactions"
+                  icon="⭐"
+                  title="Auto-Reaction Manager"
+                  description="Automatically reacts to configured trigger words, and mirrors user reactions."
+                  featureKey="auto_reactions"
+                  initialEnabled={configs['auto_reactions']?.enabled ?? false}
+                  initialConfig={configs['auto_reactions']?.config ?? {}}
+                >
+                  {(config, setConfig) => (
+                    <>
+                      <div className="section-divider">
+                        <div className="section-divider-line" />
+                        <span className="section-divider-text">Settings</span>
+                        <div className="section-divider-line" />
+                      </div>
+
+                      <div className="form-group" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginTop: '0.5rem' }}>
+                        <input
+                          id="reactions-mirroring-toggle"
+                          type="checkbox"
+                          checked={config.reaction_mirroring ?? false}
+                          onChange={(e) => setConfig('reaction_mirroring', e.target.checked)}
+                          style={{ width: '1.2rem', height: '1.2rem', accentColor: 'var(--accent-primary)' }}
+                        />
+                        <label htmlFor="reactions-mirroring-toggle" className="form-label" style={{ margin: 0, cursor: 'pointer' }}>
+                          Enable Reaction Mirroring (Double Reactions)
+                        </label>
+                      </div>
+                      <p className="form-hint" style={{ marginTop: '0.25rem' }}>
+                        When enabled, the bot duplicates reactions added by server members to increase reaction count.
+                      </p>
+
+                      <div className="section-divider" style={{ marginTop: '1.5rem' }}>
+                        <div className="section-divider-line" />
+                        <span className="section-divider-text">Add Reaction Trigger</span>
+                        <div className="section-divider-line" />
+                      </div>
+
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: '0.75rem', alignItems: 'end' }}>
+                        <div className="form-group" style={{ margin: 0 }}>
+                          <label className="form-label">Trigger Word / Phrase</label>
+                          <input
+                            id="reactions-new-trigger"
+                            className="form-input"
+                            placeholder="e.g. hype, gg, congrats"
+                            value={newTriggerWord}
+                            onChange={(e) => setNewTriggerWord(e.target.value)}
+                          />
+                        </div>
+                        <div className="form-group" style={{ margin: 0 }}>
+                          <label className="form-label">Reaction Emoji (Unicode or Name)</label>
+                          <input
+                            id="reactions-new-emoji"
+                            className="form-input"
+                            placeholder="e.g. 🔥, 👍, :hype:"
+                            value={newTriggerEmoji}
+                            onChange={(e) => setNewTriggerEmoji(e.target.value)}
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          className="btn-primary"
+                          style={{ height: '38px', padding: '0 1rem' }}
+                          onClick={async () => {
+                            if (!newTriggerWord.trim() || !newTriggerEmoji.trim()) {
+                              alert('Please fill out both the trigger word and the emoji.');
+                              return;
+                            }
+                            try {
+                              const res = await fetch('/api/social/auto-reactions', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                  action: 'add',
+                                  trigger_word: newTriggerWord,
+                                  reaction_emoji: newTriggerEmoji,
+                                }),
+                              });
+                              if (!res.ok) throw new Error('Failed to add trigger');
+                              const newRow = await res.json();
+                              setAutoReactions((prev) => [...prev, newRow]);
+                              setNewTriggerWord('');
+                              setNewTriggerEmoji('');
+                            } catch (err: any) {
+                              alert(err.message);
+                            }
+                          }}
+                        >
+                          Add
+                        </button>
+                      </div>
+
+                      <div className="section-divider" style={{ marginTop: '1.5rem' }}>
+                        <div className="section-divider-line" />
+                        <span className="section-divider-text">Active Word Triggers</span>
+                        <div className="section-divider-line" />
+                      </div>
+
+                      {loadingReactions ? (
+                        <div style={{ display: 'flex', justifyContent: 'center', padding: '1rem' }}>
+                          <div className="spinner" style={{ width: 24, height: 24 }} />
+                        </div>
+                      ) : autoReactions.length === 0 ? (
+                        <p className="form-hint" style={{ textAlign: 'center', padding: '1rem' }}>
+                          No word triggers configured yet.
+                        </p>
+                      ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: '200px', overflowY: 'auto', paddingRight: '0.25rem' }}>
+                          {autoReactions.map((trig) => (
+                            <div key={trig.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.5rem', backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: '4px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                              <span style={{ fontSize: '0.875rem' }}>
+                                Trigger: <code style={{ color: 'var(--accent-primary)', backgroundColor: 'transparent', padding: 0 }}>{trig.trigger_word}</code> ➡️ {trig.reaction_emoji}
+                              </span>
+                              <button
+                                type="button"
+                                style={{ background: 'transparent', border: 'none', color: '#EF4444', cursor: 'pointer', fontSize: '0.8125rem' }}
+                                onClick={async () => {
+                                  if (!confirm('Are you sure you want to delete this trigger?')) return;
+                                  try {
+                                    const res = await fetch('/api/social/auto-reactions', {
+                                      method: 'POST',
+                                      headers: { 'Content-Type': 'application/json' },
+                                      body: JSON.stringify({ action: 'delete', id: trig.id }),
+                                    });
+                                    if (!res.ok) throw new Error('Failed to delete trigger');
+                                    setAutoReactions((prev) => prev.filter((t) => t.id !== trig.id));
+                                  } catch (err: any) {
+                                    alert(err.message);
+                                  }
+                                }}
+                              >
+                                Delete
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </>
+                  )}
+                </FeatureCard>
               </div>
             </div>
           )}

@@ -1,6 +1,7 @@
 const { Events } = require('discord.js');
 const { awardMessageCoins } = require('../modules/gaming/vault');
 const { isFeatureEnabled } = require('../lib/supabase');
+const { handleMessageAutoReactions } = require('../modules/social/autoReaction');
 
 module.exports = {
   name: Events.MessageCreate,
@@ -18,6 +19,12 @@ module.exports = {
     const vaultEnabled = await isFeatureEnabled(guildId, 'vault');
     if (vaultEnabled) {
       await awardMessageCoins(message.author.id, guildId, message.guild).catch(() => {});
+    }
+
+    // Auto-Reactions: react to trigger words
+    const reactionsEnabled = await isFeatureEnabled(guildId, 'auto_reactions');
+    if (reactionsEnabled) {
+      await handleMessageAutoReactions(message).catch(() => {});
     }
   },
 };
