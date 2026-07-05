@@ -160,8 +160,51 @@ async function handleHelpDeskChatMessage(message) {
     const messages = await thread.messages.fetch({ limit: 15 });
     const sorted = [...messages.values()].reverse();
 
-    // Construct system instructions with FAQ cards
+    // Fetch live guild updates to ensure member count and structures are fully accurate
+    const guild = message.guild;
+    try {
+      await guild.fetch();
+    } catch (e) {
+      logger.warn('[HELPDESK] Failed to fetch live guild updates:', e.message);
+    }
+
+    let guildContext = `\n\nLive Server Context Details for the server "${guild.name}":\n`;
+    guildContext += `- Server Name: ${guild.name}\n`;
+    guildContext += `- Total Server Members (live): ${guild.memberCount}\n`;
+
+    const owner = await guild.fetchOwner().catch(() => null);
+    if (owner) {
+      guildContext += `- Server Owner: ${owner.user.tag} (ID: ${owner.user.id})\n`;
+    }
+
+    // List server text/announcement channels for context referencing
+    const textChannels = guild.channels.cache
+      .filter(c => c.type === 0 || c.type === 5)
+      .map(c => `  * #${c.name}: <#${c.id}>`)
+      .slice(0, 30)
+      .join('\n');
+    if (textChannels) {
+      guildContext += `- Available Text Channels list (you should mention channels using the exact format <#channel_id> so they render as clickable links in Discord):\n${textChannels}\n`;
+    }
+
+    // Retrieve active configuration contexts
+    const gatekeeperConfig = await getFeatureConfig(guildId, 'gatekeeper');
+    if (gatekeeperConfig?.enabled) {
+      guildContext += `- Gatekeeper Onboarding is ACTIVE.\n`;
+      if (gatekeeperConfig.config?.landing_channel_id) {
+        guildContext += `  * Landing / Entry Channel: <#${gatekeeperConfig.config.landing_channel_id}>\n`;
+      }
+    }
+
+    const vaultConfig = await getFeatureConfig(guildId, 'vault');
+    if (vaultConfig?.enabled) {
+      guildContext += `- Vault Coins Economy is ACTIVE. Members earn vault coins by sending messages in active text channels.\n`;
+    }
+
+    // Construct system instructions with FAQ cards and live context
     let systemPrompt = config.ai_system_prompt || 'You are a helpful customer support bot.';
+    systemPrompt += guildContext;
+
     const faqList = config.faq_list || [];
     if (faqList.length > 0) {
       systemPrompt += '\n\nUse the following Server FAQ list to answer the user\'s questions about this server accurately:\n';
