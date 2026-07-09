@@ -67,7 +67,7 @@ module.exports = {
 
       // Format rules
       const rulesContent = Array.isArray(config.rules) && config.rules.length > 0
-        ? config.rules.map(r => `• ${r}`).join('\n')
+        ? config.rules.map(r => `• ${r}`).join('\n\n')
         : '• Please follow server guidelines.';
 
       const embed = new EmbedBuilder()
