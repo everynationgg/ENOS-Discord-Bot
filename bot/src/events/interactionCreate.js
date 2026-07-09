@@ -33,6 +33,15 @@ module.exports = {
         return;
       }
 
+      // ─── Autocomplete Interactions ───────────────────────────────────────────
+      if (interaction.isAutocomplete()) {
+        const command = client.commands.get(interaction.commandName);
+        if (command && command.autocomplete) {
+          await command.autocomplete(interaction);
+        }
+        return;
+      }
+
       // ─── Button Interactions ──────────────────────────────────────────────────
       if (interaction.isButton()) {
         if (interaction.customId === 'verify_here') {
@@ -58,7 +67,7 @@ module.exports = {
           const { handleHelpDeskClose } = require('../modules/moderation/helpdesk');
           return handleHelpDeskClose(interaction);
         }
-        if (interaction.customId === 'join_palworld_server') {
+        if (interaction.customId.startsWith('join_game_server:')) {
           const { handleKeyformButton } = require('../modules/moderation/keyform');
           return handleKeyformButton(interaction);
         }
@@ -78,7 +87,7 @@ module.exports = {
           const { handleLFGModalSubmit } = require('../modules/gaming/lfg');
           return handleLFGModalSubmit(interaction);
         }
-        if (interaction.customId === 'palworld_registration_modal') {
+        if (interaction.customId.startsWith('game_registration_modal:')) {
           const { handleKeyformModalSubmit } = require('../modules/moderation/keyform');
           return handleKeyformModalSubmit(interaction);
         }

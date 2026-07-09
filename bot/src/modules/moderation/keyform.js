@@ -9,19 +9,33 @@ const logger = require('../../lib/logger');
  */
 async function handleKeyformButton(interaction) {
   try {
+    // Extract game key from the customId (format: "join_game_server:game_key")
+    const parts = interaction.customId.split(':');
+    const gameKey = parts[1] || 'palworld';
+
+    const guildId = interaction.guildId;
+    const config = await getKeyformConfig(guildId, gameKey);
+
+    if (!config) {
+      return interaction.reply({
+        content: `❌ **Server configuration for "${gameKey}" not found.** Please contact an administrator.`,
+        ephemeral: true
+      });
+    }
+
     const modal = new ModalBuilder()
-      .setCustomId('palworld_registration_modal')
-      .setTitle('Palworld Server Registration');
+      .setCustomId(`game_registration_modal:${gameKey}`)
+      .setTitle(`${config.game_name} Registration`);
 
     const ignInput = new TextInputBuilder()
-      .setCustomId('palworld_ign')
+      .setCustomId('game_ign')
       .setLabel('In-Game Name (IGN) you intend to use')
       .setStyle(TextInputStyle.Short)
       .setRequired(true)
       .setPlaceholder('Enter your character name');
 
     const agreementInput = new TextInputBuilder()
-      .setCustomId('palworld_agreement')
+      .setCustomId('game_agreement')
       .setLabel("Type 'I AGREE' to confirm active status")
       .setStyle(TextInputStyle.Short)
       .setRequired(true)
@@ -48,8 +62,12 @@ async function handleKeyformButton(interaction) {
  */
 async function handleKeyformModalSubmit(interaction) {
   try {
-    const ign = interaction.fields.getTextInputValue('palworld_ign').trim();
-    const agreement = interaction.fields.getTextInputValue('palworld_agreement').trim();
+    // Extract game key from the customId (format: "game_registration_modal:game_key")
+    const parts = interaction.customId.split(':');
+    const gameKey = parts[1] || 'palworld';
+
+    const ign = interaction.fields.getTextInputValue('game_ign').trim();
+    const agreement = interaction.fields.getTextInputValue('game_agreement').trim();
 
     // Check agreement
     if (agreement.toUpperCase() !== 'I AGREE') {
@@ -63,10 +81,10 @@ async function handleKeyformModalSubmit(interaction) {
     await interaction.deferReply({ ephemeral: true });
 
     const guildId = interaction.guildId;
-    const config = await getKeyformConfig(guildId, 'palworld');
+    const config = await getKeyformConfig(guildId, gameKey);
 
     if (!config) {
-      return interaction.editReply('❌ **Server configuration not found.** Please ask an administrator to set it up in the dashboard.');
+      return interaction.editReply(`❌ **Server configuration for "${gameKey}" not found.** Please contact an administrator.`);
     }
 
     // Add registration to database
@@ -75,7 +93,7 @@ async function handleKeyformModalSubmit(interaction) {
       interaction.user.id,
       interaction.user.tag,
       ign,
-      'palworld'
+      gameKey
     );
 
     if (!success) {
@@ -115,7 +133,7 @@ async function handleKeyformModalSubmit(interaction) {
 
     // Record internal bot audit event log
     await logBotEvent(guildId, 'keyform_join', interaction.user.id, {
-      game_key: 'palworld',
+      game_key: gameKey,
       ign,
       discord_tag: interaction.user.tag
     });
