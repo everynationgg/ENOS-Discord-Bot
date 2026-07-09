@@ -66,4 +66,62 @@ async function logBotEvent(guildId, eventType, discordId = null, details = {}) {
   if (error) logger.error('[SUPABASE] logBotEvent error:', error.message);
 }
 
-module.exports = { supabase, getFeatureConfig, isFeatureEnabled, logBotEvent };
+/**
+ * Fetches a keyform server config.
+ * @param {string} guildId
+ * @param {string} gameKey
+ * @returns {Promise<object|null>}
+ */
+async function getKeyformConfig(guildId, gameKey) {
+  const { data, error } = await supabase
+    .from('keyform_configs')
+    .select('*')
+    .eq('guild_id', guildId)
+    .eq('game_key', gameKey)
+    .maybeSingle();
+
+  if (error) {
+    logger.error(`[SUPABASE] getKeyformConfig error (${gameKey}):`, error.message);
+    return null;
+  }
+  return data;
+}
+
+/**
+ * Saves a keyform registration.
+ * @param {string} guildId
+ * @param {string} discordId
+ * @param {string} discordTag
+ * @param {string} ign
+ * @param {string} gameKey
+ * @returns {Promise<boolean>}
+ */
+async function addKeyformRegistration(guildId, discordId, discordTag, ign, gameKey) {
+  const { error } = await supabase.from('keyform_registrations').upsert(
+    {
+      guild_id: guildId,
+      discord_id: discordId,
+      discord_tag: discordTag,
+      ign,
+      game_key: gameKey,
+      registered_at: new Date().toISOString(),
+    },
+    { onConflict: 'guild_id,discord_id,game_key' }
+  );
+
+  if (error) {
+    logger.error('[SUPABASE] addKeyformRegistration error:', error.message);
+    return false;
+  }
+  return true;
+}
+
+module.exports = {
+  supabase,
+  getFeatureConfig,
+  isFeatureEnabled,
+  logBotEvent,
+  getKeyformConfig,
+  addKeyformRegistration,
+};
+

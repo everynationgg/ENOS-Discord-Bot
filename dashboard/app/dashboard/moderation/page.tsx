@@ -13,6 +13,119 @@ export default function ModerationPage() {
   const [newAnswer, setNewAnswer] = useState('');
   const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'synced' | 'error'>('idle');
 
+  // Keyform states
+  const [keyformConfigs, setKeyformConfigs] = useState<any[]>([]);
+  const [selectedGameKey, setSelectedGameKey] = useState<string>('');
+  const [registrations, setRegistrations] = useState<any[]>([]);
+  const [loadingKeyform, setLoadingKeyform] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [gameFilter, setGameFilter] = useState('');
+  const [keyformSaveStatus, setKeyformSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+
+  // Form states
+  const [gameKey, setGameKey] = useState('');
+  const [gameName, setGameName] = useState('');
+  const [serverUrl, setServerUrl] = useState('');
+  const [serverPassword, setServerPassword] = useState('');
+  const [targetChannelId, setTargetChannelId] = useState('');
+  const [logChannelId, setLogChannelId] = useState('');
+  const [rules, setRules] = useState<string[]>([]);
+  const [newRuleText, setNewRuleText] = useState('');
+
+  const fetchKeyformData = async () => {
+    setLoadingKeyform(true);
+    try {
+      const [confRes, regRes] = await Promise.all([
+        fetch('/api/moderation/keyform/config'),
+        fetch('/api/moderation/keyform/registrations')
+      ]);
+      const confData = await confRes.json();
+      const regData = await regRes.json();
+      setKeyformConfigs(Array.isArray(confData) ? confData : []);
+      setRegistrations(Array.isArray(regData) ? regData : []);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoadingKeyform(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'keyform') {
+      fetchKeyformData();
+    }
+  }, [activeTab]);
+
+  const handleSelectGameConfig = (gk: string) => {
+    setSelectedGameKey(gk);
+    if (!gk) {
+      setGameKey('');
+      setGameName('');
+      setServerUrl('');
+      setServerPassword('');
+      setTargetChannelId('');
+      setLogChannelId('');
+      setRules([]);
+      return;
+    }
+    const found = keyformConfigs.find(c => c.game_key === gk);
+    if (found) {
+      setGameKey(found.game_key);
+      setGameName(found.game_name);
+      setServerUrl(found.server_url);
+      setServerPassword(found.server_password);
+      setTargetChannelId(found.target_channel_id);
+      setLogChannelId(found.log_channel_id);
+      setRules(found.rules || []);
+    }
+  };
+
+  const handleSaveKeyform = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!gameKey || !gameName || !serverUrl || !serverPassword || !targetChannelId || !logChannelId) {
+      alert('Please fill in all fields.');
+      return;
+    }
+    setKeyformSaveStatus('saving');
+    try {
+      const res = await fetch('/api/moderation/keyform/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          game_key: gameKey,
+          game_name: gameName,
+          server_url: serverUrl,
+          server_password: serverPassword,
+          target_channel_id: targetChannelId,
+          log_channel_id: logChannelId,
+          rules,
+        }),
+      });
+      if (!res.ok) throw new Error();
+      setKeyformSaveStatus('saved');
+      setTimeout(() => setKeyformSaveStatus('idle'), 2500);
+      fetchKeyformData();
+    } catch {
+      setKeyformSaveStatus('error');
+    }
+  };
+
+  const handleRevokeRegistration = async (id: string) => {
+    if (!confirm('Are you sure you want to revoke access and remove this player registration?')) return;
+    try {
+      const res = await fetch(`/api/moderation/keyform/registrations?id=${id}`, {
+        method: 'DELETE',
+      });
+      if (res.ok) {
+        fetchKeyformData();
+      } else {
+        alert('Failed to revoke access.');
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   useEffect(() => {
     fetch('/api/config')
       .then((r) => r.json())
@@ -69,6 +182,13 @@ export default function ModerationPage() {
             id="sidebar-mod-helpdesk"
           >
             🤖 AI Support Help Desk
+          </button>
+          <button
+            className={`sidebar-item ${activeTab === 'keyform' ? 'active' : ''}`}
+            onClick={() => setActiveTab('keyform')}
+            id="sidebar-mod-keyform"
+          >
+            🔑 Keyform Access
           </button>
         </aside>
 
@@ -562,6 +682,298 @@ export default function ModerationPage() {
                     );
                   }}
                 </FeatureCard>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'keyform' && (
+            <div className="split-layout-detail">
+              <div className="feature-instructions">
+                <h3>🔑 Keyform Access Guidelines</h3>
+                <p>
+                  Create self-service registration forms for game servers (like Palworld, Minecraft, etc.) right inside Discord.
+                </p>
+                <ol>
+                  <li>Create/bind a registration channel on Discord. Copy its ID for <strong>Target Channel ID</strong>.</li>
+                  <li>Create a logging channel for registrations. Copy its ID for <strong>Logging Channel ID</strong>.</li>
+                  <li>Set the server connection URL/IP and Password. These are delivered ephemerally to users who register and agree.</li>
+                  <li>Build a checklist of server rules. These rules are dynamically populated in the Discord embed.</li>
+                </ol>
+                <div className="tip-box">
+                  <strong>💡 How to setup on Discord:</strong><br />
+                  Once configured and saved, run <code>/setup-[game_key]</code> (e.g. <code>/setup-palworld</code>) in your target channel to deploy the registration panel.
+                </div>
+              </div>
+
+              <div className="feature-form-card" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+                <div>
+                  <h3 style={{ marginBottom: '1rem' }}>⚙️ Server Configuration</h3>
+                  
+                  <div className="form-group" style={{ marginBottom: '1.25rem' }}>
+                    <label className="form-label">Select Game Server</label>
+                    <select
+                      className="form-input"
+                      value={selectedGameKey}
+                      onChange={(e) => handleSelectGameConfig(e.target.value)}
+                      style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)' }}
+                    >
+                      <option value="">➕ Setup New Game Server</option>
+                      {keyformConfigs.map((c) => (
+                        <option key={c.game_key} value={c.game_key}>
+                          🎮 {c.game_name} ({c.game_key})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <form onSubmit={handleSaveKeyform} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                      <div className="form-group">
+                        <label className="form-label">Game Key (e.g., palworld)</label>
+                        <input
+                          className="form-input"
+                          placeholder="e.g. palworld"
+                          value={gameKey}
+                          onChange={(e) => setGameKey(e.target.value)}
+                          disabled={!!selectedGameKey}
+                          required
+                        />
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label">Game Display Name</label>
+                        <input
+                          className="form-input"
+                          placeholder="e.g. Palworld"
+                          value={gameName}
+                          onChange={(e) => setGameName(e.target.value)}
+                          required
+                        />
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                      <div className="form-group">
+                        <label className="form-label">Server Connection URL / IP</label>
+                        <input
+                          className="form-input"
+                          placeholder="e.g. 192.168.1.100:8211"
+                          value={serverUrl}
+                          onChange={(e) => setServerUrl(e.target.value)}
+                          required
+                        />
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label">Server Password</label>
+                        <input
+                          className="form-input"
+                          type="text"
+                          placeholder="Server password"
+                          value={serverPassword}
+                          onChange={(e) => setServerPassword(e.target.value)}
+                          required
+                        />
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                      <div className="form-group">
+                        <label className="form-label">Target Registration Channel ID</label>
+                        <input
+                          className="form-input"
+                          placeholder="Discord channel ID"
+                          value={targetChannelId}
+                          onChange={(e) => setTargetChannelId(e.target.value)}
+                          required
+                        />
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label">Logging Channel ID</label>
+                        <input
+                          className="form-input"
+                          placeholder="Discord channel ID"
+                          value={logChannelId}
+                          onChange={(e) => setLogChannelId(e.target.value)}
+                          required
+                        />
+                      </div>
+                    </div>
+
+                    <div className="form-group">
+                      <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span>Server Rules (Bullet Points)</span>
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{rules.length} rules</span>
+                      </label>
+                      
+                      <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.75rem' }}>
+                        <input
+                          className="form-input"
+                          placeholder="Type a new rule bullet point..."
+                          value={newRuleText}
+                          onChange={(e) => setNewRuleText(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              if (newRuleText.trim()) {
+                                setRules([...rules, newRuleText.trim()]);
+                                setNewRuleText('');
+                              }
+                            }
+                          }}
+                        />
+                        <button
+                          type="button"
+                          className="btn btn-secondary"
+                          onClick={() => {
+                            if (newRuleText.trim()) {
+                              setRules([...rules, newRuleText.trim()]);
+                              setNewRuleText('');
+                            }
+                          }}
+                          style={{ padding: '0 1rem' }}
+                        >
+                          Add
+                        </button>
+                      </div>
+
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: '200px', overflowY: 'auto' }}>
+                        {rules.map((rule, idx) => (
+                          <div
+                            key={idx}
+                            style={{
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              alignItems: 'center',
+                              padding: '0.5rem 0.75rem',
+                              background: 'rgba(255,255,255,0.02)',
+                              border: '1px solid rgba(255,255,255,0.05)',
+                              borderRadius: 'var(--radius-sm)',
+                              fontSize: '0.8125rem'
+                            }}
+                          >
+                            <span>• {rule}</span>
+                            <button
+                              type="button"
+                              onClick={() => setRules(rules.filter((_, i) => i !== idx))}
+                              style={{ background: 'transparent', border: 'none', color: '#EF4444', cursor: 'pointer', fontSize: '0.75rem' }}
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        ))}
+                        {rules.length === 0 && (
+                          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                            No rules added. Rules will not display in the Discord embed.
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    <button
+                      type="submit"
+                      className="btn btn-primary"
+                      disabled={keyformSaveStatus === 'saving'}
+                      style={{
+                        marginTop: '0.5rem',
+                        backgroundColor: keyformSaveStatus === 'saved' ? '#10B981' : keyformSaveStatus === 'error' ? '#EF4444' : 'var(--accent-primary)',
+                        borderColor: keyformSaveStatus === 'saved' ? '#10B981' : keyformSaveStatus === 'error' ? '#EF4444' : 'var(--accent-primary)',
+                      }}
+                    >
+                      {keyformSaveStatus === 'saving' ? '💾 Saving Server Config...' : keyformSaveStatus === 'saved' ? '✓ Server Config Saved!' : '💾 Save Game Server Config'}
+                    </button>
+                  </form>
+                </div>
+
+                <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: '2rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                    <h3>📋 Player Access Registrations ({registrations.length})</h3>
+                    
+                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                      <select
+                        className="form-input"
+                        value={gameFilter}
+                        onChange={(e) => setGameFilter(e.target.value)}
+                        style={{ width: '130px', padding: '0.25rem 0.5rem', fontSize: '0.8rem', background: 'var(--bg-elevated)', color: 'var(--text-primary)' }}
+                      >
+                        <option value="">All Games</option>
+                        {Array.from(new Set(registrations.map(r => r.game_key))).map(gk => (
+                          <option key={gk} value={gk}>{gk}</option>
+                        ))}
+                      </select>
+
+                      <input
+                        className="form-input"
+                        placeholder="Search Discord/IGN..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        style={{ width: '180px', padding: '0.25rem 0.5rem', fontSize: '0.8rem' }}
+                      />
+                    </div>
+                  </div>
+
+                  <div style={{ background: 'rgba(255,255,255,0.01)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', overflow: 'hidden' }}>
+                    {loadingKeyform ? (
+                      <div className="empty-state" style={{ padding: '2rem' }}><div className="spinner" style={{ width: 24, height: 24 }} /></div>
+                    ) : registrations.length === 0 ? (
+                      <div className="empty-state" style={{ padding: '2rem' }}>
+                        <div className="empty-state-icon">📭</div>
+                        <div className="empty-state-title">No registrations found</div>
+                      </div>
+                    ) : (
+                      <div style={{ overflowX: 'auto' }}>
+                        <table className="data-table" style={{ fontSize: '0.8rem' }}>
+                          <thead>
+                            <tr>
+                              <th>Player</th>
+                              <th>IGN</th>
+                              <th>Game</th>
+                              <th>Date Joined</th>
+                              <th style={{ textAlign: 'right' }}>Actions</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {registrations
+                              .filter(r => !gameFilter || r.game_key === gameFilter)
+                              .filter(r => !searchQuery || r.discord_tag.toLowerCase().includes(searchQuery.toLowerCase()) || r.ign.toLowerCase().includes(searchQuery.toLowerCase()))
+                              .map((reg) => (
+                                <tr key={reg.id}>
+                                  <td>
+                                    <span style={{ fontWeight: 500, color: 'var(--text-primary)' }}>
+                                      @{reg.discord_tag}
+                                    </span>
+                                    <br />
+                                    <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{reg.discord_id}</span>
+                                  </td>
+                                  <td>
+                                    <code style={{ fontSize: '0.75rem', color: 'var(--text-primary)', background: 'rgba(255,255,255,0.04)', padding: '0.1rem 0.35rem', borderRadius: 4 }}>
+                                      {reg.ign}
+                                    </code>
+                                  </td>
+                                  <td>
+                                    <span style={{ textTransform: 'capitalize', color: 'var(--accent-primary)', fontWeight: 500 }}>
+                                      {reg.game_key}
+                                    </span>
+                                  </td>
+                                  <td>
+                                    {new Date(reg.registered_at).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', month: 'short', day: 'numeric', year: 'numeric' })}
+                                  </td>
+                                  <td style={{ textAlign: 'right' }}>
+                                    <button
+                                      type="button"
+                                      className="btn btn-secondary btn-xs"
+                                      onClick={() => handleRevokeRegistration(reg.id)}
+                                      style={{ color: '#EF4444', borderColor: 'rgba(239,68,68,0.2)' }}
+                                    >
+                                      Revoke Access
+                                    </button>
+                                  </td>
+                                </tr>
+                              ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
             </div>
           )}

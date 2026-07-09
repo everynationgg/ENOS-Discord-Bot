@@ -132,3 +132,80 @@ export async function triggerPruning() {
   const { error } = await supabaseAdmin.rpc('prune_old_records');
   if (error) throw new Error(error.message);
 }
+
+/**
+ * Get all keyform configurations for a guild.
+ */
+export async function getKeyformConfigs(guildId: string) {
+  const { data, error } = await supabaseAdmin
+    .from('keyform_configs')
+    .select('*')
+    .eq('guild_id', guildId)
+    .order('game_name', { ascending: true });
+
+  if (error) throw new Error(error.message);
+  return data || [];
+}
+
+/**
+ * Upsert a keyform configuration.
+ */
+export async function upsertKeyformConfig(
+  guildId: string,
+  gameKey: string,
+  gameName: string,
+  serverUrl: string,
+  serverPassword: string,
+  targetChannelId: string,
+  logChannelId: string,
+  rules: string[]
+) {
+  const { error } = await supabaseAdmin.from('keyform_configs').upsert(
+    {
+      guild_id: guildId,
+      game_key: gameKey,
+      game_name: gameName,
+      server_url: serverUrl,
+      server_password: serverPassword,
+      target_channel_id: targetChannelId,
+      log_channel_id: logChannelId,
+      rules,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: 'guild_id,game_key' }
+  );
+
+  if (error) throw new Error(error.message);
+}
+
+/**
+ * Get all keyform registrations for a guild, optionally filtered by game.
+ */
+export async function getKeyformRegistrations(guildId: string, gameKey?: string) {
+  let query = supabaseAdmin
+    .from('keyform_registrations')
+    .select('*')
+    .eq('guild_id', guildId)
+    .order('registered_at', { ascending: false });
+
+  if (gameKey) {
+    query = query.eq('game_key', gameKey);
+  }
+
+  const { data, error } = await query;
+  if (error) throw new Error(error.message);
+  return data || [];
+}
+
+/**
+ * Delete (revoke) a keyform registration.
+ */
+export async function deleteKeyformRegistration(guildId: string, id: string) {
+  const { error } = await supabaseAdmin
+    .from('keyform_registrations')
+    .delete()
+    .eq('guild_id', guildId)
+    .eq('id', id);
+
+  if (error) throw new Error(error.message);
+}

@@ -58,6 +58,10 @@ module.exports = {
           const { handleHelpDeskClose } = require('../modules/moderation/helpdesk');
           return handleHelpDeskClose(interaction);
         }
+        if (interaction.customId === 'join_palworld_server') {
+          const { handleKeyformButton } = require('../modules/moderation/keyform');
+          return handleKeyformButton(interaction);
+        }
         return;
       }
 
@@ -73,6 +77,10 @@ module.exports = {
         if (interaction.customId.startsWith('lfg_modal:')) {
           const { handleLFGModalSubmit } = require('../modules/gaming/lfg');
           return handleLFGModalSubmit(interaction);
+        }
+        if (interaction.customId === 'palworld_registration_modal') {
+          const { handleKeyformModalSubmit } = require('../modules/moderation/keyform');
+          return handleKeyformModalSubmit(interaction);
         }
         return;
       }
