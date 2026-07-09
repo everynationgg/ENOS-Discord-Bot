@@ -701,7 +701,7 @@ export default function ModerationPage() {
                 </ol>
                 <div className="tip-box">
                   <strong>💡 How to setup on Discord:</strong><br />
-                  Once configured and saved, run <code>/setup-[game_key]</code> (e.g. <code>/setup-palworld</code>) in your target channel to deploy the registration panel.
+                  Once configured and saved, run <code>/setup-keyform game:[game_key]</code> (e.g. <code>/setup-keyform game:palworld</code>) in your target channel to deploy the registration panel.
                 </div>
               </div>
 
