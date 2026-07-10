@@ -67,16 +67,16 @@ async function checkTwitchStream(login) {
 /**
  * Builds a live alert embed.
  */
-function buildLiveEmbed(streamer, streamData, platform) {
+function buildLiveEmbed(streamer, streamData, platform, guildName) {
   const platformColor = platform === 'twitch' ? 0x9146FF : 0xFF0000;
-  const platformEmoji = platform === 'twitch' ? '<:twitch:>' : '▶️';
+  const platformEmoji = platform === 'twitch' ? '👾' : '▶️';
   const watchUrl = platform === 'twitch'
     ? `https://twitch.tv/${streamer.handle}`
     : streamer.stream_url;
 
   return new EmbedBuilder()
     .setColor(platformColor)
-    .setTitle(`🔴 ${streamer.display_name} is LIVE!`)
+    .setTitle(`${platformEmoji} ${streamer.display_name} is LIVE!`)
     .setDescription(`**${streamData.title || 'No title'}**`)
     .setImage(streamData.thumbnailUrl || null)
     .addFields(
@@ -84,19 +84,19 @@ function buildLiveEmbed(streamer, streamData, platform) {
       { name: '👁️ Viewers', value: (streamData.viewerCount || 0).toLocaleString(), inline: true },
       { name: '📺 Platform', value: platform.charAt(0).toUpperCase() + platform.slice(1), inline: true }
     )
-    .setFooter({ text: 'Every Nation Social Sync • ENOS' })
+    .setFooter({ text: `${guildName || 'Every Nation'} Social Sync` })
     .setTimestamp();
 }
 
 /**
  * Builds a "Stream Ended" static embed.
  */
-function buildStreamEndedEmbed(streamer, platform) {
+function buildStreamEndedEmbed(streamer, platform, guildName) {
   return new EmbedBuilder()
     .setColor(0x6B7280)
     .setTitle(`⬛ ${streamer.display_name} — Stream Ended`)
     .setDescription('Thanks for watching! The stream has ended.')
-    .setFooter({ text: 'Every Nation Social Sync • ENOS' })
+    .setFooter({ text: `${guildName || 'Every Nation'} Social Sync` })
     .setTimestamp();
 }
 
@@ -151,7 +151,7 @@ async function handleGoLive(client, streamer, streamData, platform) {
   const channel = await guild.channels.fetch(streamer.alert_channel_id).catch(() => null);
   if (!channel) return;
 
-  const embed = buildLiveEmbed(streamer, streamData, platform);
+  const embed = buildLiveEmbed(streamer, streamData, platform, guild.name);
   const watchUrl = platform === 'twitch'
     ? `https://twitch.tv/${streamer.handle}`
     : streamer.stream_url;
@@ -196,7 +196,7 @@ async function handleGoOffline(client, streamer) {
     try {
       const channel = await guild.channels.fetch(streamer.alert_channel_id);
       const message = await channel.messages.fetch(streamer.last_message_id);
-      const endedEmbed = buildStreamEndedEmbed(streamer, streamer.platform);
+      const endedEmbed = buildStreamEndedEmbed(streamer, streamer.platform, guild.name);
       await message.edit({ embeds: [endedEmbed], components: [] });
     } catch (err) {
       logger.warn(`[SOCIAL] Could not edit ended stream message: ${err.message}`);

@@ -86,7 +86,7 @@ async function handleVerifyButton(interaction) {
 
   const modal = new ModalBuilder()
     .setCustomId('verify_modal')
-    .setTitle('Every Nation — Member Registration');
+    .setTitle(`${interaction.guild.name.slice(0, 45)} — Member Registration`);
 
   const indianNameInput = new TextInputBuilder()
     .setCustomId('indian_name')

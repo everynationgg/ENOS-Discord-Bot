@@ -37,7 +37,7 @@ const GAME_BRANCHES = [
 ];
 
 // ─── Build LFG Embed ──────────────────────────────────────────────────────────
-function buildLFGEmbed(session, voiceChannelMention) {
+function buildLFGEmbed(session, voiceChannelMention, guildName) {
   const statusColor = session.status === 'open' ? 0x8B5CF6 : 0x6B7280;
   const statusText = session.status === 'open' ? '🟢 Active' : '🔴 Closed';
 
@@ -51,7 +51,7 @@ function buildLFGEmbed(session, voiceChannelMention) {
       { name: '🔊 Voice Channel', value: voiceChannelMention || 'Not set', inline: true },
       { name: '👥 Target Party Size', value: `${session.max_size} Players`, inline: true }
     )
-    .setFooter({ text: `Session ID: ${session.id.substring(0, 8)} • Every Nation LFG` })
+    .setFooter({ text: `Session ID: ${session.id.substring(0, 8)} • ${guildName || 'Every Nation'} LFG` })
     .setTimestamp(new Date(session.created_at));
 
   return embed;
@@ -292,7 +292,7 @@ async function handleLFGModalSubmit(interaction) {
   }
 
   // Post embed
-  const embed = buildLFGEmbed(session, voiceChannelMention);
+  const embed = buildLFGEmbed(session, voiceChannelMention, interaction.guild.name);
   const buttons = buildLFGButtons(guildId, voiceChannelId, inviteUrl);
 
   let targetChannel = interaction.channel;
@@ -375,7 +375,7 @@ async function refreshLFGEmbed(guild, session) {
       }
     }
 
-    const embed = buildLFGEmbed(session, voiceChannelMention);
+    const embed = buildLFGEmbed(session, voiceChannelMention, guild.name);
     const buttons = buildLFGButtons(guild.id, voiceChannelId, inviteUrl, session.status === 'closed');
 
     await message.edit({ embeds: [embed], components: [buttons] });

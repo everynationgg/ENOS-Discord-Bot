@@ -12,6 +12,9 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 async function runDailyDigest(client, guildId = process.env.DISCORD_GUILD_ID) {
   if (!guildId) return;
 
+  const guild = await client.guilds.fetch(guildId).catch(() => null);
+  const guildName = guild ? guild.name : 'Every Nation';
+
   const featureConfig = await getFeatureConfig(guildId, 'digest');
   if (!featureConfig?.enabled) return;
 
@@ -70,7 +73,7 @@ async function runDailyDigest(client, guildId = process.env.DISCORD_GUILD_ID) {
     .join('\n');
 
   const prompt = `
-You are a community digest assistant for "Every Nation," a Filipino/multilingual Discord gaming server.
+You are a community digest assistant for "${guildName}," a Filipino/multilingual Discord gaming server.
 Analyze the following messages from the past 24 hours and generate a concise, well-structured daily digest in English.
 Handle Taglish (Tagalog-English mixed), Filipino slang, and gaming jargon naturally — translate or explain as needed.
 
