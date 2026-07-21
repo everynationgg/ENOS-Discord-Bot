@@ -9,6 +9,7 @@ const { pruneOldRecords } = require('../modules/system/pruner');
 const { resetDailyQuests } = require('../modules/gaming/vault');
 const { expireOldLFGSessions } = require('../modules/gaming/lfg');
 const { loadBirthdayQueue, dispatchBirthdays } = require('../modules/social/birthdays');
+const { checkAndProcessTrivia } = require('../modules/gaming/trivia');
 
 /**
  * Initializes all scheduled cron jobs.
@@ -132,6 +133,15 @@ function initCrons(client) {
       await dispatchBirthdays(client);
     } catch (err) {
       logger.error('[CRON] Birthday dispatcher failed:', err.message);
+    }
+  });
+
+  // ─── Trivia Scheduler: Every 5 minutes ──────────────────────────────────────
+  cron.schedule('*/5 * * * *', async () => {
+    try {
+      await checkAndProcessTrivia(client);
+    } catch (err) {
+      logger.error('[CRON] Trivia check failed:', err.message);
     }
   });
 

@@ -32,12 +32,13 @@ export default function GamingPage() {
 
   const lfgConfig = configs['lfg'] || {};
   const vaultConfig = configs['vault'] || {};
+  const triviaConfig = configs['trivia'] || {};
 
   return (
     <div className="page-wrapper">
       <div className="page-header">
         <h1>🎮 Gaming</h1>
-        <p>Configure LFG party finder, Vault Economy, and game branch settings.</p>
+        <p>Configure LFG party finder, Vault Economy, Trivia Drops, and game branch settings.</p>
       </div>
 
       <div className="dashboard-layout" style={{ padding: 0 }}>
@@ -65,6 +66,13 @@ export default function GamingPage() {
           >
             💰 Vault Economy
           </button>
+          <button
+            className={`sidebar-item ${activeTab === 'trivia' ? 'active' : ''}`}
+            onClick={() => setActiveTab('trivia')}
+            id="sidebar-game-trivia"
+          >
+            🧠 Trivia Drop
+          </button>
         </aside>
 
         {/* Detail Content Area */}
@@ -87,6 +95,13 @@ export default function GamingPage() {
                 <h3>💰 Vault Economy</h3>
                 <p>
                   Reward users automatically with Vault Coins for voice and text activity, define custom role multipliers, and configure automatic rank-up tier roles.
+                </p>
+              </div>
+
+              <div className="overview-item">
+                <h3>🧠 Trivia Drop</h3>
+                <p>
+                  Auto-drops a daily AI-generated trivia question in a weighted random channel. Anti-cheat ephemeral shuffling per user, microsecond speed scoring, and podium point rewards all in one.
                 </p>
               </div>
             </div>
@@ -373,6 +388,276 @@ export default function GamingPage() {
                             />
                           </div>
                         ))}
+                      </>
+                    );
+                  }}
+                </FeatureCard>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'trivia' && (
+            <div className="split-layout-detail">
+              <div className="feature-instructions">
+                <h3>Trivia Drop Configuration Guide</h3>
+                <p>
+                  The daily trivia system auto-generates a unique multiple-choice question via AI and drops it into a weighted random channel. The answer order is shuffled per player to prevent leaking answers.
+                </p>
+                <ol>
+                  <li>Enable the feature and add the <strong>Channel Whitelist</strong> below — these are the channels where trivia can drop.</li>
+                  <li>Set a <strong>Priority</strong> per channel: <code>high</code> (3x weight), <code>medium</code> (2x), or <code>low</code> (1x) — dead channels can be revived with low priority.</li>
+                  <li>Optionally set a <strong>Topic</strong> for a channel (e.g. <code>Palworld survival mechanics</code>) for themed questions. Leave blank for general trivia.</li>
+                  <li>Configure the <strong>Close Time</strong> (in 24h format, e.g. <code>22:00</code>) — sessions close at this time if 3 winners haven't claimed all spots first.</li>
+                  <li>Set the server <strong>Timezone</strong> so scheduling works correctly regardless of where your community is based.</li>
+                  <li>Optionally configure a <strong>Leaderboard Channel ID</strong> to post and auto-update a live Top 5 trivia points leaderboard.</li>
+                  <li>Set <strong>Allowed Roles</strong> to restrict who can participate (leave empty to allow all members).</li>
+                </ol>
+                <div className="tip-box">
+                  <strong>💡 Force Trigger / Skip:</strong><br />
+                  Use the manual control buttons at the bottom of the config card to instantly spawn a drop or close the active session from this panel.
+                </div>
+              </div>
+
+              <div className="feature-form-card">
+                <FeatureCard
+                  id="trivia"
+                  icon="🧠"
+                  title="Daily Trivia Drop"
+                  description="AI-generated daily trivia with anti-cheat ephemeral shuffling, microsecond podium scoring, and Vault-independent point rewards."
+                  featureKey="trivia"
+                  initialEnabled={triviaConfig.enabled ?? false}
+                  initialConfig={triviaConfig.config ?? {}}
+                >
+                  {(config, setConfig) => {
+                    const allowedChannels: any[] = config.allowed_channels || [];
+                    const allowedRoles: string[] = config.allowed_roles || [];
+                    const [manualStatus, setManualStatus] = useState<string>('');
+
+                    const handleManualAction = async (action: string) => {
+                      setManualStatus('loading');
+                      try {
+                        const res = await fetch('/api/gaming/trivia/action', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ action }),
+                        });
+                        const data = await res.json();
+                        setManualStatus(data.error ? `error: ${data.error}` : action === 'trigger' ? 'triggered' : action === 'skip' ? 'skipped' : 'rerolled');
+                      } catch {
+                        setManualStatus('error: request failed');
+                      }
+                      setTimeout(() => setManualStatus(''), 4000);
+                    };
+
+                    return (
+                      <>
+                        {/* Timezone & Close Time */}
+                        <div className="section-divider">
+                          <div className="section-divider-line" />
+                          <span className="section-divider-text">Schedule Settings</span>
+                          <div className="section-divider-line" />
+                        </div>
+
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                          <div className="form-group">
+                            <label className="form-label">Timezone</label>
+                            <input
+                              id="trivia-timezone"
+                              className="form-input"
+                              placeholder="e.g. Asia/Manila, America/New_York"
+                              value={config.timezone || ''}
+                              onChange={(e) => setConfig('timezone', e.target.value)}
+                            />
+                            <span className="form-hint">IANA timezone string</span>
+                          </div>
+                          <div className="form-group">
+                            <label className="form-label">Auto-Close Time (24h)</label>
+                            <input
+                              id="trivia-close-time"
+                              className="form-input"
+                              placeholder="e.g. 22:00"
+                              value={config.close_time || ''}
+                              onChange={(e) => setConfig('close_time', e.target.value)}
+                            />
+                            <span className="form-hint">Between 01:00 – 23:00 (server timezone)</span>
+                          </div>
+                        </div>
+
+                        {/* Channel Whitelist */}
+                        <div className="section-divider">
+                          <div className="section-divider-line" />
+                          <span className="section-divider-text">Channel Whitelist</span>
+                          <div className="section-divider-line" />
+                        </div>
+
+                        <div style={{ display: 'grid', gridTemplateColumns: '100px 1fr 90px 80px', gap: '0.5rem', marginBottom: '0.4rem', paddingRight: '0.25rem' }}>
+                          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 'bold' }}>Priority</span>
+                          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 'bold' }}>Channel ID</span>
+                          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 'bold' }}>Topic</span>
+                          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 'bold' }}>Remove</span>
+                        </div>
+
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                          {allowedChannels.map((ch: any, i: number) => (
+                            <div key={i} style={{ display: 'grid', gridTemplateColumns: '100px 1fr 90px 80px', gap: '0.5rem', alignItems: 'center' }}>
+                              <select
+                                id={`trivia-ch-priority-${i}`}
+                                className="form-input"
+                                value={ch.priority || 'medium'}
+                                onChange={(e) => {
+                                  const updated = [...allowedChannels];
+                                  updated[i] = { ...ch, priority: e.target.value };
+                                  setConfig('allowed_channels', updated);
+                                }}
+                                style={{ padding: '0.375rem 0.5rem', fontSize: '0.8125rem' }}
+                              >
+                                <option value="high">🔴 High</option>
+                                <option value="medium">🟡 Medium</option>
+                                <option value="low">🟢 Low</option>
+                              </select>
+                              <input
+                                id={`trivia-ch-id-${i}`}
+                                className="form-input"
+                                placeholder="Channel ID"
+                                value={ch.channel_id || ''}
+                                onChange={(e) => {
+                                  const updated = [...allowedChannels];
+                                  updated[i] = { ...ch, channel_id: e.target.value };
+                                  setConfig('allowed_channels', updated);
+                                }}
+                                style={{ padding: '0.375rem 0.625rem', fontSize: '0.8125rem' }}
+                              />
+                              <input
+                                id={`trivia-ch-topic-${i}`}
+                                className="form-input"
+                                placeholder="e.g. Palworld"
+                                value={ch.topic || ''}
+                                onChange={(e) => {
+                                  const updated = [...allowedChannels];
+                                  updated[i] = { ...ch, topic: e.target.value };
+                                  setConfig('allowed_channels', updated);
+                                }}
+                                style={{ padding: '0.375rem 0.625rem', fontSize: '0.8125rem' }}
+                              />
+                              <button
+                                id={`trivia-remove-ch-${i}`}
+                                className="btn btn-danger btn-icon btn-sm"
+                                onClick={() => setConfig('allowed_channels', allowedChannels.filter((_: any, j: number) => j !== i))}
+                              >✕</button>
+                            </div>
+                          ))}
+                          <button
+                            id="trivia-add-channel-btn"
+                            className="btn btn-secondary btn-sm"
+                            onClick={() => setConfig('allowed_channels', [...allowedChannels, { channel_id: '', priority: 'medium', topic: '' }])}
+                          >
+                            + Add Channel
+                          </button>
+                        </div>
+
+                        {/* Allowed Roles */}
+                        <div className="section-divider">
+                          <div className="section-divider-line" />
+                          <span className="section-divider-text">Participation Roles</span>
+                          <div className="section-divider-line" />
+                        </div>
+
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                          {allowedRoles.map((roleId: string, i: number) => (
+                            <div key={i} style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                              <input
+                                id={`trivia-role-${i}`}
+                                className="form-input"
+                                placeholder="Role ID or Role Name"
+                                value={roleId}
+                                onChange={(e) => {
+                                  const updated = [...allowedRoles];
+                                  updated[i] = e.target.value;
+                                  setConfig('allowed_roles', updated);
+                                }}
+                              />
+                              <button
+                                id={`trivia-remove-role-${i}`}
+                                className="btn btn-danger btn-icon btn-sm"
+                                onClick={() => setConfig('allowed_roles', allowedRoles.filter((_: string, j: number) => j !== i))}
+                              >✕</button>
+                            </div>
+                          ))}
+                          <button
+                            id="trivia-add-role-btn"
+                            className="btn btn-secondary btn-sm"
+                            onClick={() => setConfig('allowed_roles', [...allowedRoles, ''])}
+                          >
+                            + Add Role
+                          </button>
+                          <span className="form-hint">Leave empty to allow all members to participate.</span>
+                        </div>
+
+                        {/* Live Leaderboard Channel */}
+                        <div className="section-divider">
+                          <div className="section-divider-line" />
+                          <span className="section-divider-text">Live Point Tracker</span>
+                          <div className="section-divider-line" />
+                        </div>
+
+                        <div className="form-group">
+                          <label className="form-label">Leaderboard Channel ID</label>
+                          <input
+                            id="trivia-leaderboard-channel"
+                            className="form-input"
+                            placeholder="Channel where top 5 points are auto-posted"
+                            value={config.leaderboard_channel_id || ''}
+                            onChange={(e) => setConfig('leaderboard_channel_id', e.target.value)}
+                          />
+                          <span className="form-hint">Bot will post and edit a single message here as scores update. Leave empty to disable.</span>
+                        </div>
+
+                        {/* Manual Controls */}
+                        <div className="section-divider">
+                          <div className="section-divider-line" />
+                          <span className="section-divider-text">Manual Safety Controls</span>
+                          <div className="section-divider-line" />
+                        </div>
+
+                        <div style={{ display: 'flex', gap: '0.625rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                          <button
+                            id="trivia-force-trigger"
+                            className="btn btn-primary btn-sm"
+                            disabled={manualStatus === 'loading'}
+                            onClick={() => handleManualAction('trigger')}
+                          >
+                            ⚡ Force Trigger
+                          </button>
+                          <button
+                            id="trivia-skip"
+                            className="btn btn-secondary btn-sm"
+                            disabled={manualStatus === 'loading'}
+                            onClick={() => handleManualAction('skip')}
+                          >
+                            ⏭️ Skip / Close Active
+                          </button>
+                          <button
+                            id="trivia-reroll"
+                            className="btn btn-secondary btn-sm"
+                            disabled={manualStatus === 'loading'}
+                            onClick={() => handleManualAction('reroll')}
+                          >
+                            🎲 Reroll Drop
+                          </button>
+                          {manualStatus && (
+                            <span style={{
+                              fontSize: '0.8125rem',
+                              color: manualStatus.startsWith('error') ? 'var(--color-error)' : 'var(--color-success)',
+                              fontWeight: 500,
+                            }}>
+                              {manualStatus === 'loading' ? '⏳ Processing...' :
+                               manualStatus === 'triggered' ? '✅ Drop triggered!' :
+                               manualStatus === 'skipped' ? '✅ Session closed.' :
+                               manualStatus === 'rerolled' ? '✅ Rerolled successfully.' :
+                               `❌ ${manualStatus}`}
+                            </span>
+                          )}
+                        </div>
                       </>
                     );
                   }}

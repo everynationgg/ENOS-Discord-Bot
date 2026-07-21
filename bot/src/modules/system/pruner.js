@@ -45,6 +45,23 @@ async function pruneOldRecords() {
 
   results.lfg_sessions = lfgError ? 'error' : lfgCount;
 
+  // Completed or Skipped Trivia drops (cascades to trivia_participants)
+  const { count: triviaDropCount, error: triviaDropError } = await supabase
+    .from('trivia_drops')
+    .delete({ count: 'exact' })
+    .in('status', ['completed', 'skipped'])
+    .lt('created_at', cutoff);
+
+  results.trivia_drops = triviaDropError ? 'error' : triviaDropCount;
+
+  // Trivia transactions
+  const { count: triviaTxCount, error: triviaTxError } = await supabase
+    .from('trivia_transactions')
+    .delete({ count: 'exact' })
+    .lt('created_at', cutoff);
+
+  results.trivia_transactions = triviaTxError ? 'error' : triviaTxCount;
+
   logger.info('[PRUNER] Pruning complete:', results);
   return results;
 }
