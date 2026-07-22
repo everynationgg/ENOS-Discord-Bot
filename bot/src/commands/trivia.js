@@ -14,6 +14,17 @@ module.exports = {
     )
     .addSubcommand(sub =>
       sub.setName('skip').setDescription('Skip/Close the currently active trivia session (Admin only)')
+    )
+    .addSubcommand(sub =>
+      sub.setName('drops')
+        .setDescription('Configure or view daily trivia drops count (1-3) (Admin only)')
+        .addIntegerOption(opt =>
+          opt.setName('count')
+            .setDescription('Number of drops per day (1 to 3)')
+            .setRequired(false)
+            .setMinValue(1)
+            .setMaxValue(3)
+        )
     ),
 
   /**
@@ -57,10 +68,13 @@ module.exports = {
 
     if (sub === 'trigger') {
       if (!interaction.member.permissions.has(PermissionFlagsBits.ManageGuild)) {
-        return interaction.reply({ content: '❌ You need the **Manage Server** permission to trigger a trivia drop.', ephemeral: true });
+        await interaction.reply({ content: '❌ You need the **Manage Server** permission to trigger a trivia drop.', ephemeral: true });
+        setTimeout(() => { interaction.deleteReply().catch(() => {}); }, 20000);
+        return;
       }
 
       await interaction.deferReply({ ephemeral: true });
+      setTimeout(() => { interaction.deleteReply().catch(() => {}); }, 20000);
       const success = await triggerTriviaDrop(interaction.client, interaction.guild.id);
       
       if (success) {
@@ -72,10 +86,13 @@ module.exports = {
 
     if (sub === 'skip') {
       if (!interaction.member.permissions.has(PermissionFlagsBits.ManageGuild)) {
-        return interaction.reply({ content: '❌ You need the **Manage Server** permission to skip a trivia session.', ephemeral: true });
+        await interaction.reply({ content: '❌ You need the **Manage Server** permission to skip a trivia session.', ephemeral: true });
+        setTimeout(() => { interaction.deleteReply().catch(() => {}); }, 20000);
+        return;
       }
 
       await interaction.deferReply({ ephemeral: true });
+      setTimeout(() => { interaction.deleteReply().catch(() => {}); }, 20000);
 
       // Find the active drop
       const { data: activeDrop } = await supabase
@@ -91,6 +108,54 @@ module.exports = {
 
       await forceCloseDrop(interaction.client, interaction.guild.id, activeDrop.id, 'skipped');
       return interaction.editReply('✅ The active trivia session has been skipped and closed.');
+    }
+
+    if (sub === 'drops') {
+      if (!interaction.member.permissions.has(PermissionFlagsBits.ManageGuild)) {
+        await interaction.reply({ content: '❌ You need the **Manage Server** permission to configure trivia settings.', ephemeral: true });
+        setTimeout(() => { interaction.deleteReply().catch(() => {}); }, 20000);
+        return;
+      }
+
+      await interaction.deferReply({ ephemeral: true });
+      setTimeout(() => { interaction.deleteReply().catch(() => {}); }, 20000);
+
+      const count = interaction.options.getInteger('count');
+
+      // Fetch feature config
+      const { data: featureRow } = await supabase
+        .from('guild_config')
+        .select('config')
+        .eq('guild_id', interaction.guild.id)
+        .eq('feature_key', 'trivia')
+        .maybeSingle();
+
+      const config = featureRow?.config || {};
+
+      if (count !== null) {
+        const drops = Math.min(3, Math.max(1, count));
+        config.drops_per_day = drops;
+        // Invalidate scheduled_drop_times to trigger recalculation for today
+        delete config.scheduled_drop_times;
+
+        const { error } = await supabase
+          .from('guild_config')
+          .upsert({
+            guild_id: interaction.guild.id,
+            feature_key: 'trivia',
+            config,
+            updated_at: new Date().toISOString(),
+          }, { onConflict: 'guild_id,feature_key' });
+
+        if (error) {
+          return interaction.editReply('❌ Failed to update trivia daily drops configuration.');
+        }
+
+        return interaction.editReply(`✅ Daily trivia drops configured to **${drops}** per day (max 3).`);
+      } else {
+        const current = Math.min(3, Math.max(1, parseInt(config.drops_per_day, 10) || 1));
+        return interaction.editReply(`ℹ️ Server trivia is currently configured for **${current}** drop(s) per day (max 3).`);
+      }
     }
   },
 };

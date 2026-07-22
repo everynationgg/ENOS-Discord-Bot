@@ -207,6 +207,9 @@ async function triggerTriviaDrop(client, guildId) {
  */
 async function handleTriviaStartClick(interaction) {
   await interaction.deferReply({ ephemeral: true });
+  setTimeout(() => {
+    interaction.deleteReply().catch(() => {});
+  }, 60000);
 
   const parts = interaction.customId.split(':');
   const dropId = parts[1];
@@ -304,7 +307,7 @@ async function handleTriviaStartClick(interaction) {
     .setColor(0xFACC15)
     .setTitle('🧠 Daily Trivia Question')
     .setDescription(description)
-    .setFooter({ text: 'Answer quickly! Sub-millisecond speed is tracked.' });
+    .setFooter({ text: '⏱️ You have 60 seconds to answer! Sub-millisecond speed is tracked.' });
 
   const row = new ActionRowBuilder().addComponents(buttons);
 
@@ -323,6 +326,9 @@ async function handleTriviaAnswerClick(interaction) {
 
   // Defer immediately to prevent 3-second Discord interaction timeouts during DB/API calls
   await interaction.deferReply({ ephemeral: true });
+  setTimeout(() => {
+    interaction.deleteReply().catch(() => {});
+  }, 20000);
 
   // Fetch drop and participant together
   const [dropRes, partRes] = await Promise.all([
@@ -670,6 +676,27 @@ function getLocalTimeInTimezone(timezone) {
 }
 
 /**
+ * Generates drop times for a day based on drops count (1 to 3, max 3).
+ * Spreads drops evenly across daytime hours (9:00 AM to 9:00 PM).
+ * @param {number} dropsCount
+ * @returns {string[]} Array of HH:MM time strings
+ */
+function generateDropTimesForDay(dropsCount) {
+  const count = Math.min(3, Math.max(1, dropsCount || 1));
+  const windows = count === 1
+    ? [[9, 20]]
+    : count === 2
+      ? [[9, 14], [15, 20]]
+      : [[9, 12], [13, 16], [17, 20]];
+
+  return windows.map(([startH, endH]) => {
+    const h = Math.floor(Math.random() * (endH - startH + 1)) + startH;
+    const m = Math.floor(Math.random() * 60);
+    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+  });
+}
+
+/**
  * Checks all active trivia drop schedules and updates/closes sessions.
  * Called periodically (e.g. every 5 minutes) via cron.
  * @param {import('discord.js').Client} client
@@ -692,6 +719,7 @@ async function checkAndProcessTrivia(client) {
       const guildId = entry.guild_id;
       const config = entry.config || {};
       const tz = config.timezone || 'Asia/Manila';
+      const dropsPerDay = Math.min(3, Math.max(1, parseInt(config.drops_per_day, 10) || 1));
 
       let local;
       try {
@@ -706,17 +734,21 @@ async function checkAndProcessTrivia(client) {
 
       // Ensure scheduling exists for today
       let isConfigDirty = false;
-      if (!config.scheduled_drop_date || config.scheduled_drop_date !== today) {
-        const randHour = Math.floor(Math.random() * (21 - 9 + 1)) + 9; // 9:00 AM to 9:00 PM
-        const randMin = Math.floor(Math.random() * 60);
-        const formatHour = String(randHour).padStart(2, '0');
-        const formatMin = String(randMin).padStart(2, '0');
-
-        config.scheduled_drop_time = `${formatHour}:${formatMin}`;
+      if (
+        !config.scheduled_drop_date ||
+        config.scheduled_drop_date !== today ||
+        !Array.isArray(config.scheduled_drop_times) ||
+        config.scheduled_drop_times.length !== dropsPerDay
+      ) {
+        config.scheduled_drop_times = generateDropTimesForDay(dropsPerDay);
+        config.scheduled_drop_time = config.scheduled_drop_times[0];
+        if (config.scheduled_drop_date !== today) {
+          config.completed_drops_today = 0;
+        }
         config.scheduled_drop_date = today;
         isConfigDirty = true;
 
-        logger.info(`[TRIVIA CRON] Scheduled trivia for guild ${guildId} at ${config.scheduled_drop_time} (TZ: ${tz})`);
+        logger.info(`[TRIVIA CRON] Scheduled ${dropsPerDay} drop(s) for guild ${guildId} at [${config.scheduled_drop_times.join(', ')}] (TZ: ${tz})`);
       }
 
       // Check if manual trigger was requested from the dashboard
@@ -730,16 +762,21 @@ async function checkAndProcessTrivia(client) {
         isConfigDirty = true;
       }
       // Check if it's time to drop today (scheduled)
-      else if (config.last_drop_date !== today) {
-        const [currH, currM] = currentTimeStr.split(':').map(Number);
-        const [schedH, schedM] = (config.scheduled_drop_time || '09:00').split(':').map(Number);
+      else {
+        const completedCount = config.completed_drops_today || 0;
+        if (completedCount < config.scheduled_drop_times.length) {
+          const targetTime = config.scheduled_drop_times[completedCount];
+          const [currH, currM] = currentTimeStr.split(':').map(Number);
+          const [schedH, schedM] = targetTime.split(':').map(Number);
 
-        if (currH > schedH || (currH === schedH && currM >= schedM)) {
-          logger.info(`[TRIVIA CRON] Triggering scheduled drop for guild ${guildId}. Time reached: ${currentTimeStr} >= ${config.scheduled_drop_time}`);
-          const dropSuccess = await triggerTriviaDrop(client, guildId);
-          if (dropSuccess) {
-            config.last_drop_date = today;
-            isConfigDirty = true;
+          if (currH > schedH || (currH === schedH && currM >= schedM)) {
+            logger.info(`[TRIVIA CRON] Triggering scheduled drop ${completedCount + 1}/${config.scheduled_drop_times.length} for guild ${guildId}. Time reached: ${currentTimeStr} >= ${targetTime}`);
+            const dropSuccess = await triggerTriviaDrop(client, guildId);
+            if (dropSuccess) {
+              config.completed_drops_today = completedCount + 1;
+              config.last_drop_date = today;
+              isConfigDirty = true;
+            }
           }
         }
       }
@@ -821,6 +858,9 @@ async function getLeaderboardCommandMention(client) {
  */
 async function handleTriviaLeaderboardButton(interaction) {
   await interaction.deferReply({ ephemeral: true });
+  setTimeout(() => {
+    interaction.deleteReply().catch(() => {});
+  }, 20000);
 
   const { data: topPoints, error } = await supabase
     .from('trivia_points')

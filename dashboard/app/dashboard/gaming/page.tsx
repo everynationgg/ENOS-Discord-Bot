@@ -408,7 +408,7 @@ export default function GamingPage() {
                   <li>Set a <strong>Priority</strong> per channel: <code>high</code> (3x weight), <code>medium</code> (2x), or <code>low</code> (1x) — dead channels can be revived with low priority.</li>
                   <li>Optionally set a <strong>Topic</strong> for a channel (e.g. <code>Palworld survival mechanics</code>) for themed questions. Leave blank for general trivia.</li>
                   <li>Configure the <strong>Close Time</strong> (in 24h format, e.g. <code>22:00</code>) — sessions close at this time if 3 winners haven't claimed all spots first.</li>
-                  <li>Set the server <strong>Timezone</strong> so scheduling works correctly regardless of where your community is based.</li>
+                  <li>Set the server <strong>Timezone</strong> and <strong>Drops Per Day</strong> (1–3 drops daily, evenly auto-scheduled throughout daytime hours).</li>
                   <li>Optionally configure a <strong>Leaderboard Channel ID</strong> to post and auto-update a live Top 5 trivia points leaderboard.</li>
                   <li>Set <strong>Allowed Roles</strong> to restrict who can participate (leave empty to allow all members).</li>
                 </ol>
@@ -458,7 +458,7 @@ export default function GamingPage() {
                           <div className="section-divider-line" />
                         </div>
 
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.75rem' }}>
                           <div className="form-group">
                             <label className="form-label">Timezone</label>
                             <input
@@ -480,6 +480,23 @@ export default function GamingPage() {
                               onChange={(e) => setConfig('close_time', e.target.value)}
                             />
                             <span className="form-hint">Between 01:00 – 23:00 (server timezone)</span>
+                          </div>
+                          <div className="form-group">
+                            <label className="form-label">Drops Per Day (1–3)</label>
+                            <input
+                              id="trivia-drops-per-day"
+                              type="number"
+                              min={1}
+                              max={3}
+                              className="form-input"
+                              placeholder="1"
+                              value={config.drops_per_day ?? 1}
+                              onChange={(e) => {
+                                const val = Math.min(3, Math.max(1, parseInt(e.target.value, 10) || 1));
+                                setConfig('drops_per_day', val);
+                              }}
+                            />
+                            <span className="form-hint">Number of daily trivia drops (max 3)</span>
                           </div>
                         </div>
 

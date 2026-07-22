@@ -143,3 +143,4 @@ OAuth2 Scopes: `bot applications.commands`
 | 30-Day Auto Pruning | System | ✅ |
 | Web Config Dashboard | — | ✅ |
 | Discord OAuth2 Admin Login | — | ✅ |
+yo
