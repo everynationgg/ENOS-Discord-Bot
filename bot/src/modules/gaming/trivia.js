@@ -38,7 +38,7 @@ async function generateTriviaQuestion(topic) {
     throw new Error('Missing GEMINI_API_KEY environment variable.');
   }
 
-  const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+  const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
   const prompt = `Generate a challenging multiple-choice trivia question.
 If a topic is provided, it must be about that topic (lore, gameplay, details). Otherwise, it should be about general gaming, pop culture, or tech.
 Topic: ${topic || 'Random general gaming, pop culture, or tech knowledge'}
@@ -858,9 +858,6 @@ async function getLeaderboardCommandMention(client) {
  */
 async function handleTriviaLeaderboardButton(interaction) {
   await interaction.deferReply({ ephemeral: true });
-  setTimeout(() => {
-    interaction.deleteReply().catch(() => {});
-  }, 20000);
 
   const { data: topPoints, error } = await supabase
     .from('trivia_points')

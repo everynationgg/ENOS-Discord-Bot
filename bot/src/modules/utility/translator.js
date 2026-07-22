@@ -18,7 +18,7 @@ async function translateText(text, targetLanguage) {
     throw new Error('GEMINI_API_KEY is not configured on the bot server.');
   }
 
-  const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+  const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
   const prompt = `Translate the following text into ${targetLanguage}. Automatically detect the source language. Provide only the translated text as the result. Do not include any quotes, markdown headers, notes, explanations, or wrapper tags.
 
 Text to translate:

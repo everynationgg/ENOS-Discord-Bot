@@ -68,13 +68,10 @@ module.exports = {
 
     if (sub === 'trigger') {
       if (!interaction.member.permissions.has(PermissionFlagsBits.ManageGuild)) {
-        await interaction.reply({ content: '❌ You need the **Manage Server** permission to trigger a trivia drop.', ephemeral: true });
-        setTimeout(() => { interaction.deleteReply().catch(() => {}); }, 20000);
-        return;
+        return interaction.reply({ content: '❌ You need the **Manage Server** permission to trigger a trivia drop.', ephemeral: true });
       }
 
       await interaction.deferReply({ ephemeral: true });
-      setTimeout(() => { interaction.deleteReply().catch(() => {}); }, 20000);
       const success = await triggerTriviaDrop(interaction.client, interaction.guild.id);
       
       if (success) {
@@ -86,13 +83,10 @@ module.exports = {
 
     if (sub === 'skip') {
       if (!interaction.member.permissions.has(PermissionFlagsBits.ManageGuild)) {
-        await interaction.reply({ content: '❌ You need the **Manage Server** permission to skip a trivia session.', ephemeral: true });
-        setTimeout(() => { interaction.deleteReply().catch(() => {}); }, 20000);
-        return;
+        return interaction.reply({ content: '❌ You need the **Manage Server** permission to skip a trivia session.', ephemeral: true });
       }
 
       await interaction.deferReply({ ephemeral: true });
-      setTimeout(() => { interaction.deleteReply().catch(() => {}); }, 20000);
 
       // Find the active drop
       const { data: activeDrop } = await supabase
@@ -112,13 +106,10 @@ module.exports = {
 
     if (sub === 'drops') {
       if (!interaction.member.permissions.has(PermissionFlagsBits.ManageGuild)) {
-        await interaction.reply({ content: '❌ You need the **Manage Server** permission to configure trivia settings.', ephemeral: true });
-        setTimeout(() => { interaction.deleteReply().catch(() => {}); }, 20000);
-        return;
+        return interaction.reply({ content: '❌ You need the **Manage Server** permission to configure trivia settings.', ephemeral: true });
       }
 
       await interaction.deferReply({ ephemeral: true });
-      setTimeout(() => { interaction.deleteReply().catch(() => {}); }, 20000);
 
       const count = interaction.options.getInteger('count');
 
