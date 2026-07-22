@@ -251,7 +251,18 @@ async function handleTriviaStartClick(interaction) {
     .maybeSingle();
 
   if (participant) {
-    return interaction.editReply({ content: '❌ You have already participated in this trivia session.' });
+    const cmdMention = await getLeaderboardCommandMention(interaction.client);
+    const row = new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId('trivia_leaderboard')
+        .setLabel('View Leaderboard')
+        .setEmoji('📊')
+        .setStyle(ButtonStyle.Secondary)
+    );
+    return interaction.editReply({
+      content: `❌ You have already participated in this trivia session.\n\n🏆 View standings with ${cmdMention} or click below:`,
+      components: [row],
+    });
   }
 
   // Shuffle answers specifically for this participant
@@ -352,9 +363,19 @@ async function handleTriviaAnswerClick(interaction) {
     })
     .eq('id', participant.id);
 
+  const cmdMention = await getLeaderboardCommandMention(interaction.client);
+  const leaderboardBtnRow = new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId('trivia_leaderboard')
+      .setLabel('View Leaderboard')
+      .setEmoji('📊')
+      .setStyle(ButtonStyle.Secondary)
+  );
+
   if (!isCorrect) {
     return interaction.editReply({
-      content: `❌ **Incorrect answer!** Better luck next time.\n⏱️ Response time: **${(speedMs / 1000).toFixed(6)}s**`,
+      content: `❌ **Incorrect answer!** Better luck next time.\n⏱️ Response time: **${(speedMs / 1000).toFixed(6)}s**\n\n🏆 View standings with ${cmdMention} or click below:`,
+      components: [leaderboardBtnRow],
     });
   }
 
@@ -370,13 +391,15 @@ async function handleTriviaAnswerClick(interaction) {
   
   if (freshDrop?.status !== 'active') {
     return interaction.editReply({
-      content: `✅ **Correct!** However, the session closed before your submission.\n⏱️ Response time: **${(speedMs / 1000).toFixed(6)}s**`,
+      content: `✅ **Correct!** However, the session closed before your submission.\n⏱️ Response time: **${(speedMs / 1000).toFixed(6)}s**\n\n🏆 View standings with ${cmdMention} or click below:`,
+      components: [leaderboardBtnRow],
     });
   }
 
   if (winners.length >= 3) {
     return interaction.editReply({
-      content: `✅ **Correct!** However, 3 winners have already claimed the podium spots.\n⏱️ Response time: **${(speedMs / 1000).toFixed(6)}s**`,
+      content: `✅ **Correct!** However, 3 winners have already claimed the podium spots.\n⏱️ Response time: **${(speedMs / 1000).toFixed(6)}s**\n\n🏆 View standings with ${cmdMention} or click below:`,
+      components: [leaderboardBtnRow],
     });
   }
 
@@ -479,8 +502,10 @@ async function handleTriviaAnswerClick(interaction) {
   await updateLiveLeaderboard(interaction.client, interaction.guild.id);
 
   return interaction.editReply({
-    content: `✅ **Correct!** You came in **${placeName}**!\n⏱️ Response time: **${(speedMs / 1000).toFixed(6)}s**\n💰 Awarded **${winnerPoints}** trivia points!`,
+    content: `✅ **Correct!** You came in **${placeName}**!\n⏱️ Response time: **${(speedMs / 1000).toFixed(6)}s**\n💰 Awarded **${winnerPoints}** trivia points!\n\n🏆 View standings with ${cmdMention} or click below:`,
+    components: [leaderboardBtnRow],
   });
+}
 }
 
 /**
@@ -773,12 +798,69 @@ async function checkAndProcessTrivia(client) {
   }
 }
 
+/**
+ * Helper to get the formatted clickable slash command link for </trivia leaderboard:id>
+ * @param {import('discord.js').Client} client
+ * @returns {Promise<string>}
+ */
+async function getLeaderboardCommandMention(client) {
+  try {
+    const appCommands = client.application?.commands?.cache || await client.application?.commands?.fetch().catch(() => null);
+    const cmd = appCommands?.find?.(c => c.name === 'trivia');
+    if (cmd) {
+      return `</trivia leaderboard:${cmd.id}>`;
+    }
+  } catch (e) {
+    // Ignore fallback
+  }
+  return '`/trivia leaderboard`';
+}
+
+/**
+ * Handles the "📊 View Leaderboard" button click
+ * @param {import('discord.js').ButtonInteraction} interaction
+ */
+async function handleTriviaLeaderboardButton(interaction) {
+  await interaction.deferReply({ ephemeral: true });
+
+  const { data: topPoints, error } = await supabase
+    .from('trivia_points')
+    .select('discord_id, points')
+    .eq('guild_id', interaction.guild.id)
+    .order('points', { ascending: false })
+    .limit(5);
+
+  if (error || !topPoints) {
+    return interaction.editReply('❌ Failed to fetch leaderboard data.');
+  }
+
+  const lines = topPoints.map((entry, index) => {
+    const medal = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `**${index + 1}.**`;
+    return `${medal} <@${entry.discord_id}> — **${entry.points.toLocaleString()}** points`;
+  });
+
+  if (lines.length === 0) {
+    lines.push('*No points earned yet. Play trivia to show up here!*');
+  }
+
+  const embed = new EmbedBuilder()
+    .setColor(0xFACC15)
+    .setTitle('🏆 Server Trivia Leaderboard (Top 5)')
+    .setDescription(lines.join('\n'))
+    .setFooter({ text: 'Every Nation Trivia System' })
+    .setTimestamp();
+
+  return interaction.editReply({ embeds: [embed] });
+}
+
 module.exports = {
   triggerTriviaDrop,
   handleTriviaStartClick,
   handleTriviaAnswerClick,
+  handleTriviaLeaderboardButton,
   forceCloseDrop,
   updateLiveLeaderboard,
   checkAndProcessTrivia,
 };
+
 

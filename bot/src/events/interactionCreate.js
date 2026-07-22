@@ -71,6 +71,10 @@ module.exports = {
           const { handleKeyformButton } = require('../modules/moderation/keyform');
           return handleKeyformButton(interaction);
         }
+        if (interaction.customId === 'trivia_leaderboard') {
+          const { handleTriviaLeaderboardButton } = require('../modules/gaming/trivia');
+          return handleTriviaLeaderboardButton(interaction);
+        }
         if (interaction.customId.startsWith('trivia_start:')) {
           const { handleTriviaStartClick } = require('../modules/gaming/trivia');
           return handleTriviaStartClick(interaction);
