@@ -53,7 +53,7 @@ Do not wrap in markdown, backticks, or write any extra text.`;
 
   const result = await model.generateContent(prompt);
   const text = result.response.text().trim();
-  
+
   // Clean up markdown block format if Gemini wrapped it despite prompt
   const cleanJson = text.replace(/^```json\s*/i, '').replace(/```$/, '').trim();
   const parsed = JSON.parse(cleanJson);
@@ -232,7 +232,7 @@ async function handleTriviaStartClick(interaction) {
   const allowedRoles = config.allowed_roles || []; // Array of role IDs/names
 
   if (allowedRoles.length > 0) {
-    const hasRole = interaction.member.roles.cache.some(r => 
+    const hasRole = interaction.member.roles.cache.some(r =>
       allowedRoles.includes(r.id) || allowedRoles.includes(r.name)
     );
     if (!hasRole) {
@@ -388,7 +388,7 @@ async function handleTriviaAnswerClick(interaction) {
     .maybeSingle();
 
   const winners = freshDrop?.winners || [];
-  
+
   if (freshDrop?.status !== 'active') {
     return interaction.editReply({
       content: `✅ **Correct!** However, the session closed before your submission.\n⏱️ Response time: **${(speedMs / 1000).toFixed(6)}s**\n\n🏆 View standings with ${cmdMention} or click below:`,
@@ -491,9 +491,9 @@ async function handleTriviaAnswerClick(interaction) {
             .setStyle(ButtonStyle.Secondary)
             .setDisabled(true)
         );
-        await message.edit({ embeds: [updatedEmbed], components: [disabledRow] }).catch(() => {});
+        await message.edit({ embeds: [updatedEmbed], components: [disabledRow] }).catch(() => { });
       } else {
-        await message.edit({ embeds: [updatedEmbed] }).catch(() => {});
+        await message.edit({ embeds: [updatedEmbed] }).catch(() => { });
       }
     }
   }
@@ -505,7 +505,6 @@ async function handleTriviaAnswerClick(interaction) {
     content: `✅ **Correct!** You came in **${placeName}**!\n⏱️ Response time: **${(speedMs / 1000).toFixed(6)}s**\n💰 Awarded **${winnerPoints}** trivia points!\n\n🏆 View standings with ${cmdMention} or click below:`,
     components: [leaderboardBtnRow],
   });
-}
 }
 
 /**
@@ -635,7 +634,7 @@ async function forceCloseDrop(client, guildId, dropId, status = 'completed') {
           { name: '🏆 Podium', value: podiumText }
         );
 
-      await message.edit({ embeds: [updatedEmbed], components: [disabledRow] }).catch(() => {});
+      await message.edit({ embeds: [updatedEmbed], components: [disabledRow] }).catch(() => { });
     }
   } catch (err) {
     logger.error('[TRIVIA] forceCloseDrop error:', err.message);
@@ -657,7 +656,7 @@ function getLocalTimeInTimezone(timezone) {
   const formatter = new Intl.DateTimeFormat('en-US', options);
   const parts = formatter.formatToParts(new Date());
   const map = parts.reduce((acc, p) => ({ ...acc, [p.type]: p.value }), {});
-  
+
   // Format as YYYY-MM-DD
   const dateStr = `${map.year}-${map.month}-${map.day}`;
   const timeStr = `${map.hour}:${map.minute}`;
@@ -716,7 +715,7 @@ async function checkAndProcessTrivia(client) {
         config.scheduled_drop_time = `${formatHour}:${formatMin}`;
         config.scheduled_drop_date = today;
         isConfigDirty = true;
-        
+
         logger.info(`[TRIVIA CRON] Scheduled trivia for guild ${guildId} at ${config.scheduled_drop_time} (TZ: ${tz})`);
       }
 
@@ -862,5 +861,5 @@ module.exports = {
   updateLiveLeaderboard,
   checkAndProcessTrivia,
 };
-
+// Trivia module helper comment
 
