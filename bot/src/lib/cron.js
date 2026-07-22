@@ -136,8 +136,8 @@ function initCrons(client) {
     }
   });
 
-  // ─── Trivia Scheduler: Every 5 minutes ──────────────────────────────────────
-  cron.schedule('*/5 * * * *', async () => {
+  // ─── Trivia Scheduler: Every minute ──────────────────────────────────────────
+  cron.schedule('* * * * *', async () => {
     try {
       await checkAndProcessTrivia(client);
     } catch (err) {

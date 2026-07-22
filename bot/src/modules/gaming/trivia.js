@@ -38,7 +38,7 @@ async function generateTriviaQuestion(topic) {
     throw new Error('Missing GEMINI_API_KEY environment variable.');
   }
 
-  const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+  const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
   const prompt = `Generate a challenging multiple-choice trivia question.
 If a topic is provided, it must be about that topic (lore, gameplay, details). Otherwise, it should be about general gaming, pop culture, or tech.
 Topic: ${topic || 'Random general gaming, pop culture, or tech knowledge'}
@@ -124,6 +124,19 @@ async function triggerTriviaDrop(client, guildId) {
     const questionData = await generateTriviaQuestion(chosen.topic);
 
     const allAnswers = shuffleArray([questionData.correct_answer, ...questionData.incorrect_answers]);
+
+    // Auto-close any existing active drops for this guild before spawning a new drop
+    const { data: existingActive } = await supabase
+      .from('trivia_drops')
+      .select('id')
+      .eq('guild_id', guildId)
+      .eq('status', 'active');
+
+    if (existingActive && existingActive.length > 0) {
+      for (const oldDrop of existingActive) {
+        await forceCloseDrop(client, guildId, oldDrop.id, 'skipped');
+      }
+    }
 
     // Insert drop in database
     const { data: drop, error } = await supabase
