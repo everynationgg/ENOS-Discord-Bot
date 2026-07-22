@@ -206,6 +206,8 @@ async function triggerTriviaDrop(client, guildId) {
  * @param {import('discord.js').ButtonInteraction} interaction
  */
 async function handleTriviaStartClick(interaction) {
+  await interaction.deferReply({ ephemeral: true });
+
   const parts = interaction.customId.split(':');
   const dropId = parts[1];
 
@@ -217,11 +219,11 @@ async function handleTriviaStartClick(interaction) {
     .maybeSingle();
 
   if (error || !drop) {
-    return interaction.reply({ content: '❌ Trivia session not found.', ephemeral: true });
+    return interaction.editReply({ content: '❌ Trivia session not found.' });
   }
 
   if (drop.status !== 'active') {
-    return interaction.reply({ content: '❌ This trivia session has already closed.', ephemeral: true });
+    return interaction.editReply({ content: '❌ This trivia session has already closed.' });
   }
 
   // Check roles
@@ -234,9 +236,8 @@ async function handleTriviaStartClick(interaction) {
       allowedRoles.includes(r.id) || allowedRoles.includes(r.name)
     );
     if (!hasRole) {
-      return interaction.reply({
+      return interaction.editReply({
         content: '❌ You do not have the required roles to participate in this trivia.',
-        ephemeral: true,
       });
     }
   }
@@ -250,7 +251,7 @@ async function handleTriviaStartClick(interaction) {
     .maybeSingle();
 
   if (participant) {
-    return interaction.reply({ content: '❌ You have already participated in this trivia session.', ephemeral: true });
+    return interaction.editReply({ content: '❌ You have already participated in this trivia session.' });
   }
 
   // Shuffle answers specifically for this participant
@@ -270,7 +271,7 @@ async function handleTriviaStartClick(interaction) {
 
   if (insertErr) {
     logger.error('[TRIVIA] Failed to insert participant:', insertErr.message);
-    return interaction.reply({ content: '❌ Failed to start trivia. Please try again.', ephemeral: true });
+    return interaction.editReply({ content: '❌ Failed to start trivia. Please try again.' });
   }
 
   // Render ephemeral view
@@ -296,7 +297,7 @@ async function handleTriviaStartClick(interaction) {
 
   const row = new ActionRowBuilder().addComponents(buttons);
 
-  await interaction.reply({ embeds: [embed], components: [row], ephemeral: true });
+  await interaction.editReply({ embeds: [embed], components: [row] });
 }
 
 /**
@@ -309,6 +310,9 @@ async function handleTriviaAnswerClick(interaction) {
   const choiceIndex = parseInt(parts[2], 10);
   const endTime = getPreciseTime();
 
+  // Defer immediately to prevent 3-second Discord interaction timeouts during DB/API calls
+  await interaction.deferReply({ ephemeral: true });
+
   // Fetch drop and participant together
   const [dropRes, partRes] = await Promise.all([
     supabase.from('trivia_drops').select('*').eq('id', dropId).maybeSingle(),
@@ -316,22 +320,22 @@ async function handleTriviaAnswerClick(interaction) {
   ]);
 
   if (dropRes.error || !dropRes.data) {
-    return interaction.reply({ content: '❌ Trivia session not found.', ephemeral: true });
+    return interaction.editReply({ content: '❌ Trivia session not found.' });
   }
 
   const drop = dropRes.data;
   const participant = partRes.data;
 
   if (drop.status !== 'active') {
-    return interaction.reply({ content: '❌ This trivia session has already closed.', ephemeral: true });
+    return interaction.editReply({ content: '❌ This trivia session has already closed.' });
   }
 
   if (!participant) {
-    return interaction.reply({ content: '❌ You did not start this trivia correctly.', ephemeral: true });
+    return interaction.editReply({ content: '❌ You did not start this trivia correctly.' });
   }
 
   if (participant.answered_at) {
-    return interaction.reply({ content: '❌ You have already answered this trivia question.', ephemeral: true });
+    return interaction.editReply({ content: '❌ You have already answered this trivia question.' });
   }
 
   const speedMs = endTime - participant.started_at_ms;
@@ -349,9 +353,8 @@ async function handleTriviaAnswerClick(interaction) {
     .eq('id', participant.id);
 
   if (!isCorrect) {
-    return interaction.reply({
+    return interaction.editReply({
       content: `❌ **Incorrect answer!** Better luck next time.\n⏱️ Response time: **${(speedMs / 1000).toFixed(6)}s**`,
-      ephemeral: true,
     });
   }
 
@@ -366,16 +369,14 @@ async function handleTriviaAnswerClick(interaction) {
   const winners = freshDrop?.winners || [];
   
   if (freshDrop?.status !== 'active') {
-    return interaction.reply({
+    return interaction.editReply({
       content: `✅ **Correct!** However, the session closed before your submission.\n⏱️ Response time: **${(speedMs / 1000).toFixed(6)}s**`,
-      ephemeral: true,
     });
   }
 
   if (winners.length >= 3) {
-    return interaction.reply({
+    return interaction.editReply({
       content: `✅ **Correct!** However, 3 winners have already claimed the podium spots.\n⏱️ Response time: **${(speedMs / 1000).toFixed(6)}s**`,
-      ephemeral: true,
     });
   }
 
@@ -477,9 +478,8 @@ async function handleTriviaAnswerClick(interaction) {
   // Update Live Point Tracker Leaderboard if configured
   await updateLiveLeaderboard(interaction.client, interaction.guild.id);
 
-  return interaction.reply({
+  return interaction.editReply({
     content: `✅ **Correct!** You came in **${placeName}**!\n⏱️ Response time: **${(speedMs / 1000).toFixed(6)}s**\n💰 Awarded **${winnerPoints}** trivia points!`,
-    ephemeral: true,
   });
 }
 
