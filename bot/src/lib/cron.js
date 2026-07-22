@@ -4,7 +4,7 @@ const { supabase } = require('./supabase');
 
 // ─── Import Feature Modules ────────────────────────────────────────────────────
 const { runDailyDigest } = require('../modules/ai/digest');
-const { checkYouTubeLive } = require('../modules/social/youtube');
+const { checkTikTokLive } = require('../modules/social/tiktok');
 const { pruneOldRecords } = require('../modules/system/pruner');
 const { resetDailyQuests } = require('../modules/gaming/vault');
 const { expireOldLFGSessions } = require('../modules/gaming/lfg');
@@ -50,12 +50,12 @@ function initCrons(client) {
     { timezone: tz }
   );
 
-  // ─── YouTube Live Check: Every 5 minutes ─────────────────────────────────────
+  // ─── TikTok Live Check: Every 5 minutes ───────────────────────────────────────
   cron.schedule('*/5 * * * *', async () => {
     try {
-      await checkYouTubeLive(client);
+      await checkTikTokLive(client);
     } catch (err) {
-      logger.error('[CRON] YouTube check failed:', err.message);
+      logger.error('[CRON] TikTok check failed:', err.message);
     }
   });
 

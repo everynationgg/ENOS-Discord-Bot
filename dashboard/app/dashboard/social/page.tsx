@@ -505,12 +505,11 @@ export default function SocialPage() {
               <div className="feature-instructions">
                 <h3>Live Alert Hub Guidelines</h3>
                 <p>Auto-post cards when creators start streaming. Follow these steps to configure connections:</p>
-                <ol>
+                 <ol>
                   <li>Enable Developer Mode in Discord, right-click the target text channel, and copy the ID into <strong>Alert Channel ID</strong>.</li>
                   <li>Right-click your notification role under Server Settings {"->"} Roles, copy the ID, and input it into <strong>Ping Role ID</strong>.</li>
-                  <li>Register a Twitch application in the Developer Console and provide the Client ID and Secret.</li>
-                  <li>Generate a YouTube Data API Key from the Google Cloud Console.</li>
-                  <li>Add streamers using their exact Twitch handle, or YouTube channel ID (e.g. <code>UCxxxxxx</code>).</li>
+                  <li>Register a Twitch application in the Developer Console and provide the Client ID and Secret (for Twitch streamers).</li>
+                  <li>Add streamers using their exact Twitch handle, or TikTok username (e.g. <code>@username</code>).</li>
                 </ol>
               </div>
 
@@ -519,7 +518,7 @@ export default function SocialPage() {
                   id="live-alerts"
                   icon="🔴"
                   title="Social Sync — Live Alert Hub"
-                  description="Auto-posts rich embeds when creators go live on Twitch or YouTube. Updates to 'Ended' state when stream closes."
+                  description="Auto-posts rich embeds when creators go live on Twitch or TikTok. Updates to 'Ended' state when stream closes."
                   featureKey="live_alerts"
                   initialEnabled={liveConfig.enabled ?? false}
                   initialConfig={liveConfig.config ?? {}}
@@ -586,17 +585,6 @@ export default function SocialPage() {
                               onChange={(e) => setConfig('twitch_client_secret', e.target.value)}
                             />
                           </div>
-                          <div className="form-group" style={{ gridColumn: 'span 2' }}>
-                            <label className="form-label">YouTube API Key</label>
-                            <input
-                              id="youtube-api-key"
-                              className="form-input"
-                              type="password"
-                              placeholder="••••••••"
-                              value={config.youtube_api_key || ''}
-                              onChange={(e) => setConfig('youtube_api_key', e.target.value)}
-                            />
-                          </div>
                         </div>
 
                         <div className="section-divider">
@@ -606,7 +594,7 @@ export default function SocialPage() {
                         </div>
 
                         <div className="streamer-row" style={{ marginBottom: '-0.25rem' }}>
-                          {['Platform', 'Handle / Channel ID', 'Display Name', ''].map((h) => (
+                          {['Platform', 'Handle / Username', 'Display Name', ''].map((h) => (
                             <span key={h} style={{ fontSize: '0.6875rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-muted)' }}>{h}</span>
                           ))}
                         </div>
@@ -626,12 +614,12 @@ export default function SocialPage() {
                                 style={{ padding: '0.375rem 2rem 0.375rem 0.625rem', fontSize: '0.8125rem' }}
                               >
                                 <option value="twitch">🟣 Twitch</option>
-                                <option value="youtube">🔴 YouTube</option>
+                                <option value="tiktok">🎵 TikTok</option>
                               </select>
                               <input
                                 id={`streamer-handle-${i}`}
                                 className="form-input"
-                                placeholder={s.platform === 'youtube' ? 'UCxxxxxxx...' : 'username'}
+                                placeholder={s.platform === 'tiktok' ? '@username' : 'username'}
                                 value={s.handle || ''}
                                 onChange={(e) => {
                                   const updated = [...streamers];
