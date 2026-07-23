@@ -27,20 +27,23 @@ async function postBossCardToDiscord(guildId: string, boss: any) {
     return;
   }
 
-  // Fetch channel ID for weekly_boss
+  // Fetch all channel IDs configured for weekly_boss
   const { data: featureRows } = await supabaseAdmin
     .from('guild_config')
     .select('config, guild_id')
     .eq('feature_key', 'weekly_boss');
 
-  let channelId: string | null = null;
+  const channelIds: string[] = [];
   if (featureRows && featureRows.length > 0) {
-    const matched = featureRows.find((r: any) => r.guild_id === guildId) || featureRows[0];
-    channelId = matched?.config?.channel_id || null;
+    featureRows.forEach((r: any) => {
+      if (r.config?.channel_id && typeof r.config.channel_id === 'string' && r.config.channel_id.trim()) {
+        channelIds.push(r.config.channel_id.trim());
+      }
+    });
   }
 
-  if (!channelId) {
-    console.error('[BOSS POST] Channel ID not configured for weekly_boss!');
+  if (channelIds.length === 0) {
+    console.error('[BOSS POST] No channel ID configured in Weekly Boss panel!');
     return;
   }
 
@@ -110,31 +113,33 @@ async function postBossCardToDiscord(guildId: string, boss: any) {
     },
   ];
 
-  if (imageBuffer) {
-    const formData = new FormData();
-    formData.append(
-      'payload_json',
-      JSON.stringify({
-        embeds: [embed],
-        components,
-      })
-    );
-    formData.append('files[0]', new Blob([Uint8Array.from(imageBuffer)], { type: 'image/png' }), 'weekly_boss_arena.png');
+  for (const chId of channelIds) {
+    if (imageBuffer) {
+      const formData = new FormData();
+      formData.append(
+        'payload_json',
+        JSON.stringify({
+          embeds: [embed],
+          components,
+        })
+      );
+      formData.append('files[0]', new Blob([Uint8Array.from(imageBuffer)], { type: 'image/png' }), 'weekly_boss_arena.png');
 
-    await fetch(`https://discord.com/api/v10/channels/${channelId}/messages`, {
-      method: 'POST',
-      headers: { Authorization: `Bot ${token}` },
-      body: formData,
-    }).catch((e) => console.error('[BOSS POST] Error posting boss card with image to Discord:', e));
-  } else {
-    await fetch(`https://discord.com/api/v10/channels/${channelId}/messages`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bot ${token}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ embeds: [embed], components }),
-    }).catch((e) => console.error('[BOSS POST] Error posting boss card to Discord:', e));
+      await fetch(`https://discord.com/api/v10/channels/${chId}/messages`, {
+        method: 'POST',
+        headers: { Authorization: `Bot ${token}` },
+        body: formData,
+      }).catch((e) => console.error(`[BOSS POST] Error posting boss card to Discord channel ${chId}:`, e));
+    } else {
+      await fetch(`https://discord.com/api/v10/channels/${chId}/messages`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bot ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ embeds: [embed], components }),
+      }).catch((e) => console.error(`[BOSS POST] Error posting boss card to Discord channel ${chId}:`, e));
+    }
   }
 }
 

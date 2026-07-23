@@ -18,46 +18,15 @@ function getWeekIdentifier(date = new Date()) {
 }
 
 /**
- * Generates thematic glitch boss lore using Gemini API (1 call per week on spawn).
+ * Returns default boss data when no custom boss is specified.
  * @returns {Promise<{ bossName: string, bossTitle: string, lore: string }>}
  */
 async function generateGlitchBossLore() {
-  const defaultBoss = {
-    bossName: 'ERROR-MOD: Corrupted Ye Tianshi',
-    bossTitle: 'Anomalous Realm Anomaly',
-    lore: 'A catastrophic system leak merged Where Winds Meet realm data with ENOS core protocols. Overdrive emergency defense activated!',
+  return {
+    bossName: 'ERROR-MOD: Corrupted Anomaly',
+    bossTitle: 'System Threat',
+    lore: 'A space-time realm rift merged game data with ENOS core protocols. An entity has manifested in the server! Coordinate your triad skills to neutralize!',
   };
-
-  if (!process.env.GEMINI_API_KEY) return defaultBoss;
-
-  const prompt = `Generate a glitch-corrupted weekly RPG boss title for a Discord bot gaming event.
-Blend the prefix "ERROR-MOD: Corrupted " with a boss/character from popular games (e.g. Where Winds Meet, Palworld, Genshin Impact, Elden Ring, Valorant).
-
-Respond ONLY with a raw JSON object:
-{
-  "bossName": "ERROR-MOD: Corrupted [Boss Name]",
-  "bossTitle": "The [Glitched System Title]",
-  "lore": "A 2-sentence lore description of how system error corrupted this boss into the server."
-}
-Do not wrap in markdown or write any extra text.`;
-
-  const modelsToTry = ['gemini-2.5-flash', 'gemini-flash-latest'];
-  for (const m of modelsToTry) {
-    try {
-      const model = genAI.getGenerativeModel({ model: m });
-      const res = await model.generateContent(prompt);
-      const text = res.response.text().trim();
-      const cleanJson = text.replace(/^```json\s*/i, '').replace(/```$/, '').trim();
-      const parsed = JSON.parse(cleanJson);
-      if (parsed.bossName && parsed.bossTitle && parsed.lore) {
-        return parsed;
-      }
-    } catch (e) {
-      logger.warn(`[BOSS AI] Model ${m} failed for boss lore: ${e.message}`);
-    }
-  }
-
-  return defaultBoss;
 }
 
 /**
