@@ -61,6 +61,59 @@ Do not wrap in markdown or write any extra text.`;
 }
 
 /**
+ * Generates boss artwork image using Gemini 2.0 Flash image generation.
+ * Uploads to Supabase Storage and returns public URL.
+ * @param {string} bossName - Full boss name e.g. "ERROR-MOD: Corrupted Malenia"
+ * @returns {Promise<string|null>} - Public image URL or null on failure
+ */
+async function generateBossImage(bossName) {
+  if (!process.env.GEMINI_API_KEY) return null;
+
+  // Extract just the character name from "ERROR-MOD: Corrupted [Name]"
+  const match = bossName.match(/Corrupted\s+(.+)$/);
+  const characterName = match ? match[1].trim() : bossName;
+
+  const imagePrompt = `Full-body dramatic anime-style portrait of a glitched, corrupted, digital anomaly version of ${characterName}. Dark cyberspace background with green matrix code streams. Red and cyan chromatic aberration glitch distortion effects layered over the character. Digital scanlines, corrupted data particle effects. Cinematic RPG boss art. No text, no UI, no watermarks.`;
+
+  try {
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-preview-image-generation' });
+    const result = await model.generateContent({
+      contents: [{ role: 'user', parts: [{ text: imagePrompt }] }],
+      generationConfig: { responseModalities: ['IMAGE', 'TEXT'] },
+    });
+
+    const parts = result.response.candidates?.[0]?.content?.parts || [];
+    const imagePart = parts.find(p => p.inlineData?.mimeType?.startsWith('image/'));
+    if (!imagePart) {
+      logger.warn('[BOSS AI] Gemini image generation returned no image part');
+      return null;
+    }
+
+    const imageBuffer = Buffer.from(imagePart.inlineData.data, 'base64');
+    const fileName = `boss-${Date.now()}.png`;
+
+    const { error: uploadError } = await supabase.storage
+      .from('boss-images')
+      .upload(fileName, imageBuffer, { contentType: 'image/png', upsert: true });
+
+    if (uploadError) {
+      logger.warn('[BOSS AI] Supabase Storage upload failed:', uploadError.message);
+      return null;
+    }
+
+    const { data: publicUrlData } = supabase.storage
+      .from('boss-images')
+      .getPublicUrl(fileName);
+
+    logger.info(`[BOSS AI] Boss image generated and stored: ${publicUrlData.publicUrl}`);
+    return publicUrlData.publicUrl;
+  } catch (e) {
+    logger.warn('[BOSS AI] Gemini image generation failed:', e.message);
+    return null;
+  }
+}
+
+/**
  * Gets or initializes the active Weekly Boss for a guild.
  * @param {string} guildId
  * @returns {Promise<any>}
@@ -112,8 +165,12 @@ async function getOrCreateActiveBoss(guildId) {
     bossHp = 50000 + (targetPlayers * 35000);
   }
 
-  // Generate Boss AI Lore
+  // Generate Boss AI Lore first (image prompt depends on boss name)
   const bossData = await generateGlitchBossLore();
+
+  // Generate boss artwork image using the AI-selected boss name
+  const customImageUrl = await generateBossImage(bossData.bossName);
+
 
   // Insert new weekly boss season in Supabase
   const { data: newBoss, error } = await supabase
@@ -130,6 +187,7 @@ async function getOrCreateActiveBoss(guildId) {
       is_defeated: false,
       mom_buff: false,
       dad_debuff: false,
+      custom_image_url: customImageUrl,
       last_action: 'Weekly Boss Spawned! Pick your class to begin combat.',
     })
     .select()
