@@ -722,156 +722,178 @@ export default function GamingPage() {
                   initialEnabled={configs['weekly_boss']?.enabled ?? true}
                   initialConfig={configs['weekly_boss']?.config ?? {}}
                 >
-                  {(config, setConfig) => (
-                    <>
-                      <div className="section-divider">
-                        <div className="section-divider-line" />
-                        <span className="section-divider-text">Boss Settings</span>
-                        <div className="section-divider-line" />
-                      </div>
+                  {(config, setConfig) => {
+                    const [gameName, setGameName] = useState<string>(config.game_name || '');
+                    const [bossName, setBossName] = useState<string>(config.override_name || '');
+                    const [baseHP, setBaseHP] = useState<string>(config.override_hp || '');
+                    const [imageUrl, setImageUrl] = useState<string>(config.custom_image_url || '');
 
-                      <div className="form-group">
-                        <label className="form-label">Boss Announcement Channel ID</label>
-                        <input
-                          id="boss-channel-id"
-                          className="form-input"
-                          placeholder="Channel ID for boss card posts (e.g. 1234567890)"
-                          value={config.channel_id || ''}
-                          onChange={(e) => setConfig('channel_id', e.target.value)}
-                        />
-                        <span className="form-hint">Channel where /boss status cards are posted</span>
-                      </div>
-
-                      {/* Manual Boss Configuration Controls */}
-                      <div className="section-divider">
-                        <div className="section-divider-line" />
-                        <span className="section-divider-text">⚔️ Weekly Boss Setup</span>
-                        <div className="section-divider-line" />
-                      </div>
-
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-                        <div className="form-group">
-                          <label className="form-label">🎮 Game Name</label>
-                          <input
-                            id="boss-game-name"
-                            className="form-input"
-                            placeholder="e.g. Diablo 4, Wuthering Waves, Elden Ring"
-                            value={config.game_name || ''}
-                            onChange={(e) => setConfig('game_name', e.target.value)}
-                          />
-                          <span className="form-hint">The game where the boss originates</span>
+                    return (
+                      <>
+                        <div className="section-divider">
+                          <div className="section-divider-line" />
+                          <span className="section-divider-text">Boss Settings</span>
+                          <div className="section-divider-line" />
                         </div>
 
                         <div className="form-group">
-                          <label className="form-label">⚔️ Boss / Character Name</label>
+                          <label className="form-label">Boss Announcement Channel ID</label>
                           <input
-                            id="boss-override-name"
+                            id="boss-channel-id"
                             className="form-input"
-                            placeholder="e.g. Lilith, Aemeth, Malenia"
-                            value={config.override_name || ''}
-                            onChange={(e) => setConfig('override_name', e.target.value)}
+                            placeholder="Channel ID for boss card posts (e.g. 1234567890)"
+                            value={config.channel_id || ''}
+                            onChange={(e) => setConfig('channel_id', e.target.value)}
                           />
-                          <span className="form-hint">Name of the boss character</span>
-                        </div>
-                      </div>
-
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-                        <div className="form-group">
-                          <label className="form-label">❤️ Manual Base HP (Optional Override)</label>
-                          <input
-                            id="boss-override-hp"
-                            type="number"
-                            className="form-input"
-                            placeholder="e.g. 150000"
-                            value={config.override_hp || ''}
-                            onChange={(e) => setConfig('override_hp', e.target.value)}
-                          />
-                          <span className="form-hint">Leave blank for automatic player-scaled HP</span>
+                          <span className="form-hint">Channel where /boss status cards are posted</span>
                         </div>
 
-                        <div className="form-group">
-                          <label className="form-label">🖼️ Custom Boss Image URL</label>
-                          <input
-                            id="boss-image-url"
-                            className="form-input"
-                            placeholder="https://.../boss_image.png"
-                            value={config.custom_image_url || ''}
-                            onChange={(e) => setConfig('custom_image_url', e.target.value)}
-                          />
-                          <span className="form-hint">Paste direct image URL for the weekly boss banner</span>
+                        {/* Manual Boss Configuration Controls */}
+                        <div className="section-divider">
+                          <div className="section-divider-line" />
+                          <span className="section-divider-text">⚔️ Weekly Boss Setup</span>
+                          <div className="section-divider-line" />
                         </div>
-                      </div>
 
-                      {/* Live Image Preview Card */}
-                      {config.custom_image_url && (
-                        <div style={{
-                          marginTop: '0.5rem',
-                          marginBottom: '1rem',
-                          padding: '0.75rem',
-                          backgroundColor: '#020617',
-                          borderRadius: '0.375rem',
-                          border: '1px dashed rgba(99, 102, 241, 0.4)',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          gap: '0.5rem',
-                          alignItems: 'center',
-                        }}>
-                          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>
-                            🖼️ Boss Image Live Preview:
-                          </span>
-                          <img
-                            src={config.custom_image_url}
-                            alt="Boss Artwork Preview"
-                            style={{
-                              maxHeight: '200px',
-                              maxWidth: '100%',
-                              borderRadius: '0.375rem',
-                              objectFit: 'contain',
-                              border: '1px solid rgba(255,255,255,0.1)',
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                          <div className="form-group">
+                            <label className="form-label">🎮 Game Name</label>
+                            <input
+                              id="boss-game-name"
+                              className="form-input"
+                              placeholder="e.g. Diablo 4, Wuthering Waves, Elden Ring"
+                              value={gameName}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setGameName(val);
+                                setConfig('game_name', val);
+                              }}
+                            />
+                            <span className="form-hint">The game where the boss originates</span>
+                          </div>
+
+                          <div className="form-group">
+                            <label className="form-label">⚔️ Boss / Character Name</label>
+                            <input
+                              id="boss-override-name"
+                              className="form-input"
+                              placeholder="e.g. Lilith, Aemeth, Malenia"
+                              value={bossName}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setBossName(val);
+                                setConfig('override_name', val);
+                              }}
+                            />
+                            <span className="form-hint">Name of the boss character</span>
+                          </div>
+                        </div>
+
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                          <div className="form-group">
+                            <label className="form-label">❤️ Manual Base HP (Optional Override)</label>
+                            <input
+                              id="boss-override-hp"
+                              type="number"
+                              className="form-input"
+                              placeholder="e.g. 150000"
+                              value={baseHP}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setBaseHP(val);
+                                setConfig('override_hp', val);
+                              }}
+                            />
+                            <span className="form-hint">Leave blank for automatic player-scaled HP</span>
+                          </div>
+
+                          <div className="form-group">
+                            <label className="form-label">🖼️ Custom Boss Image URL</label>
+                            <input
+                              id="boss-image-url"
+                              className="form-input"
+                              placeholder="https://.../boss_image.png"
+                              value={imageUrl}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setImageUrl(val);
+                                setConfig('custom_image_url', val);
+                              }}
+                            />
+                            <span className="form-hint">Paste direct image URL for the weekly boss banner</span>
+                          </div>
+                        </div>
+
+                        {/* Live Image Preview Card */}
+                        {imageUrl && (
+                          <div style={{
+                            marginTop: '0.5rem',
+                            marginBottom: '1rem',
+                            padding: '0.75rem',
+                            backgroundColor: '#020617',
+                            borderRadius: '0.375rem',
+                            border: '1px dashed rgba(99, 102, 241, 0.4)',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '0.5rem',
+                            alignItems: 'center',
+                          }}>
+                            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>
+                              🖼️ Boss Image Live Preview:
+                            </span>
+                            <img
+                              src={imageUrl}
+                              alt="Boss Artwork Preview"
+                              style={{
+                                maxHeight: '200px',
+                                maxWidth: '100%',
+                                borderRadius: '0.375rem',
+                                objectFit: 'contain',
+                                border: '1px solid rgba(255,255,255,0.1)',
+                              }}
+                              onError={(e: any) => {
+                                e.target.style.display = 'none';
+                              }}
+                            />
+                          </div>
+                        )}
+
+                        {/* Admin Quick Action Controls */}
+                        <div className="section-divider">
+                          <div className="section-divider-line" />
+                          <span className="section-divider-text">🚀 Action Controls</span>
+                          <div className="section-divider-line" />
+                        </div>
+
+                        <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                          <button
+                            id="boss-force-spawn"
+                            className="btn btn-primary btn-sm"
+                            disabled={config.boss_status === 'loading'}
+                            onClick={async () => {
+                              setConfig('boss_status', 'loading');
+                              try {
+                                const res = await fetch('/api/gaming/boss/action', {
+                                  method: 'POST',
+                                  headers: { 'Content-Type': 'application/json' },
+                                  body: JSON.stringify({
+                                    action: 'spawn',
+                                    gameName,
+                                    customName: bossName,
+                                    customHp: baseHP,
+                                    customImageUrl: imageUrl,
+                                  }),
+                                });
+                                const data = await res.json();
+                                setConfig('boss_status', data.error ? `error: ${data.error}` : 'spawned');
+                              } catch {
+                                setConfig('boss_status', 'error: request failed');
+                              }
+                              setTimeout(() => setConfig('boss_status', ''), 4000);
                             }}
-                            onError={(e: any) => {
-                              e.target.style.display = 'none';
-                            }}
-                          />
-                        </div>
-                      )}
-
-                      {/* Admin Quick Action Controls */}
-                      <div className="section-divider">
-                        <div className="section-divider-line" />
-                        <span className="section-divider-text">🚀 Action Controls</span>
-                        <div className="section-divider-line" />
-                      </div>
-
-                      <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
-                        <button
-                          id="boss-force-spawn"
-                          className="btn btn-primary btn-sm"
-                          disabled={config.boss_status === 'loading'}
-                          onClick={async () => {
-                            setConfig('boss_status', 'loading');
-                            try {
-                              const res = await fetch('/api/gaming/boss/action', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({
-                                  action: 'spawn',
-                                  gameName: config.game_name,
-                                  customName: config.override_name,
-                                  customHp: config.override_hp,
-                                  customImageUrl: config.custom_image_url,
-                                }),
-                              });
-                              const data = await res.json();
-                              setConfig('boss_status', data.error ? `error: ${data.error}` : 'spawned');
-                            } catch {
-                              setConfig('boss_status', 'error: request failed');
-                            }
-                            setTimeout(() => setConfig('boss_status', ''), 4000);
-                          }}
-                        >
-                          🚀 Spawn Boss & Post Card to Discord
-                        </button>
+                          >
+                            🚀 Spawn Boss & Post Card to Discord
+                          </button>
 
                         <button
                           id="boss-force-end"
@@ -934,8 +956,9 @@ export default function GamingPage() {
                         )}
                       </div>
                     </>
-                  )}
-                </FeatureCard>
+                  );
+                }}
+              </FeatureCard>
               </div>
             </div>
           )}
