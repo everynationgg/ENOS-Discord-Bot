@@ -753,6 +753,126 @@ export default function GamingPage() {
                         />
                         <span className="form-hint">Direct link to a transparent PNG for custom weekly boss rendering</span>
                       </div>
+
+                      {/* Admin Quick Action Controls */}
+                      <div className="section-divider">
+                        <div className="section-divider-line" />
+                        <span className="section-divider-text">Admin Quick Action Controls</span>
+                        <div className="section-divider-line" />
+                      </div>
+
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                        <div className="form-group">
+                          <label className="form-label">Manual Boss Name (Optional Override)</label>
+                          <input
+                            id="boss-override-name"
+                            className="form-input"
+                            placeholder="e.g. ERROR-MOD: Corrupted Malenia"
+                            value={config.override_name || ''}
+                            onChange={(e) => setConfig('override_name', e.target.value)}
+                          />
+                        </div>
+                        <div className="form-group">
+                          <label className="form-label">Manual Base HP (Optional Override)</label>
+                          <input
+                            id="boss-override-hp"
+                            type="number"
+                            className="form-input"
+                            placeholder="e.g. 150000"
+                            value={config.override_hp || ''}
+                            onChange={(e) => setConfig('override_hp', e.target.value)}
+                          />
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                        <button
+                          id="boss-force-spawn"
+                          className="btn btn-primary btn-sm"
+                          disabled={config.boss_status === 'loading'}
+                          onClick={async () => {
+                            setConfig('boss_status', 'loading');
+                            try {
+                              const res = await fetch('/api/gaming/boss/action', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                  action: 'spawn',
+                                  customName: config.override_name,
+                                  customHp: config.override_hp,
+                                }),
+                              });
+                              const data = await res.json();
+                              setConfig('boss_status', data.error ? `error: ${data.error}` : 'spawned');
+                            } catch {
+                              setConfig('boss_status', 'error: request failed');
+                            }
+                            setTimeout(() => setConfig('boss_status', ''), 4000);
+                          }}
+                        >
+                          🚀 Force Spawn Boss
+                        </button>
+
+                        <button
+                          id="boss-force-end"
+                          className="btn btn-secondary btn-sm"
+                          disabled={config.boss_status === 'loading'}
+                          onClick={async () => {
+                            setConfig('boss_status', 'loading');
+                            try {
+                              const res = await fetch('/api/gaming/boss/action', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ action: 'end' }),
+                              });
+                              const data = await res.json();
+                              setConfig('boss_status', data.error ? `error: ${data.error}` : 'ended');
+                            } catch {
+                              setConfig('boss_status', 'error: request failed');
+                            }
+                            setTimeout(() => setConfig('boss_status', ''), 4000);
+                          }}
+                        >
+                          ⏹️ Force End / Reset AP
+                        </button>
+
+                        <button
+                          id="boss-force-overkill"
+                          className="btn btn-secondary btn-sm"
+                          disabled={config.boss_status === 'loading'}
+                          onClick={async () => {
+                            setConfig('boss_status', 'loading');
+                            try {
+                              const res = await fetch('/api/gaming/boss/action', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ action: 'overkill' }),
+                              });
+                              const data = await res.json();
+                              setConfig('boss_status', data.error ? `error: ${data.error}` : 'overkill');
+                            } catch {
+                              setConfig('boss_status', 'error: request failed');
+                            }
+                            setTimeout(() => setConfig('boss_status', ''), 4000);
+                          }}
+                        >
+                          💥 Force Trigger Overkill
+                        </button>
+
+                        {config.boss_status && (
+                          <span style={{
+                            fontSize: '0.8125rem',
+                            color: config.boss_status.startsWith('error') ? 'var(--color-error)' : 'var(--color-success)',
+                            fontWeight: 500,
+                          }}>
+                            {config.boss_status === 'loading' ? '⏳ Processing...' :
+                             config.boss_status === 'spawned' ? '✅ Boss spawned!' :
+                             config.boss_status === 'ended' ? '✅ Cycle ended & AP reset.' :
+                             config.boss_status === 'overkill' ? '✅ Overkill Mode triggered!' :
+                             `❌ ${config.boss_status}`}
+                          </span>
+                        )}
+                      </div>
                     </>
                   )}
                 </FeatureCard>
