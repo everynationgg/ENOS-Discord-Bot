@@ -255,59 +255,33 @@ export async function POST(req: NextRequest) {
     const currentWeek = getWeekIdentifier();
 
     if (action === 'spawn') {
-      let bossName = customName ? customName.trim() : null;
-      let bossTitle = 'Glitched System Threat';
-      let lore = 'System anomaly detected in the gaming realm. Coordinate your triad skills to neutralize!';
-      let hp = customHp ? parseInt(customHp, 10) : 150000;
+      // Delegate entirely to the Fly.io bot which has no timeout constraints.
+      // The bot generates lore, AI image, renders canvas, and posts to Discord.
+      const botUrl = process.env.BOT_ADMIN_URL; // e.g. https://enos-discord-bot.fly.dev
+      const botSecret = process.env.DASHBOARD_SECRET;
 
-      if (!bossName) {
-        const aiData = await generateGlitchBossLore();
-        bossName = aiData.bossName;
-        bossTitle = aiData.bossTitle;
-        lore = aiData.lore;
+      if (!botUrl) {
+        return NextResponse.json({ error: 'BOT_ADMIN_URL not configured' }, { status: 500 });
       }
 
-      // Generate AI boss artwork image using the boss name
-      const customImageUrl = await generateBossImage(bossName);
+      const botRes = await fetch(`${botUrl}/boss/spawn`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-dashboard-secret': botSecret || '',
+        },
+        body: JSON.stringify({ guild_id: guildId, customName, customHp }),
+        signal: AbortSignal.timeout(120000), // 2 min — plenty for image gen on Fly.io
+      });
 
-      // Delete existing non-overkill boss season for current week before inserting new spawn
-      await supabaseAdmin
-        .from('boss_seasons')
-        .delete()
-        .eq('guild_id', guildId)
-        .eq('week_identifier', currentWeek)
-        .eq('is_overkill', false);
-
-      // Insert new boss season
-      const { data: newBoss, error } = await supabaseAdmin
-        .from('boss_seasons')
-        .insert({
-          guild_id: guildId,
-          week_identifier: currentWeek,
-          boss_name: bossName,
-          boss_title: bossTitle,
-          lore,
-          max_hp: hp,
-          current_hp: hp,
-          is_overkill: false,
-          is_defeated: false,
-          mom_buff: false,
-          dad_debuff: false,
-          custom_image_url: customImageUrl,
-          last_action: '⚡ Admin force spawned a new Weekly Boss!',
-        })
-        .select()
-        .single();
-
-      if (error) {
-        return NextResponse.json({ error: error.message }, { status: 500 });
+      const botData = await botRes.json();
+      if (!botRes.ok || !botData.success) {
+        return NextResponse.json({ error: botData.error || 'Bot spawn failed' }, { status: 500 });
       }
 
-      // Post boss card embed directly to configured Discord channel
-      await postBossCardToDiscord(guildId, newBoss);
-
-      return NextResponse.json({ success: true, action: 'spawn', boss: newBoss });
+      return NextResponse.json({ success: true, action: 'spawn', boss: botData.boss });
     }
+
 
     if (action === 'end') {
       // Mark active boss as defeated & current_hp = 0

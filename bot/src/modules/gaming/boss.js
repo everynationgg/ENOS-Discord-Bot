@@ -583,4 +583,6 @@ module.exports = {
   setPlayerClass,
   allocateStatPoint,
   executeCombatAction,
+  generateGlitchBossLore,
+  generateBossImage,
 };

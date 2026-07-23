@@ -3,6 +3,7 @@ const { Client, GatewayIntentBits, Partials, Collection } = require('discord.js'
 const { loadEvents } = require('./lib/loader');
 const { loadCommands } = require('./lib/loader');
 const { initCrons } = require('./lib/cron');
+const { startAdminServer } = require('./lib/adminServer');
 const logger = require('./lib/logger');
 
 // ─── Client Setup ─────────────────────────────────────────────────────────────
@@ -44,6 +45,7 @@ client.cooldowns = new Collection();
 // ─── Initialize Cron Jobs after ready ─────────────────────────────────────────
 client.once('ready', async () => {
   initCrons(client);
+  startAdminServer(client);
   logger.info(`[READY] Logged in as ${client.user.tag}`);
 });
 
