@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { supabaseAdmin } from '@/lib/supabase';
+import { renderBossImage } from '@/lib/bossCanvas';
 
 function getGuildId(req: NextRequest, body?: any) {
   return (
@@ -85,19 +86,55 @@ async function postBossCardToDiscord(guildId: string, boss: any) {
 
   const currentWeek = boss.week_identifier;
 
-  const embed = {
+  // Fetch Class Distribution
+  const { data: allPlayers } = await supabaseAdmin
+    .from('boss_player_states')
+    .select('class_key')
+    .eq('guild_id', guildId)
+    .eq('week_identifier', currentWeek);
+
+  const classCounts = { mom: 0, dad: 0, kid: 0 };
+  (allPlayers || []).forEach((p: any) => {
+    if (p.class_key && classCounts[p.class_key as keyof typeof classCounts] !== undefined) {
+      classCounts[p.class_key as keyof typeof classCounts]++;
+    }
+  });
+
+  // Render Canvas Buffer
+  let imageBuffer: Buffer | null = null;
+  try {
+    imageBuffer = await renderBossImage({
+      bossName: boss.boss_name,
+      bossTitle: boss.boss_title,
+      currentHp: Number(boss.current_hp),
+      maxHp: Number(boss.max_hp),
+      isOverkill: boss.is_overkill,
+      momBuff: boss.mom_buff,
+      dadDebuff: boss.dad_debuff,
+      lastAction: boss.last_action,
+      classCounts,
+    });
+  } catch (err) {
+    console.error('[BOSS CANVAS] Failed to render image in dashboard route:', err);
+  }
+
+  const embed: any = {
     title: `🎮 Weekly Boss Bounty — ${boss.boss_name}`,
     description:
       `**Lore**: ${boss.lore}\n\n` +
       `⚔️ **Last Action**: ${boss.last_action}\n` +
-      `🛡️ **M.O.M. Buff**: ❌ Inactive\n` +
-      `🔨 **D.A.D. Debuff**: ❌ Inactive\n\n` +
+      `🛡️ **M.O.M. Buff**: ${boss.mom_buff ? '✅ **ACTIVE**' : '❌ Inactive'}\n` +
+      `🔨 **D.A.D. Debuff**: ${boss.dad_debuff ? '✅ **ACTIVE**' : '❌ Inactive'}\n\n` +
       `HP: **${Number(boss.current_hp).toLocaleString()} / ${Number(boss.max_hp).toLocaleString()}** (100%)\n` +
       `👤 *Click a button below to pick your class and join the battle!*`,
     color: boss.is_overkill ? 15671108 : 6514417,
     footer: { text: `ENOS Weekly RPG System • Week ${currentWeek}` },
     timestamp: new Date().toISOString(),
   };
+
+  if (imageBuffer) {
+    embed.image = { url: 'attachment://weekly_boss_arena.png' };
+  }
 
   const components = [
     {
@@ -111,17 +148,37 @@ async function postBossCardToDiscord(guildId: string, boss: any) {
     },
   ];
 
-  await fetch(`https://discord.com/api/v10/channels/${channelId}/messages`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bot ${token}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      embeds: [embed],
-      components,
-    }),
-  }).catch((e) => console.error('[BOSS POST] Error posting boss card to Discord:', e));
+  if (imageBuffer) {
+    const formData = new FormData();
+    formData.append(
+      'payload_json',
+      JSON.stringify({
+        embeds: [embed],
+        components,
+      })
+    );
+    formData.append('files[0]', new Blob([Uint8Array.from(imageBuffer)], { type: 'image/png' }), 'weekly_boss_arena.png');
+
+    await fetch(`https://discord.com/api/v10/channels/${channelId}/messages`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bot ${token}`,
+      },
+      body: formData,
+    }).catch((e) => console.error('[BOSS POST] Error posting boss card with image to Discord:', e));
+  } else {
+    await fetch(`https://discord.com/api/v10/channels/${channelId}/messages`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bot ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        embeds: [embed],
+        components,
+      }),
+    }).catch((e) => console.error('[BOSS POST] Error posting boss card to Discord:', e));
+  }
 }
 
 export async function POST(req: NextRequest) {
