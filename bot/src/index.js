@@ -34,6 +34,8 @@ client.cooldowns = new Collection();
   try {
     await loadCommands(client);
     await loadEvents(client);
+    // Start HTTP admin server BEFORE Discord login so Fly.io health checks pass immediately
+    startAdminServer(client);
     await client.login(process.env.DISCORD_TOKEN);
     logger.info('Bot login sequence initiated.');
   } catch (err) {
@@ -45,7 +47,6 @@ client.cooldowns = new Collection();
 // ─── Initialize Cron Jobs after ready ─────────────────────────────────────────
 client.once('ready', async () => {
   initCrons(client);
-  startAdminServer(client);
   logger.info(`[READY] Logged in as ${client.user.tag}`);
 });
 
