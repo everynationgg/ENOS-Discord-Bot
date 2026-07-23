@@ -484,6 +484,14 @@ async function triggerOverkillRevival(guildId, boss) {
     .update({ is_defeated: true })
     .eq('id', boss.id);
 
+  // Delete existing overkill boss season for this week before inserting new overkill spawn
+  await supabase
+    .from('boss_seasons')
+    .delete()
+    .eq('guild_id', guildId)
+    .eq('week_identifier', boss.week_identifier)
+    .eq('is_overkill', true);
+
   // Spawn Overkill Boss with refreshed HP
   const overkillName = `ERROR-MOD: Backup System Activated! (${boss.boss_name.replace(/^ERROR-MOD: Corrupted /, '')})`;
   await supabase

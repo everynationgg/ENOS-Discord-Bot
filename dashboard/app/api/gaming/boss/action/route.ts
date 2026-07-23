@@ -93,12 +93,13 @@ export async function POST(req: NextRequest) {
         lore = aiData.lore;
       }
 
-      // Mark old active bosses for this week as defeated
+      // Delete existing non-overkill boss season for current week before inserting new spawn
       await supabaseAdmin
         .from('boss_seasons')
-        .update({ is_defeated: true })
+        .delete()
         .eq('guild_id', guildId)
-        .eq('week_identifier', currentWeek);
+        .eq('week_identifier', currentWeek)
+        .eq('is_overkill', false);
 
       // Insert new boss season
       const { data: newBoss, error } = await supabaseAdmin
@@ -165,6 +166,14 @@ export async function POST(req: NextRequest) {
         .from('boss_seasons')
         .update({ is_defeated: true, current_hp: 0 })
         .eq('id', activeBoss.id);
+
+      // Delete existing overkill boss season for current week before inserting new overkill spawn
+      await supabaseAdmin
+        .from('boss_seasons')
+        .delete()
+        .eq('guild_id', guildId)
+        .eq('week_identifier', currentWeek)
+        .eq('is_overkill', true);
 
       // Spawn Overkill Boss
       const overkillName = `ERROR-MOD: Backup System Activated! (${activeBoss.boss_name.replace(/^ERROR-MOD: Corrupted /, '')})`;
