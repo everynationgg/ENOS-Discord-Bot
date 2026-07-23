@@ -383,7 +383,10 @@ async function executeCombatAction(guildId, userId, actionType) {
 
   // Atomic Update Boss HP & Synergy State in Supabase
   const newHp = Math.max(0, boss.current_hp - totalDmg);
-  const actionText = `${classKey.toUpperCase()} used **${skillName}** dealt **${totalDmg.toLocaleString()} DMG**${isSynergy ? ` 🔥 (${synergyType.toUpperCase()} COMBO!)` : ''}`;
+  let actionText = `${classKey.toUpperCase()} used ${skillName} dealt ${totalDmg.toLocaleString()} DMG`;
+  if (apConserved) actionText += ' ⚡ (0 AP SPENT!)';
+  if (isSynergy) actionText += ` 🔥 (${synergyType.toUpperCase()} COMBO!)`;
+  if (newLevel > profile.level) actionText += ` 🎉 (LEVEL UP to Lv.${newLevel}!)`;
 
   const { data: updatedBoss, error: bossErr } = await supabase
     .from('boss_seasons')

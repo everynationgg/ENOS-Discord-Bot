@@ -14,6 +14,158 @@ function drawRoundedRect(ctx: any, x: number, y: number, width: number, height: 
   ctx.closePath();
 }
 
+/**
+ * Draws pixel-art M.O.M. avatar matching character sheet (Straw hat, blue ribbon, purple dress, red slipper)
+ */
+function drawMomSprite(ctx: any, cx: number, cy: number) {
+  ctx.save();
+  ctx.fillStyle = '#0f172a';
+  ctx.beginPath();
+  ctx.arc(cx, cy, 18, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = '#38bdf8';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  // Wavy Brown Hair
+  ctx.fillStyle = '#65350f';
+  ctx.fillRect(cx - 10, cy - 6, 20, 16);
+
+  // Face
+  ctx.fillStyle = '#fbcfe8';
+  ctx.fillRect(cx - 7, cy - 8, 14, 12);
+
+  // Angry Brows & Eyes
+  ctx.fillStyle = '#1e1b4b';
+  ctx.fillRect(cx - 5, cy - 6, 4, 2);
+  ctx.fillRect(cx + 1, cy - 6, 4, 2);
+
+  // Purple Dress
+  ctx.fillStyle = '#c084fc';
+  ctx.fillRect(cx - 7, cy + 4, 14, 10);
+
+  // Green Sash Belt
+  ctx.fillStyle = '#22c55e';
+  ctx.fillRect(cx - 7, cy + 6, 14, 3);
+
+  // Straw Hat
+  ctx.fillStyle = '#fde047';
+  ctx.fillRect(cx - 12, cy - 13, 24, 4);
+  ctx.fillRect(cx - 8, cy - 17, 16, 5);
+
+  // Blue Hat Ribbon
+  ctx.fillStyle = '#3b82f6';
+  ctx.fillRect(cx - 8, cy - 13, 16, 2);
+
+  // Red Slipper (Weapon)
+  ctx.fillStyle = '#ef4444';
+  ctx.fillRect(cx + 7, cy - 4, 5, 8);
+  ctx.fillStyle = '#dc2626';
+  ctx.fillRect(cx + 8, cy - 2, 4, 4);
+
+  ctx.restore();
+}
+
+/**
+ * Draws pixel-art D.A.D. avatar matching character sheet (Blonde mustache, plaid shirt, jeans, tools)
+ */
+function drawDadSprite(ctx: any, cx: number, cy: number) {
+  ctx.save();
+  ctx.fillStyle = '#0f172a';
+  ctx.beginPath();
+  ctx.arc(cx, cy, 18, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = '#f59e0b';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  // Face
+  ctx.fillStyle = '#fde68a';
+  ctx.fillRect(cx - 7, cy - 8, 14, 12);
+
+  // Blonde Hair
+  ctx.fillStyle = '#facc15';
+  ctx.fillRect(cx - 8, cy - 14, 16, 7);
+
+  // Eyes
+  ctx.fillStyle = '#1e3a8a';
+  ctx.fillRect(cx - 5, cy - 5, 3, 3);
+  ctx.fillRect(cx + 2, cy - 5, 3, 3);
+
+  // Thick Blonde Mustache
+  ctx.fillStyle = '#eab308';
+  ctx.fillRect(cx - 6, cy - 1, 12, 4);
+
+  // Plaid Flannel Shirt
+  ctx.fillStyle = '#2563eb';
+  ctx.fillRect(cx - 7, cy + 4, 14, 8);
+  ctx.fillStyle = '#78350f';
+  ctx.fillRect(cx - 4, cy + 4, 2, 8);
+  ctx.fillRect(cx + 2, cy + 4, 2, 8);
+
+  // Blue Jeans
+  ctx.fillStyle = '#1d4ed8';
+  ctx.fillRect(cx - 6, cy + 11, 12, 4);
+
+  // Red Screwdriver Tool
+  ctx.fillStyle = '#ef4444';
+  ctx.fillRect(cx + 7, cy, 3, 7);
+  ctx.fillStyle = '#94a3b8';
+  ctx.fillRect(cx + 8, cy + 7, 1, 4);
+
+  ctx.restore();
+}
+
+/**
+ * Draws pixel-art K.I.D. avatar matching character sheet (Propeller hat, purple EN shirt, iPad tablet)
+ */
+function drawKidSprite(ctx: any, cx: number, cy: number) {
+  ctx.save();
+  ctx.fillStyle = '#0f172a';
+  ctx.beginPath();
+  ctx.arc(cx, cy, 18, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = '#ec4899';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  // Face
+  ctx.fillStyle = '#fed7aa';
+  ctx.fillRect(cx - 7, cy - 7, 14, 11);
+
+  // Brown Hair
+  ctx.fillStyle = '#78350f';
+  ctx.fillRect(cx - 8, cy - 10, 16, 5);
+
+  // Red Propeller Hat (Backward)
+  ctx.fillStyle = '#ef4444';
+  ctx.fillRect(cx - 9, cy - 13, 18, 5);
+
+  // Spinning Yellow Propeller
+  ctx.fillStyle = '#facc15';
+  ctx.fillRect(cx - 1, cy - 17, 2, 4);
+  ctx.fillRect(cx - 7, cy - 18, 14, 2);
+
+  // Angry Eyes focusing on iPad
+  ctx.fillStyle = '#1e1b4b';
+  ctx.fillRect(cx - 5, cy - 4, 3, 2);
+  ctx.fillRect(cx + 2, cy - 4, 3, 2);
+
+  // Purple & Yellow Shirt
+  ctx.fillStyle = '#a855f7';
+  ctx.fillRect(cx - 7, cy + 4, 14, 8);
+  ctx.fillStyle = '#eab308';
+  ctx.fillRect(cx - 7, cy + 4, 5, 8);
+
+  // Glowing iPad Tablet
+  ctx.fillStyle = '#cbd5e1';
+  ctx.fillRect(cx - 5, cy + 7, 10, 8);
+  ctx.fillStyle = '#38bdf8';
+  ctx.fillRect(cx - 4, cy + 8, 8, 6);
+
+  ctx.restore();
+}
+
 export async function renderBossImage(data: {
   bossName?: string;
   bossTitle?: string;
@@ -140,7 +292,7 @@ export async function renderBossImage(data: {
   ctx.fillText(hpText, hpBarX + hpBarW - 10, hpBarY + 13);
   ctx.textAlign = 'left';
 
-  // 4. Combat Arena Layout
+  // 4. Combat Arena Layout: Triad (Left) vs Boss (Right)
   ctx.fillStyle = 'rgba(15, 23, 42, 0.6)';
   drawRoundedRect(ctx, 20, 130, 360, 215, 12);
   ctx.fill();
@@ -149,12 +301,12 @@ export async function renderBossImage(data: {
 
   ctx.fillStyle = '#cbd5e1';
   ctx.font = 'bold 14px sans-serif';
-  ctx.fillText('⚔️ COMBAT TRIAD', 35, 155);
+  ctx.fillText('COMBAT TRIAD CLASS SLOTS', 35, 155);
 
   const triadClasses = [
-    { name: 'M.O.M.', role: 'Buff Support', color: '#38bdf8', icon: '🛡️', count: classCounts.mom || 0, buffActive: momBuff },
-    { name: 'D.A.D.', role: 'Debuff Setup', color: '#f59e0b', icon: '🔨', count: classCounts.dad || 0, buffActive: dadDebuff },
-    { name: 'K.I.D.', role: 'Nuke Combo', color: '#ec4899', icon: '⚡', count: classCounts.kid || 0, buffActive: false },
+    { key: 'mom', name: 'M.O.M.', role: 'Buff Support', color: '#38bdf8', count: classCounts.mom || 0, buffActive: momBuff },
+    { key: 'dad', name: 'D.A.D.', role: 'Debuff Setup', color: '#f59e0b', count: classCounts.dad || 0, buffActive: dadDebuff },
+    { key: 'kid', name: 'K.I.D.', role: 'Nuke Combo', color: '#ec4899', count: classCounts.kid || 0, buffActive: false },
   ];
 
   triadClasses.forEach((cls, idx) => {
@@ -166,26 +318,28 @@ export async function renderBossImage(data: {
     ctx.lineWidth = 1;
     ctx.stroke();
 
-    ctx.font = '16px sans-serif';
-    ctx.fillText(cls.icon, 45, slotY + 28);
+    // Draw Pixel Art Character Avatar
+    if (cls.key === 'mom') drawMomSprite(ctx, 58, slotY + 22);
+    else if (cls.key === 'dad') drawDadSprite(ctx, 58, slotY + 22);
+    else if (cls.key === 'kid') drawKidSprite(ctx, 58, slotY + 22);
 
     ctx.fillStyle = '#f8fafc';
     ctx.font = 'bold 15px sans-serif';
-    ctx.fillText(cls.name, 72, slotY + 22);
+    ctx.fillText(cls.name, 88, slotY + 22);
 
     ctx.fillStyle = '#94a3b8';
     ctx.font = '11px sans-serif';
-    ctx.fillText(`${cls.role} • ${cls.count} Active`, 72, slotY + 36);
+    ctx.fillText(`${cls.role} • ${cls.count} Active`, 88, slotY + 36);
 
     if (cls.buffActive) {
       ctx.fillStyle = 'rgba(34, 197, 94, 0.25)';
-      drawRoundedRect(ctx, 250, slotY + 12, 105, 20, 5);
+      drawRoundedRect(ctx, 245, slotY + 12, 110, 20, 5);
       ctx.fill();
       ctx.strokeStyle = '#22c55e';
       ctx.stroke();
       ctx.fillStyle = '#4ade80';
       ctx.font = 'bold 10px sans-serif';
-      ctx.fillText('✓ SETUP READY', 256, slotY + 26);
+      ctx.fillText('✓ SETUP READY', 251, slotY + 26);
     }
   });
 

@@ -273,21 +273,13 @@ module.exports = {
 
       const res = await executeCombatAction(guildId, userId, actionType);
       if (!res.success) {
-        const msg = await interaction.followUp({ content: res.message, ephemeral: true });
-        setTimeout(() => msg.delete().catch(() => {}), 5000);
+        await interaction.followUp({ content: res.message, ephemeral: true });
+        setTimeout(() => interaction.deleteReply().catch(() => {}), 5000);
         return;
       }
 
       const payload = await buildBossEmbedPayload(guildId, userId);
       await interaction.editReply(payload);
-
-      let combatNotice = `⚔️ Dealt **${res.damageDealt.toLocaleString()} DMG** using **${res.skillName}**! (+${res.pointsEarned} pts, +${res.xpEarned} XP)`;
-      if (res.apConserved) combatNotice += ' ⚡ **AP CONSERVED (0 AP spent)!**';
-      if (res.isSynergy) combatNotice += ` 🔥 **${res.synergyType.toUpperCase()} TRIAD COMBO EXECUTED!**`;
-      if (res.leveledUp) combatNotice += ` 🎉 **LEVEL UP! You are now Level ${res.newLevel}!** Check /boss stats to allocate stat points.`;
-
-      const msg = await interaction.followUp({ content: combatNotice, ephemeral: true });
-      setTimeout(() => msg.delete().catch(() => {}), 5000);
       return;
     }
 
