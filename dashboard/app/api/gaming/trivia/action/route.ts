@@ -48,32 +48,41 @@ Respond ONLY with a raw JSON object containing these keys:
 }
 Do not wrap in markdown, backticks, or write any extra text.`;
 
-  const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-      }),
+  const modelsToTry = ['gemini-1.5-flash', 'gemini-2.0-flash', 'gemini-1.5-pro'];
+  let lastErrText = '';
+
+  for (const modelName of modelsToTry) {
+    try {
+      const res = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+          }),
+        }
+      );
+
+      if (!res.ok) {
+        lastErrText = await res.text();
+        continue;
+      }
+
+      const data = await res.json();
+      const text = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '';
+      const cleanJson = text.replace(/^```json\s*/i, '').replace(/```$/, '').trim();
+      const parsed = JSON.parse(cleanJson);
+
+      if (parsed.question && parsed.correct_answer && parsed.incorrect_answers && parsed.incorrect_answers.length === 3) {
+        return parsed;
+      }
+    } catch (e: any) {
+      lastErrText = e.message;
     }
-  );
-
-  if (!res.ok) {
-    const errText = await res.text();
-    throw new Error(`Gemini API error (${res.status}): ${errText}`);
   }
 
-  const data = await res.json();
-  const text = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '';
-  const cleanJson = text.replace(/^```json\s*/i, '').replace(/```$/, '').trim();
-  const parsed = JSON.parse(cleanJson);
-
-  if (!parsed.question || !parsed.correct_answer || !parsed.incorrect_answers || parsed.incorrect_answers.length !== 3) {
-    throw new Error('Invalid JSON format returned by Gemini API.');
-  }
-
-  return parsed;
+  throw new Error(`Gemini API Quota Exceeded (429). Google AI Studio free tier limit reached on this API key. Please wait a minute or upgrade your key in AI Studio. Details: ${lastErrText}`);
 }
 
 async function closeActiveDrop(guildId: string, status: 'completed' | 'skipped' | 'superseded' = 'skipped') {

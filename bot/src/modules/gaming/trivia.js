@@ -38,7 +38,6 @@ async function generateTriviaQuestion(topic) {
     throw new Error('Missing GEMINI_API_KEY environment variable.');
   }
 
-  const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
   const prompt = `Generate a challenging multiple-choice trivia question.
 If a topic is provided, it must be about that topic (lore, gameplay, details). Otherwise, it should be about general gaming, pop culture, or tech.
 Topic: ${topic || 'Random general gaming, pop culture, or tech knowledge'}
@@ -51,18 +50,27 @@ Respond ONLY with a raw JSON object containing these keys:
 }
 Do not wrap in markdown, backticks, or write any extra text.`;
 
-  const result = await model.generateContent(prompt);
-  const text = result.response.text().trim();
+  const modelsToTry = ['gemini-1.5-flash', 'gemini-2.0-flash', 'gemini-1.5-pro'];
+  let lastError;
 
-  // Clean up markdown block format if Gemini wrapped it despite prompt
-  const cleanJson = text.replace(/^```json\s*/i, '').replace(/```$/, '').trim();
-  const parsed = JSON.parse(cleanJson);
+  for (const modelName of modelsToTry) {
+    try {
+      const model = genAI.getGenerativeModel({ model: modelName });
+      const result = await model.generateContent(prompt);
+      const text = result.response.text().trim();
+      const cleanJson = text.replace(/^```json\s*/i, '').replace(/```$/, '').trim();
+      const parsed = JSON.parse(cleanJson);
 
-  if (!parsed.question || !parsed.correct_answer || !parsed.incorrect_answers || parsed.incorrect_answers.length !== 3) {
-    throw new Error('Invalid JSON format returned by Gemini.');
+      if (parsed.question && parsed.correct_answer && parsed.incorrect_answers && parsed.incorrect_answers.length === 3) {
+        return parsed;
+      }
+    } catch (err) {
+      logger.warn(`[TRIVIA] Model ${modelName} failed or quota exceeded: ${err.message}. Trying next fallback...`);
+      lastError = err;
+    }
   }
 
-  return parsed;
+  throw new Error(`Gemini API quota exceeded or unavailable across models: ${lastError?.message || 'Unknown error'}`);
 }
 
 /**

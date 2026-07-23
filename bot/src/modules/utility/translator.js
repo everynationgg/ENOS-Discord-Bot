@@ -18,7 +18,6 @@ async function translateText(text, targetLanguage) {
     throw new Error('GEMINI_API_KEY is not configured on the bot server.');
   }
 
-  const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
   const prompt = `Translate the following text into ${targetLanguage}. Automatically detect the source language. Provide only the translated text as the result. Do not include any quotes, markdown headers, notes, explanations, or wrapper tags.
 
 Text to translate:
@@ -26,9 +25,22 @@ Text to translate:
 ${text}
 """`;
 
-  const result = await model.generateContent(prompt);
-  const responseText = result.response.text();
-  return responseText ? responseText.trim() : '⚠️ No translation response was generated.';
+  const modelsToTry = ['gemini-1.5-flash', 'gemini-2.0-flash', 'gemini-1.5-pro'];
+  let lastError;
+
+  for (const modelName of modelsToTry) {
+    try {
+      const model = genAI.getGenerativeModel({ model: modelName });
+      const result = await model.generateContent(prompt);
+      const responseText = result.response.text();
+      if (responseText) return responseText.trim();
+    } catch (err) {
+      logger.warn(`[TRANSLATOR] Model ${modelName} failed or quota exceeded: ${err.message}. Trying fallback...`);
+      lastError = err;
+    }
+  }
+
+  return '⚠️ Gemini API limit reached. Please try again in a few seconds.';
 }
 
 /**
