@@ -20,55 +20,6 @@ function getWeekIdentifier(date = new Date()) {
   return `${d.getUTCFullYear()}-W${String(weekNo).padStart(2, '0')}`;
 }
 
-async function generateGlitchBossLore() {
-  const apiKey = process.env.GEMINI_API_KEY;
-  const defaultBoss = {
-    bossName: 'ERROR-MOD: Corrupted Ye Tianshi',
-    bossTitle: 'Anomalous Realm Anomaly',
-    lore: 'A catastrophic system leak merged Where Winds Meet realm data with ENOS core protocols. Overdrive emergency defense activated!',
-  };
-
-  if (!apiKey) return defaultBoss;
-
-  const prompt = `Generate a glitch-corrupted weekly RPG boss title for a Discord bot gaming event.
-Blend the prefix "ERROR-MOD: Corrupted " with a boss/character from popular games.
-
-Respond ONLY with a raw JSON object:
-{
-  "bossName": "ERROR-MOD: Corrupted [Boss Name]",
-  "bossTitle": "The [Glitched System Title]",
-  "lore": "A 2-sentence lore description of how system error corrupted this boss into the server."
-}
-Do not wrap in markdown or write any extra text.`;
-
-  const modelsToTry = ['gemini-2.5-flash', 'gemini-flash-latest'];
-  for (const modelName of modelsToTry) {
-    try {
-      const res = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
-        }
-      );
-      if (!res.ok) continue;
-
-      const data = await res.json();
-      const text = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '';
-      const cleanJson = text.replace(/^```json\s*/i, '').replace(/```$/, '').trim();
-      const parsed = JSON.parse(cleanJson);
-      if (parsed.bossName && parsed.bossTitle && parsed.lore) {
-        return parsed;
-      }
-    } catch (e) {
-      // Try next fallback
-    }
-  }
-
-  return defaultBoss;
-}
-
 async function postBossCardToDiscord(guildId: string, boss: any) {
   const token = process.env.DISCORD_TOKEN || process.env.DISCORD_BOT_TOKEN;
   if (!token) return;
@@ -187,21 +138,17 @@ export async function POST(req: NextRequest) {
 
     const body = await req.json();
     const guildId = getGuildId(req, body);
-    const { action, customName, customHp, customImageUrl } = body;
+    const { action, customName, gameName, customHp, customImageUrl } = body;
     const currentWeek = getWeekIdentifier();
 
     if (action === 'spawn') {
-      let bossName = customName ? customName.trim() : null;
-      let bossTitle = 'Glitched System Threat';
-      let lore = 'System anomaly detected in the gaming realm. Coordinate your triad skills to neutralize!';
-      const hp = customHp ? parseInt(customHp, 10) : 150000;
+      const charName = customName ? customName.trim() : 'Corrupted Anomaly';
+      const gameLabel = gameName ? gameName.trim() : 'Gaming Realm';
 
-      if (!bossName) {
-        const aiData = await generateGlitchBossLore();
-        bossName = aiData.bossName;
-        bossTitle = aiData.bossTitle;
-        lore = aiData.lore;
-      }
+      const bossName = `ERROR-MOD: Corrupted ${charName}`;
+      const bossTitle = `System Threat (${gameLabel})`;
+      const lore = `A space-time realm rift merged ${gameLabel} data with ENOS core protocols. ${charName} has manifested in the server! Coordinate your triad skills to neutralize!`;
+      const hp = customHp ? parseInt(customHp, 10) : 150000;
 
       await supabaseAdmin
         .from('boss_seasons')
@@ -240,7 +187,6 @@ export async function POST(req: NextRequest) {
     }
 
     if (action === 'update_image') {
-      // Update custom_image_url for current active boss season
       const { data: updatedBoss, error } = await supabaseAdmin
         .from('boss_seasons')
         .update({
