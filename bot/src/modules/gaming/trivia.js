@@ -50,7 +50,7 @@ Respond ONLY with a raw JSON object containing these keys:
 }
 Do not wrap in markdown, backticks, or write any extra text.`;
 
-  const modelsToTry = ['gemini-1.5-flash', 'gemini-2.0-flash', 'gemini-1.5-pro'];
+  const modelsToTry = ['gemini-2.5-flash', 'gemini-flash-latest'];
   let lastError;
 
   for (const modelName of modelsToTry) {

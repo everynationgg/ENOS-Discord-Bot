@@ -256,8 +256,8 @@ async function handleHelpDeskChatMessage(message) {
     } catch (apiErr) {
       const isQuotaErr = apiErr.message.includes('quota') || apiErr.message.includes('429') || apiErr.message.includes('Quota');
       if (isQuotaErr) {
-        logger.warn('[HELPDESK] gemini-2.5-flash quota exceeded. Attempting self-healing fallback to gemini-1.5-flash...');
-        modelName = 'gemini-1.5-flash';
+        logger.warn('[HELPDESK] gemini-2.5-flash quota exceeded. Attempting self-healing fallback to gemini-flash-latest...');
+        modelName = 'gemini-flash-latest';
         model = genAI.getGenerativeModel({
           model: modelName,
           systemInstruction: systemPrompt
