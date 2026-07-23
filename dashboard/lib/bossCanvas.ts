@@ -289,10 +289,34 @@ export async function renderBossImage(data: {
   }
 
   // Draw Boss Image / Sprite
+async function resolveDirectImageUrl(url: string): Promise<string> {
+  if (!url || typeof url !== 'string' || !url.startsWith('http')) return url;
+  if (/\.(png|jpg|jpeg|gif|webp)(\?.*)?$/i.test(url)) return url;
+
+  try {
+    const res = await fetch(url, {
+      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) ENOS-Bot/1.0' },
+    });
+    if (res.ok) {
+      const html = await res.text();
+      const ogMatch = html.match(/<meta\s+property=["']og:image["']\s+content=["']([^"']+)["']/i) ||
+                      html.match(/<meta\s+name=["']twitter:image["']\s+content=["']([^"']+)["']/i) ||
+                      html.match(/<img\s+src=["'](https:\/\/i\.ibb\.co\/[^"']+)["']/i);
+      if (ogMatch && ogMatch[1]) {
+        return ogMatch[1];
+      }
+    }
+  } catch (e) {
+    // ignore
+  }
+  return url;
+}
+
   let customLoaded = false;
   if (customImageUrl && typeof customImageUrl === 'string' && customImageUrl.startsWith('http')) {
     try {
-      const res = await fetch(customImageUrl, {
+      const directUrl = await resolveDirectImageUrl(customImageUrl);
+      const res = await fetch(directUrl, {
         headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) ENOS-Bot/1.0' },
       });
       if (res.ok) {

@@ -815,12 +815,14 @@ export default function GamingPage() {
                               placeholder="https://.../boss_image.png"
                               value={imageUrl}
                               onChange={(e) => {
-                                const val = e.target.value;
+                                let val = e.target.value.trim();
                                 setImageUrl(val);
                                 setConfig('custom_image_url', val);
                               }}
                             />
-                            <span className="form-hint">Paste direct image URL for the weekly boss banner</span>
+                            <span className="form-hint">
+                              Paste direct image link ending in <code>.png</code>, <code>.jpg</code>, or <code>.webp</code>. <em>(ImgBB page links like <code>ibb.co/...</code> are auto-converted to direct images on spawn)</em>
+                            </span>
                           </div>
                         </div>
 

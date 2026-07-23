@@ -143,6 +143,30 @@ async function postBossCardToDiscord(guildId: string, boss: any) {
   }
 }
 
+async function resolveDirectImageUrl(url: string | null | undefined): Promise<string | null> {
+  if (!url || typeof url !== 'string' || !url.startsWith('http')) return null;
+  if (/\.(png|jpg|jpeg|gif|webp)(\?.*)?$/i.test(url)) return url;
+
+  try {
+    const res = await fetch(url, {
+      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) ENOS-Bot/1.0' },
+    });
+    if (res.ok) {
+      const html = await res.text();
+      const ogMatch = html.match(/<meta\s+property=["']og:image["']\s+content=["']([^"']+)["']/i) ||
+                      html.match(/<meta\s+name=["']twitter:image["']\s+content=["']([^"']+)["']/i) ||
+                      html.match(/<img\s+src=["'](https:\/\/i\.ibb\.co\/[^"']+)["']/i);
+      if (ogMatch && ogMatch[1]) {
+        return ogMatch[1];
+      }
+    }
+  } catch (e) {
+    // ignore
+  }
+
+  return url;
+}
+
 export async function POST(req: NextRequest) {
   try {
     const session = await auth();
@@ -152,8 +176,9 @@ export async function POST(req: NextRequest) {
 
     const body = await req.json();
     const guildId = getGuildId(req, body);
-    const { action, customName, gameName, customHp, customImageUrl } = body;
+    const { action, customName, gameName, customHp, customImageUrl: rawImageUrl } = body;
     const currentWeek = getWeekIdentifier();
+    const resolvedImageUrl = await resolveDirectImageUrl(rawImageUrl);
 
     if (action === 'spawn') {
       const charName = customName && customName.trim() ? customName.trim() : 'Corrupted Anomaly';
@@ -186,7 +211,7 @@ export async function POST(req: NextRequest) {
             is_defeated: false,
             mom_buff: false,
             dad_debuff: false,
-            custom_image_url: customImageUrl || null,
+            custom_image_url: resolvedImageUrl || null,
             last_action: '⚡ Admin force spawned a new Weekly Boss!',
           })
           .eq('id', existingBoss.id)
@@ -213,7 +238,7 @@ export async function POST(req: NextRequest) {
             is_defeated: false,
             mom_buff: false,
             dad_debuff: false,
-            custom_image_url: customImageUrl || null,
+            custom_image_url: resolvedImageUrl || null,
             last_action: '⚡ Admin force spawned a new Weekly Boss!',
           })
           .select()
