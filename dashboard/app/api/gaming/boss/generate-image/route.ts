@@ -2,38 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { supabaseAdmin } from '@/lib/supabase';
 
-const GAME_NAME_MAP: Record<string, string> = {
-  D4: 'Diablo 4 (Diablo IV)',
-  POE: 'Path of Exile',
-  BG3: "Baldur's Gate 3",
-  Wuwa: 'Wuthering Waves',
-  Hoyoverse: 'Genshin Impact and Honkai Star Rail',
-  Enfi: 'Enshrouded',
-  Phasmo: 'Phasmophobia',
-  REPO: 'R.E.P.O.',
-  PEAK: 'Peak',
-  ML: 'Mobile Legends: Bang Bang',
-  HoK: 'Honor of Kings',
-  LOL: 'League of Legends',
-  CS2: 'Counter-Strike 2',
-  COD: 'Call of Duty',
-};
-
-const DEFAULT_GAME_BOSSES: Record<string, string> = {
-  D4: 'Lilith, Daughter of Hatred',
-  POE: 'The Maven',
-  BG3: 'Netherbrain',
-  Wuwa: 'Crownless',
-  Hoyoverse: 'Arlecchino',
-  Palworld: 'Jetragon',
-  Minecraft: 'Ender Dragon',
-  Valorant: 'Cypher',
-  CS2: 'Corrupted Anomaly Agent',
-  COD: 'Ghost Anomaly',
-  LOL: 'Baron Nashor',
-  ML: 'Lord Anomaly',
-};
-
 export async function POST(req: NextRequest) {
   try {
     const session = await auth();
@@ -41,31 +9,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { gameUniverse, bossName, customStyle, artStyle, customFullPrompt } = await req.json();
-    const apiKey = process.env.GEMINI_API_KEY;
+    const { prompt } = await req.json();
 
-    const gameKey = gameUniverse || 'D4';
-    const targetGame = GAME_NAME_MAP[gameKey] || gameUniverse || 'Diablo 4 (Diablo IV)';
-    const targetCharacter = bossName && bossName.trim().length > 0
-      ? bossName.trim()
-      : (DEFAULT_GAME_BOSSES[gameKey] || 'Lilith, Daughter of Hatred');
-
-    let prompt = '';
-
-    if (customFullPrompt && customFullPrompt.trim().length > 5) {
-      prompt = customFullPrompt.trim();
-    } else {
-      const extraStyle = customStyle ? `, ${customStyle}` : '';
-      const styleType = artStyle || 'gothic';
-
-      if (styleType === 'gothic') {
-        prompt = `Epic dark fantasy portrait of ${targetCharacter} from ${targetGame}. Majestic demonic aesthetic, dramatic dark lighting, red glowing accents, cinematic 16:9 ratio wallpaper banner${extraStyle}. Highly detailed, 8k resolution fantasy RPG character artwork, no text, no logos.`;
-      } else if (styleType === 'anime') {
-        prompt = `High-detail anime character portrait of ${targetCharacter} from ${targetGame}. Vivid cinematic lighting, cyberspace background with glowing matrix code streams, subtle chromatic aberration glitch artifacts${extraStyle}. High resolution 16:9 wallpaper quality banner, no text, no watermarks.`;
-      } else {
-        prompt = `Full-body dramatic pixel-art style portrait of glitched boss entity ${targetCharacter} from ${targetGame}. Dark cyberspace background with matrix code streams, red and cyan chromatic aberration glitch distortion overlays, digital scanlines${extraStyle}. Cinematic 16:9 RPG boss banner, no text, no logos.`;
-      }
+    if (!prompt || typeof prompt !== 'string' || prompt.trim().length === 0) {
+      return NextResponse.json({ error: 'Please enter a valid image prompt.' }, { status: 400 });
     }
+
+    const rawPrompt = prompt.trim();
+    const apiKey = process.env.GEMINI_API_KEY;
 
     let imageBuffer: Buffer | null = null;
     let mimeType = 'image/png';
@@ -79,7 +30,7 @@ export async function POST(req: NextRequest) {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              prompt,
+              prompt: rawPrompt,
               config: {
                 numberOfImages: 1,
                 outputMimeType: 'image/png',
@@ -101,11 +52,11 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // 2. High-Performance Fallback: Pollinations AI (FLUX Engine)
+    // 2. Fallback: Pollinations AI (FLUX Engine - Uses exact prompt directly)
     if (!imageBuffer) {
       try {
         const seed = Math.floor(Math.random() * 1000000);
-        const encodedPrompt = encodeURIComponent(prompt);
+        const encodedPrompt = encodeURIComponent(rawPrompt);
         const pollinationsUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=800&height=450&nologo=true&seed=${seed}&model=flux`;
 
         const res = await fetch(pollinationsUrl, { headers: { 'User-Agent': 'ENOS-Discord-Bot/1.0' } });
@@ -121,11 +72,11 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // 3. Secondary Fallback: Pollinations Standard SDXL
+    // 3. Fallback: Pollinations Standard SDXL
     if (!imageBuffer) {
       try {
         const seed = Math.floor(Math.random() * 1000000);
-        const encodedPrompt = encodeURIComponent(prompt);
+        const encodedPrompt = encodeURIComponent(rawPrompt);
         const pollinationsUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=800&height=450&nologo=true&seed=${seed}`;
 
         const res = await fetch(pollinationsUrl);
@@ -161,7 +112,7 @@ export async function POST(req: NextRequest) {
         success: true,
         imageUrl: `data:${mimeType};base64,${imageBuffer.toString('base64')}`,
         previewBase64: `data:${mimeType};base64,${imageBuffer.toString('base64')}`,
-        usedPrompt: prompt,
+        usedPrompt: rawPrompt,
       });
     }
 
@@ -175,7 +126,7 @@ export async function POST(req: NextRequest) {
       success: true,
       imageUrl: publicUrl,
       previewBase64: `data:${mimeType};base64,${imageBuffer.toString('base64')}`,
-      usedPrompt: prompt,
+      usedPrompt: rawPrompt,
     });
   } catch (err: any) {
     console.error('[BOSS AI GENERATOR API] Unexpected error:', err);

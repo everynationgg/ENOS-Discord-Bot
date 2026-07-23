@@ -723,28 +723,22 @@ export default function GamingPage() {
                   initialConfig={configs['weekly_boss']?.config ?? {}}
                 >
                   {(config, setConfig) => {
-                    const [selectedGame, setSelectedGame] = useState<string>('D4');
-                    const [targetBossName, setTargetBossName] = useState<string>('');
-                    const [artStyle, setArtStyle] = useState<string>('gothic');
-                    const [customStyle, setCustomStyle] = useState<string>('');
-                    const [customFullPrompt, setCustomFullPrompt] = useState<string>('');
+                    const [imagePrompt, setImagePrompt] = useState<string>('Lilith from Diablo 4, demonic horns, red glowing eyes, epic dark fantasy RPG portrait, 16:9 ratio');
                     const [usedPromptText, setUsedPromptText] = useState<string>('');
                     const [aiPreviewUrl, setAiPreviewUrl] = useState<string>('');
                     const [aiGenStatus, setAiGenStatus] = useState<string>('');
 
                     const handleGenerateAiImage = async () => {
+                      if (!imagePrompt.trim()) {
+                        setAiGenStatus('error: Please enter an image prompt.');
+                        return;
+                      }
                       setAiGenStatus('loading');
                       try {
                         const res = await fetch('/api/gaming/boss/generate-image', {
                           method: 'POST',
                           headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({
-                            gameUniverse: selectedGame,
-                            bossName: targetBossName || config.override_name || 'Corrupted Boss Entity',
-                            artStyle,
-                            customStyle,
-                            customFullPrompt,
-                          }),
+                          body: JSON.stringify({ prompt: imagePrompt.trim() }),
                         });
                         const data = await res.json();
                         if (data.error) {
@@ -820,62 +814,21 @@ export default function GamingPage() {
                           gap: '0.875rem',
                         }}>
                           <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', margin: 0 }}>
-                            Generate custom RPG boss artwork on-demand using Gemini AI. Preview the image first, then push it live to your Discord channel when ready!
+                            Type your custom image prompt below to generate AI boss artwork on-demand. Preview the image, then push it live to your Discord channel when ready!
                           </p>
 
-                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.75rem' }}>
-                            <div className="form-group" style={{ margin: 0 }}>
-                              <label className="form-label">Game Universe / Branch</label>
-                              <select
-                                id="boss-game-branch-select"
-                                className="form-input"
-                                value={selectedGame}
-                                onChange={(e) => setSelectedGame(e.target.value)}
-                              >
-                                {GAME_BRANCHES.map((game) => (
-                                  <option key={game} value={game}>{game}</option>
-                                ))}
-                              </select>
-                            </div>
-
-                            <div className="form-group" style={{ margin: 0 }}>
-                              <label className="form-label">Target Boss / Character Name</label>
-                              <input
-                                id="boss-target-name"
-                                className="form-input"
-                                placeholder="e.g. Lilith, Sephiroth, Malenia"
-                                value={targetBossName}
-                                onChange={(e) => setTargetBossName(e.target.value)}
-                              />
-                            </div>
-
-                            <div className="form-group" style={{ margin: 0 }}>
-                              <label className="form-label">Art Style Preset</label>
-                              <select
-                                id="boss-art-style-select"
-                                className="form-input"
-                                value={artStyle}
-                                onChange={(e) => setArtStyle(e.target.value)}
-                              >
-                                <option value="gothic">🔮 Dark Fantasy (Diablo / Elden Ring)</option>
-                                <option value="anime">✨ Anime RPG (Hoyoverse / Genshin)</option>
-                                <option value="glitch">👾 Digital Matrix Glitch</option>
-                              </select>
-                            </div>
-                          </div>
-
                           <div className="form-group" style={{ margin: 0 }}>
-                            <label className="form-label">Custom Full Prompt (Optional Override)</label>
+                            <label className="form-label">AI Image Prompt</label>
                             <textarea
-                              id="boss-custom-full-prompt"
+                              id="boss-direct-image-prompt"
                               className="form-input"
-                              rows={2}
-                              placeholder="Leave blank to use auto-built prompt, or type exact custom prompt here (e.g. Epic dark fantasy portrait of Lilith from Diablo 4 with demonic horns, black wings, dark gothic background, 16:9 ratio)"
-                              value={customFullPrompt}
-                              onChange={(e) => setCustomFullPrompt(e.target.value)}
+                              rows={3}
+                              placeholder="e.g. Cinematic dark fantasy portrait of Lilith from Diablo 4, demonic horns, glowing red eyes, red cape, gothic cathedral background, 16:9 banner"
+                              value={imagePrompt}
+                              onChange={(e) => setImagePrompt(e.target.value)}
                               style={{ fontFamily: 'monospace', fontSize: '0.8125rem' }}
                             />
-                            <span className="form-hint">Type any custom image prompt here to bypass default templates.</span>
+                            <span className="form-hint">Type any prompt you want. The AI will generate your exact artwork directly.</span>
                           </div>
 
                           <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
