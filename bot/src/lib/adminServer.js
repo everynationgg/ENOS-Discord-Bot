@@ -1,7 +1,7 @@
 const http = require('http');
-const { supabase } = require('../lib/supabase');
-const logger = require('../lib/logger');
-const { spawnBossForGuild } = require('./gaming/bossSpawn');
+const { supabase } = require('./supabase');
+const logger = require('./logger');
+const { spawnBossForGuild } = require('../modules/gaming/bossSpawn');
 
 /**
  * Lightweight internal HTTP server for dashboard-triggered actions.
