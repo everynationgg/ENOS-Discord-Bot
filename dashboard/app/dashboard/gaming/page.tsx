@@ -727,6 +727,7 @@ export default function GamingPage() {
                     const [bossName, setBossName] = useState<string>(config.override_name || '');
                     const [baseHP, setBaseHP] = useState<string>(config.override_hp || '');
                     const [imageUrl, setImageUrl] = useState<string>(config.custom_image_url || '');
+                    const [bgUrl, setBgUrl] = useState<string>(config.custom_bg_url || '');
 
                     return (
                       <>
@@ -789,30 +790,37 @@ export default function GamingPage() {
                           </div>
                         </div>
 
+                        <div className="form-group">
+                          <label className="form-label">❤️ Manual Base HP (Optional Override)</label>
+                          <input
+                            id="boss-override-hp"
+                            type="number"
+                            className="form-input"
+                            placeholder="e.g. 150000"
+                            value={baseHP}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setBaseHP(val);
+                              setConfig('override_hp', val);
+                            }}
+                          />
+                          <span className="form-hint">Leave blank for automatic player-scaled HP</span>
+                        </div>
+
+                        {/* Dual Layer Image Section */}
+                        <div className="section-divider">
+                          <div className="section-divider-line" />
+                          <span className="section-divider-text">🖼️ Boss Artwork & Layering</span>
+                          <div className="section-divider-line" />
+                        </div>
+
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
                           <div className="form-group">
-                            <label className="form-label">❤️ Manual Base HP (Optional Override)</label>
-                            <input
-                              id="boss-override-hp"
-                              type="number"
-                              className="form-input"
-                              placeholder="e.g. 150000"
-                              value={baseHP}
-                              onChange={(e) => {
-                                const val = e.target.value;
-                                setBaseHP(val);
-                                setConfig('override_hp', val);
-                              }}
-                            />
-                            <span className="form-hint">Leave blank for automatic player-scaled HP</span>
-                          </div>
-
-                          <div className="form-group">
-                            <label className="form-label">🖼️ Custom Boss Image URL</label>
+                            <label className="form-label">🧌 Boss Character Image (Transparent PNG recommended)</label>
                             <input
                               id="boss-image-url"
                               className="form-input"
-                              placeholder="https://.../boss_image.png"
+                              placeholder="https://.../boss_character.png"
                               value={imageUrl}
                               onChange={(e) => {
                                 let val = e.target.value.trim();
@@ -821,13 +829,31 @@ export default function GamingPage() {
                               }}
                             />
                             <span className="form-hint">
-                              Paste direct image link ending in <code>.png</code>, <code>.jpg</code>, or <code>.webp</code>. <em>(ImgBB page links like <code>ibb.co/...</code> are auto-converted to direct images on spawn)</em>
+                              Layer 2: Boss character art <em>(Transparent PNG layers on top of background!)</em>
+                            </span>
+                          </div>
+
+                          <div className="form-group">
+                            <label className="form-label">🌄 Arena Background Image (Optional 16:9)</label>
+                            <input
+                              id="boss-bg-url"
+                              className="form-input"
+                              placeholder="https://.../arena_background.png"
+                              value={bgUrl}
+                              onChange={(e) => {
+                                let val = e.target.value.trim();
+                                setBgUrl(val);
+                                setConfig('custom_bg_url', val);
+                              }}
+                            />
+                            <span className="form-hint">
+                              Layer 1: Custom background landscape/arena image
                             </span>
                           </div>
                         </div>
 
-                        {/* Live Image Preview Card */}
-                        {imageUrl && (
+                        {/* Live Dual Image Preview Card */}
+                        {(imageUrl || bgUrl) && (
                           <div style={{
                             marginTop: '0.5rem',
                             marginBottom: '1rem',
@@ -841,22 +867,52 @@ export default function GamingPage() {
                             alignItems: 'center',
                           }}>
                             <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>
-                              🖼️ Boss Image Live Preview:
+                              🖼️ Boss Live Layer Stack Preview:
                             </span>
-                            <img
-                              src={imageUrl}
-                              alt="Boss Artwork Preview"
-                              style={{
-                                maxHeight: '200px',
-                                maxWidth: '100%',
-                                borderRadius: '0.375rem',
-                                objectFit: 'contain',
-                                border: '1px solid rgba(255,255,255,0.1)',
-                              }}
-                              onError={(e: any) => {
-                                e.target.style.display = 'none';
-                              }}
-                            />
+                            <div style={{
+                              position: 'relative',
+                              width: '100%',
+                              maxHeight: '220px',
+                              height: '200px',
+                              borderRadius: '0.375rem',
+                              overflow: 'hidden',
+                              backgroundColor: '#0f172a',
+                              border: '1px solid rgba(255,255,255,0.1)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                            }}>
+                              {bgUrl && (
+                                <img
+                                  src={bgUrl}
+                                  alt="Background Layer"
+                                  style={{
+                                    position: 'absolute',
+                                    top: 0,
+                                    left: 0,
+                                    width: '100%',
+                                    height: '100%',
+                                    objectFit: 'cover',
+                                  }}
+                                  onError={(e: any) => { e.target.style.display = 'none'; }}
+                                />
+                              )}
+                              {imageUrl && (
+                                <img
+                                  src={imageUrl}
+                                  alt="Boss Character Layer"
+                                  style={{
+                                    position: bgUrl ? 'absolute' : 'relative',
+                                    right: bgUrl ? '5%' : 'auto',
+                                    maxHeight: '90%',
+                                    maxWidth: bgUrl ? '50%' : '100%',
+                                    objectFit: 'contain',
+                                    zIndex: 2,
+                                  }}
+                                  onError={(e: any) => { e.target.style.display = 'none'; }}
+                                />
+                              )}
+                            </div>
                           </div>
                         )}
 
@@ -884,6 +940,7 @@ export default function GamingPage() {
                                     customName: bossName,
                                     customHp: baseHP,
                                     customImageUrl: imageUrl,
+                                    customBgUrl: bgUrl,
                                   }),
                                 });
                                 const data = await res.json();

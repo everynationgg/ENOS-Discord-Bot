@@ -241,70 +241,58 @@ async function renderBossImage(data) {
   const {
     bossName = 'ERROR-MOD: Corrupted Boss',
     customImageUrl = null,
+    customBgUrl = null,
     isOverkill = false,
     viewMode = 'spawn',
     lastAction = '',
   } = data;
 
-  // 1. Cyber Background
-  const bgGrad = ctx.createLinearGradient(0, 0, width, height);
-  if (isOverkill) {
-    bgGrad.addColorStop(0, '#1a0303');
-    bgGrad.addColorStop(0.5, '#2d0808');
-    bgGrad.addColorStop(1, '#0e0202');
-  } else {
-    bgGrad.addColorStop(0, '#060814');
-    bgGrad.addColorStop(0.5, '#0f172a');
-    bgGrad.addColorStop(1, '#060710');
-  }
-  ctx.fillStyle = bgGrad;
-  ctx.fillRect(0, 0, width, height);
-
-  // Scanline Grid Effect
-  ctx.strokeStyle = isOverkill ? 'rgba(239, 68, 68, 0.08)' : 'rgba(99, 102, 241, 0.09)';
-  ctx.lineWidth = 1;
-  for (let y = 0; y < height; y += 8) {
-    ctx.beginPath();
-    ctx.moveTo(0, y);
-    ctx.lineTo(width, y);
-    ctx.stroke();
-  }
-
-  // Code Streams Background Lines
-  ctx.fillStyle = isOverkill ? 'rgba(239, 68, 68, 0.15)' : 'rgba(34, 197, 94, 0.15)';
-  ctx.font = '10px monospace';
-  for (let col = 20; col < width; col += 60) {
-    for (let row = 30; row < height; row += 40) {
-      if ((col + row) % 3 === 0) {
-        ctx.fillText('010101', col, row);
+  // ─── LAYER 1: BACKGROUND (Custom Background Image or Dark Cyber Gradient) ───
+  let customBgLoaded = false;
+  if (customBgUrl && typeof customBgUrl === 'string' && customBgUrl.startsWith('http')) {
+    try {
+      const directBgUrl = await resolveDirectImageUrl(customBgUrl);
+      const res = await fetch(directBgUrl, {
+        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) ENOS-Bot/1.0' },
+      });
+      if (res.ok) {
+        const arrayBuf = await res.arrayBuffer();
+        const bgImg = await loadImage(Buffer.from(arrayBuf));
+        ctx.drawImage(bgImg, 0, 0, width, height);
+        customBgLoaded = true;
       }
+    } catch (e) {
+      logger.warn(`[BOSS CANVAS] Error loading custom background buffer: ${e.message}`);
     }
   }
 
-async function resolveDirectImageUrl(url) {
-  if (!url || typeof url !== 'string' || !url.startsWith('http')) return url;
-  if (/\.(png|jpg|jpeg|gif|webp)(\?.*)?$/i.test(url)) return url;
-
-  try {
-    const res = await fetch(url, {
-      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) ENOS-Bot/1.0' },
-    });
-    if (res.ok) {
-      const html = await res.text();
-      const ogMatch = html.match(/<meta\s+property=["']og:image["']\s+content=["']([^"']+)["']/i) ||
-                      html.match(/<meta\s+name=["']twitter:image["']\s+content=["']([^"']+)["']/i) ||
-                      html.match(/<img\s+src=["'](https:\/\/i\.ibb\.co\/[^"']+)["']/i);
-      if (ogMatch && ogMatch[1]) {
-        return ogMatch[1];
-      }
+  if (!customBgLoaded) {
+    const bgGrad = ctx.createLinearGradient(0, 0, width, height);
+    if (isOverkill) {
+      bgGrad.addColorStop(0, '#1a0303');
+      bgGrad.addColorStop(0.5, '#2d0808');
+      bgGrad.addColorStop(1, '#0e0202');
+    } else {
+      bgGrad.addColorStop(0, '#060814');
+      bgGrad.addColorStop(0.5, '#0f172a');
+      bgGrad.addColorStop(1, '#060710');
     }
-  } catch (e) {
-    // ignore
-  }
-  return url;
-}
+    ctx.fillStyle = bgGrad;
+    ctx.fillRect(0, 0, width, height);
 
-  let customLoaded = false;
+    // Subtle Scanline Grid
+    ctx.strokeStyle = isOverkill ? 'rgba(239, 68, 68, 0.08)' : 'rgba(99, 102, 241, 0.09)';
+    ctx.lineWidth = 1;
+    for (let y = 0; y < height; y += 8) {
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(width, y);
+      ctx.stroke();
+    }
+  }
+
+  // ─── LAYER 2: BOSS CHARACTER IMAGE (Transparent PNG or Banner) ─────────────
+  let customBossLoaded = false;
   if (customImageUrl && typeof customImageUrl === 'string' && customImageUrl.startsWith('http')) {
     try {
       const directUrl = await resolveDirectImageUrl(customImageUrl);
@@ -313,29 +301,27 @@ async function resolveDirectImageUrl(url) {
       });
       if (res.ok) {
         const arrayBuf = await res.arrayBuffer();
-        const img = await loadImage(Buffer.from(arrayBuf));
+        const bossImg = await loadImage(Buffer.from(arrayBuf));
         if (viewMode === 'spawn') {
-          // Draw full-bleed custom artwork across entire banner
-          ctx.drawImage(img, 0, 0, width, height);
+          if (customBgLoaded) {
+            // Drawn on top of custom background
+            ctx.drawImage(bossImg, 380, 20, 380, 380);
+          } else {
+            // Full-bleed if single image provided
+            ctx.drawImage(bossImg, 0, 0, width, height);
+          }
         } else {
-          // Draw boss artwork on right side of combat arena
-          ctx.drawImage(img, 380, 20, 380, 340);
+          ctx.drawImage(bossImg, 380, 20, 380, 340);
         }
-        customLoaded = true;
-      } else {
-        logger.warn(`[BOSS CANVAS] Failed to fetch custom image URL: HTTP ${res.status}`);
+        customBossLoaded = true;
       }
     } catch (e) {
-      logger.warn(`[BOSS CANVAS] Error loading custom image buffer: ${e.message}`);
+      logger.warn(`[BOSS CANVAS] Error loading boss image buffer: ${e.message}`);
     }
   }
 
   if (viewMode === 'spawn') {
-    // ─── PHASE A: INITIAL BOSS SPAWN BANNER (Full-Bleed Art) ────────────────
-    if (!customLoaded) {
-      drawGlitchedBossEntity(ctx, 480, 210, isOverkill);
-    }
-
+    // ─── PHASE A: INITIAL BOSS SPAWN BANNER ──────────────────────────────────
     // Dark Vignette Frame
     const frameGrad = ctx.createRadialGradient(400, 210, 200, 400, 210, 420);
     frameGrad.addColorStop(0, 'rgba(0,0,0,0)');
@@ -343,7 +329,7 @@ async function resolveDirectImageUrl(url) {
     ctx.fillStyle = frameGrad;
     ctx.fillRect(0, 0, width, height);
 
-    // Left Title Text (No emoji to prevent Linux Node Canvas font failure)
+    // Left Title Text
     ctx.fillStyle = isOverkill ? '#ef4444' : '#38bdf8';
     ctx.font = 'bold 24px sans-serif';
     ctx.fillText('SYSTEM ANOMALY DETECTED', 35, 60);

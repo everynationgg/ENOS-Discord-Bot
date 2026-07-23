@@ -83,6 +83,7 @@ async function buildBossEmbedPayload(guildId, userId) {
     bossName: boss.boss_name,
     bossTitle: boss.boss_title,
     customImageUrl: boss.custom_image_url,
+    customBgUrl: boss.custom_bg_url,
     currentHp: Number(boss.current_hp),
     maxHp: Number(boss.max_hp),
     isOverkill: boss.is_overkill,

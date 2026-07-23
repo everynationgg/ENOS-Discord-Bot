@@ -67,6 +67,7 @@ async function postBossCardToDiscord(guildId: string, boss: any) {
       bossName: boss.boss_name,
       bossTitle: boss.boss_title,
       customImageUrl: boss.custom_image_url,
+      customBgUrl: boss.custom_bg_url,
       currentHp: Number(boss.current_hp),
       maxHp: Number(boss.max_hp),
       isOverkill: boss.is_overkill,
@@ -176,9 +177,10 @@ export async function POST(req: NextRequest) {
 
     const body = await req.json();
     const guildId = getGuildId(req, body);
-    const { action, customName, gameName, customHp, customImageUrl: rawImageUrl } = body;
+    const { action, customName, gameName, customHp, customImageUrl: rawImageUrl, customBgUrl: rawBgUrl } = body;
     const currentWeek = getWeekIdentifier();
     const resolvedImageUrl = await resolveDirectImageUrl(rawImageUrl);
+    const resolvedBgUrl = await resolveDirectImageUrl(rawBgUrl);
 
     if (action === 'spawn') {
       const charName = customName && customName.trim() ? customName.trim() : 'Corrupted Anomaly';
@@ -212,6 +214,7 @@ export async function POST(req: NextRequest) {
             mom_buff: false,
             dad_debuff: false,
             custom_image_url: resolvedImageUrl || null,
+            custom_bg_url: resolvedBgUrl || null,
             last_action: '⚡ Admin force spawned a new Weekly Boss!',
           })
           .eq('id', existingBoss.id)
@@ -239,6 +242,7 @@ export async function POST(req: NextRequest) {
             mom_buff: false,
             dad_debuff: false,
             custom_image_url: resolvedImageUrl || null,
+            custom_bg_url: resolvedBgUrl || null,
             last_action: '⚡ Admin force spawned a new Weekly Boss!',
           })
           .select()
