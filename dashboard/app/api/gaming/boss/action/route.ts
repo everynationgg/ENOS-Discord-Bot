@@ -69,6 +69,65 @@ Do not wrap in markdown or write any extra text.`;
   return defaultBoss;
 }
 
+async function generateBossImage(bossName: string): Promise<string | null> {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) return null;
+
+  const match = bossName.match(/Corrupted\s+(.+)$/);
+  const characterName = match ? match[1].trim() : bossName;
+
+  const imagePrompt = `Full-body dramatic anime-style portrait of a glitched, corrupted, digital anomaly version of ${characterName}. Dark cyberspace background with green matrix code streams. Red and cyan chromatic aberration glitch distortion effects layered over the character. Digital scanlines, corrupted data particle effects. Cinematic RPG boss art. No text, no UI, no watermarks.`;
+
+  try {
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-preview-image-generation:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: imagePrompt }] }],
+          generationConfig: { responseModalities: ['IMAGE', 'TEXT'] },
+        }),
+      }
+    );
+
+    if (!res.ok) {
+      console.error('[BOSS IMAGE] Gemini image API returned', res.status, await res.text());
+      return null;
+    }
+
+    const data = await res.json();
+    const parts = data.candidates?.[0]?.content?.parts || [];
+    const imagePart = parts.find((p: any) => p.inlineData?.mimeType?.startsWith('image/'));
+    if (!imagePart) {
+      console.warn('[BOSS IMAGE] No image part in Gemini response');
+      return null;
+    }
+
+    const imageBuffer = Buffer.from(imagePart.inlineData.data, 'base64');
+    const fileName = `boss-${Date.now()}.png`;
+
+    const { error: uploadError } = await supabaseAdmin.storage
+      .from('boss-images')
+      .upload(fileName, imageBuffer, { contentType: 'image/png', upsert: true });
+
+    if (uploadError) {
+      console.error('[BOSS IMAGE] Supabase Storage upload failed:', uploadError.message);
+      return null;
+    }
+
+    const { data: publicUrlData } = supabaseAdmin.storage
+      .from('boss-images')
+      .getPublicUrl(fileName);
+
+    console.log('[BOSS IMAGE] Generated and stored:', publicUrlData.publicUrl);
+    return publicUrlData.publicUrl;
+  } catch (e: any) {
+    console.error('[BOSS IMAGE] Gemini image generation failed:', e.message);
+    return null;
+  }
+}
+
 async function postBossCardToDiscord(guildId: string, boss: any) {
   const token = process.env.DISCORD_TOKEN || process.env.DISCORD_BOT_TOKEN;
   if (!token) return;
@@ -208,6 +267,9 @@ export async function POST(req: NextRequest) {
         lore = aiData.lore;
       }
 
+      // Generate AI boss artwork image using the boss name
+      const customImageUrl = await generateBossImage(bossName);
+
       // Delete existing non-overkill boss season for current week before inserting new spawn
       await supabaseAdmin
         .from('boss_seasons')
@@ -231,6 +293,7 @@ export async function POST(req: NextRequest) {
           is_defeated: false,
           mom_buff: false,
           dad_debuff: false,
+          custom_image_url: customImageUrl,
           last_action: '⚡ Admin force spawned a new Weekly Boss!',
         })
         .select()
