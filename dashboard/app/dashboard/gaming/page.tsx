@@ -722,159 +722,349 @@ export default function GamingPage() {
                   initialEnabled={configs['weekly_boss']?.enabled ?? true}
                   initialConfig={configs['weekly_boss']?.config ?? {}}
                 >
-                  {(config, setConfig) => (
-                    <>
-                      <div className="section-divider">
-                        <div className="section-divider-line" />
-                        <span className="section-divider-text">Boss Settings</span>
-                        <div className="section-divider-line" />
-                      </div>
+                  {(config, setConfig) => {
+                    const [selectedGame, setSelectedGame] = useState<string>('Where Winds Meet');
+                    const [targetBossName, setTargetBossName] = useState<string>('');
+                    const [customStyle, setCustomStyle] = useState<string>('');
+                    const [aiPreviewUrl, setAiPreviewUrl] = useState<string>('');
+                    const [aiGenStatus, setAiGenStatus] = useState<string>('');
 
-                      <div className="form-group">
-                        <label className="form-label">Boss Announcement Channel ID</label>
-                        <input
-                          id="boss-channel-id"
-                          className="form-input"
-                          placeholder="Channel ID for boss card posts (e.g. 1234567890)"
-                          value={config.channel_id || ''}
-                          onChange={(e) => setConfig('channel_id', e.target.value)}
-                        />
-                        <span className="form-hint">Channel where /boss status cards are posted</span>
-                      </div>
+                    const handleGenerateAiImage = async () => {
+                      setAiGenStatus('loading');
+                      try {
+                        const res = await fetch('/api/gaming/boss/generate-image', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({
+                            gameUniverse: selectedGame,
+                            bossName: targetBossName || config.override_name || 'Corrupted Boss Entity',
+                            customStyle,
+                          }),
+                        });
+                        const data = await res.json();
+                        if (data.error) {
+                          setAiGenStatus(`error: ${data.error}`);
+                        } else {
+                          setAiPreviewUrl(data.imageUrl);
+                          setConfig('custom_image_url', data.imageUrl);
+                          setAiGenStatus('success');
+                        }
+                      } catch (err: any) {
+                        setAiGenStatus(`error: ${err.message || 'Request failed'}`);
+                      }
+                    };
 
-                      <div className="form-group">
-                        <label className="form-label">Custom Boss Image URL (Optional)</label>
-                        <input
-                          id="boss-image-url"
-                          className="form-input"
-                          placeholder="https://.../transparent_boss.png"
-                          value={config.custom_image_url || ''}
-                          onChange={(e) => setConfig('custom_image_url', e.target.value)}
-                        />
-                        <span className="form-hint">Direct link to a transparent PNG for custom weekly boss rendering</span>
-                      </div>
+                    const handleApplyImageToDiscord = async (imageUrl: string) => {
+                      setAiGenStatus('applying');
+                      try {
+                        const res = await fetch('/api/gaming/boss/action', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({
+                            action: 'update_image',
+                            customImageUrl: imageUrl,
+                          }),
+                        });
+                        const data = await res.json();
+                        if (data.error) {
+                          setAiGenStatus(`error: ${data.error}`);
+                        } else {
+                          setAiGenStatus('applied');
+                        }
+                      } catch (err: any) {
+                        setAiGenStatus(`error: ${err.message || 'Update failed'}`);
+                      }
+                      setTimeout(() => setAiGenStatus(''), 4000);
+                    };
 
-                      {/* Admin Quick Action Controls */}
-                      <div className="section-divider">
-                        <div className="section-divider-line" />
-                        <span className="section-divider-text">Admin Quick Action Controls</span>
-                        <div className="section-divider-line" />
-                      </div>
-
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-                        <div className="form-group">
-                          <label className="form-label">Manual Boss Name (Optional Override)</label>
-                          <input
-                            id="boss-override-name"
-                            className="form-input"
-                            placeholder="e.g. ERROR-MOD: Corrupted Malenia"
-                            value={config.override_name || ''}
-                            onChange={(e) => setConfig('override_name', e.target.value)}
-                          />
+                    return (
+                      <>
+                        <div className="section-divider">
+                          <div className="section-divider-line" />
+                          <span className="section-divider-text">Boss Settings</span>
+                          <div className="section-divider-line" />
                         </div>
+
                         <div className="form-group">
-                          <label className="form-label">Manual Base HP (Optional Override)</label>
+                          <label className="form-label">Boss Announcement Channel ID</label>
                           <input
-                            id="boss-override-hp"
-                            type="number"
+                            id="boss-channel-id"
                             className="form-input"
-                            placeholder="e.g. 150000"
-                            value={config.override_hp || ''}
-                            onChange={(e) => setConfig('override_hp', e.target.value)}
+                            placeholder="Channel ID for boss card posts (e.g. 1234567890)"
+                            value={config.channel_id || ''}
+                            onChange={(e) => setConfig('channel_id', e.target.value)}
                           />
+                          <span className="form-hint">Channel where /boss status cards are posted</span>
                         </div>
-                      </div>
 
-                      <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
-                        <button
-                          id="boss-force-spawn"
-                          className="btn btn-primary btn-sm"
-                          disabled={config.boss_status === 'loading'}
-                          onClick={async () => {
-                            setConfig('boss_status', 'loading');
-                            try {
-                              const res = await fetch('/api/gaming/boss/action', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({
-                                  action: 'spawn',
-                                  customName: config.override_name,
-                                  customHp: config.override_hp,
-                                }),
-                              });
-                              const data = await res.json();
-                              setConfig('boss_status', data.error ? `error: ${data.error}` : 'spawned');
-                            } catch {
-                              setConfig('boss_status', 'error: request failed');
-                            }
-                            setTimeout(() => setConfig('boss_status', ''), 4000);
-                          }}
-                        >
-                          🚀 Force Spawn Boss
-                        </button>
+                        {/* Interactive AI Image Generator Section */}
+                        <div className="section-divider">
+                          <div className="section-divider-line" />
+                          <span className="section-divider-text">🎨 AI Boss Artwork Generator & Image Manager</span>
+                          <div className="section-divider-line" />
+                        </div>
 
-                        <button
-                          id="boss-force-end"
-                          className="btn btn-secondary btn-sm"
-                          disabled={config.boss_status === 'loading'}
-                          onClick={async () => {
-                            setConfig('boss_status', 'loading');
-                            try {
-                              const res = await fetch('/api/gaming/boss/action', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ action: 'end' }),
-                              });
-                              const data = await res.json();
-                              setConfig('boss_status', data.error ? `error: ${data.error}` : 'ended');
-                            } catch {
-                              setConfig('boss_status', 'error: request failed');
-                            }
-                            setTimeout(() => setConfig('boss_status', ''), 4000);
-                          }}
-                        >
-                          ⏹️ Force End / Reset AP
-                        </button>
+                        <div style={{
+                          backgroundColor: 'rgba(15, 23, 42, 0.6)',
+                          border: '1px solid rgba(99, 102, 241, 0.2)',
+                          borderRadius: '0.5rem',
+                          padding: '1rem',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '0.875rem',
+                        }}>
+                          <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', margin: 0 }}>
+                            Generate custom RPG boss artwork on-demand using Gemini AI. Preview the image first, then push it live to your Discord channel when ready!
+                          </p>
 
-                        <button
-                          id="boss-force-overkill"
-                          className="btn btn-secondary btn-sm"
-                          disabled={config.boss_status === 'loading'}
-                          onClick={async () => {
-                            setConfig('boss_status', 'loading');
-                            try {
-                              const res = await fetch('/api/gaming/boss/action', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ action: 'overkill' }),
-                              });
-                              const data = await res.json();
-                              setConfig('boss_status', data.error ? `error: ${data.error}` : 'overkill');
-                            } catch {
-                              setConfig('boss_status', 'error: request failed');
-                            }
-                            setTimeout(() => setConfig('boss_status', ''), 4000);
-                          }}
-                        >
-                          💥 Force Trigger Overkill
-                        </button>
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                            <div className="form-group" style={{ margin: 0 }}>
+                              <label className="form-label">Game Universe / Branch</label>
+                              <select
+                                id="boss-game-branch-select"
+                                className="form-input"
+                                value={selectedGame}
+                                onChange={(e) => setSelectedGame(e.target.value)}
+                              >
+                                {GAME_BRANCHES.map((game) => (
+                                  <option key={game} value={game}>{game}</option>
+                                ))}
+                              </select>
+                            </div>
 
-                        {config.boss_status && (
-                          <span style={{
-                            fontSize: '0.8125rem',
-                            color: config.boss_status.startsWith('error') ? 'var(--color-error)' : 'var(--color-success)',
-                            fontWeight: 500,
-                          }}>
-                            {config.boss_status === 'loading' ? '⏳ Processing...' :
-                             config.boss_status === 'spawned' ? '✅ Boss spawned!' :
-                             config.boss_status === 'ended' ? '✅ Cycle ended & AP reset.' :
-                             config.boss_status === 'overkill' ? '✅ Overkill Mode triggered!' :
-                             `❌ ${config.boss_status}`}
-                          </span>
-                        )}
-                      </div>
-                    </>
-                  )}
+                            <div className="form-group" style={{ margin: 0 }}>
+                              <label className="form-label">Target Boss / Character Name</label>
+                              <input
+                                id="boss-target-name"
+                                className="form-input"
+                                placeholder="e.g. Sephiroth, Malenia, Bowser"
+                                value={targetBossName}
+                                onChange={(e) => setTargetBossName(e.target.value)}
+                              />
+                            </div>
+                          </div>
+
+                          <div className="form-group" style={{ margin: 0 }}>
+                            <label className="form-label">Custom Style / Glitch Notes (Optional)</label>
+                            <input
+                              id="boss-custom-style"
+                              className="form-input"
+                              placeholder="e.g. Dark red fire dragon wings, cyan scanline matrix"
+                              value={customStyle}
+                              onChange={(e) => setCustomStyle(e.target.value)}
+                            />
+                          </div>
+
+                          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                            <button
+                              id="boss-gen-ai-image-btn"
+                              className="btn btn-primary btn-sm"
+                              disabled={aiGenStatus === 'loading' || aiGenStatus === 'applying'}
+                              onClick={handleGenerateAiImage}
+                            >
+                              🎨 Generate AI Artwork Preview
+                            </button>
+
+                            {aiGenStatus && (
+                              <span style={{
+                                fontSize: '0.8125rem',
+                                color: aiGenStatus.startsWith('error') ? 'var(--color-error)' : 'var(--color-success)',
+                                fontWeight: 500,
+                              }}>
+                                {aiGenStatus === 'loading' ? '⏳ Generating AI Image...' :
+                                 aiGenStatus === 'success' ? '✅ Artwork generated below!' :
+                                 aiGenStatus === 'applying' ? '⏳ Updating Discord Card...' :
+                                 aiGenStatus === 'applied' ? '✅ Discord Card updated live!' :
+                                 `❌ ${aiGenStatus}`}
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Image Preview Box */}
+                          {(aiPreviewUrl || config.custom_image_url) && (
+                            <div style={{
+                              marginTop: '0.5rem',
+                              padding: '0.75rem',
+                              backgroundColor: '#020617',
+                              borderRadius: '0.375rem',
+                              border: '1px dashed rgba(168, 85, 247, 0.4)',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: '0.75rem',
+                              alignItems: 'center',
+                            }}>
+                              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>
+                                {aiPreviewUrl ? '🖼️ Generated AI Image Preview:' : '🖼️ Active Custom Boss Image:'}
+                              </span>
+                              <img
+                                src={aiPreviewUrl || config.custom_image_url}
+                                alt="Boss Artwork Preview"
+                                style={{
+                                  maxHeight: '220px',
+                                  maxWidth: '100%',
+                                  borderRadius: '0.375rem',
+                                  objectFit: 'contain',
+                                  border: '1px solid rgba(255,255,255,0.1)',
+                                }}
+                              />
+                              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                                <button
+                                  id="boss-apply-to-discord-btn"
+                                  className="btn btn-primary btn-sm"
+                                  disabled={aiGenStatus === 'applying'}
+                                  onClick={() => handleApplyImageToDiscord(aiPreviewUrl || config.custom_image_url)}
+                                >
+                                  🚀 Apply Image to Live Discord Boss Card
+                                </button>
+                                <button
+                                  id="boss-clear-image-btn"
+                                  className="btn btn-secondary btn-sm"
+                                  onClick={() => {
+                                    setAiPreviewUrl('');
+                                    setConfig('custom_image_url', '');
+                                  }}
+                                >
+                                  ✕ Clear Image
+                                </button>
+                              </div>
+                            </div>
+                          )}
+
+                          <div className="form-group" style={{ margin: 0, marginTop: '0.25rem' }}>
+                            <label className="form-label">Direct Custom Boss Image URL (Manual Link / Paste)</label>
+                            <input
+                              id="boss-image-url"
+                              className="form-input"
+                              placeholder="https://.../transparent_boss.png"
+                              value={config.custom_image_url || ''}
+                              onChange={(e) => setConfig('custom_image_url', e.target.value)}
+                            />
+                          </div>
+                        </div>
+
+                        {/* Admin Quick Action Controls */}
+                        <div className="section-divider">
+                          <div className="section-divider-line" />
+                          <span className="section-divider-text">Admin Quick Action Controls</span>
+                          <div className="section-divider-line" />
+                        </div>
+
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                          <div className="form-group">
+                            <label className="form-label">Manual Boss Name (Optional Override)</label>
+                            <input
+                              id="boss-override-name"
+                              className="form-input"
+                              placeholder="e.g. ERROR-MOD: Corrupted Malenia"
+                              value={config.override_name || ''}
+                              onChange={(e) => setConfig('override_name', e.target.value)}
+                            />
+                          </div>
+                          <div className="form-group">
+                            <label className="form-label">Manual Base HP (Optional Override)</label>
+                            <input
+                              id="boss-override-hp"
+                              type="number"
+                              className="form-input"
+                              placeholder="e.g. 150000"
+                              value={config.override_hp || ''}
+                              onChange={(e) => setConfig('override_hp', e.target.value)}
+                            />
+                          </div>
+                        </div>
+
+                        <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                          <button
+                            id="boss-force-spawn"
+                            className="btn btn-primary btn-sm"
+                            disabled={config.boss_status === 'loading'}
+                            onClick={async () => {
+                              setConfig('boss_status', 'loading');
+                              try {
+                                const res = await fetch('/api/gaming/boss/action', {
+                                  method: 'POST',
+                                  headers: { 'Content-Type': 'application/json' },
+                                  body: JSON.stringify({
+                                    action: 'spawn',
+                                    customName: config.override_name,
+                                    customHp: config.override_hp,
+                                    customImageUrl: config.custom_image_url || aiPreviewUrl,
+                                  }),
+                                });
+                                const data = await res.json();
+                                setConfig('boss_status', data.error ? `error: ${data.error}` : 'spawned');
+                              } catch {
+                                setConfig('boss_status', 'error: request failed');
+                              }
+                              setTimeout(() => setConfig('boss_status', ''), 4000);
+                            }}
+                          >
+                            🚀 Force Spawn Boss
+                          </button>
+
+                          <button
+                            id="boss-force-end"
+                            className="btn btn-secondary btn-sm"
+                            disabled={config.boss_status === 'loading'}
+                            onClick={async () => {
+                              setConfig('boss_status', 'loading');
+                              try {
+                                const res = await fetch('/api/gaming/boss/action', {
+                                  method: 'POST',
+                                  headers: { 'Content-Type': 'application/json' },
+                                  body: JSON.stringify({ action: 'end' }),
+                                });
+                                const data = await res.json();
+                                setConfig('boss_status', data.error ? `error: ${data.error}` : 'ended');
+                              } catch {
+                                setConfig('boss_status', 'error: request failed');
+                              }
+                              setTimeout(() => setConfig('boss_status', ''), 4000);
+                            }}
+                          >
+                            ⏹️ Force End / Reset AP
+                          </button>
+
+                          <button
+                            id="boss-force-overkill"
+                            className="btn btn-secondary btn-sm"
+                            disabled={config.boss_status === 'loading'}
+                            onClick={async () => {
+                              setConfig('boss_status', 'loading');
+                              try {
+                                const res = await fetch('/api/gaming/boss/action', {
+                                  method: 'POST',
+                                  headers: { 'Content-Type': 'application/json' },
+                                  body: JSON.stringify({ action: 'overkill' }),
+                                });
+                                const data = await res.json();
+                                setConfig('boss_status', data.error ? `error: ${data.error}` : 'overkill');
+                              } catch {
+                                setConfig('boss_status', 'error: request failed');
+                              }
+                              setTimeout(() => setConfig('boss_status', ''), 4000);
+                            }}
+                          >
+                            💥 Force Trigger Overkill
+                          </button>
+
+                          {config.boss_status && (
+                            <span style={{
+                              fontSize: '0.8125rem',
+                              color: config.boss_status.startsWith('error') ? 'var(--color-error)' : 'var(--color-success)',
+                              fontWeight: 500,
+                            }}>
+                              {config.boss_status === 'loading' ? '⏳ Processing...' :
+                               config.boss_status === 'spawned' ? '✅ Boss spawned!' :
+                               config.boss_status === 'ended' ? '✅ Cycle ended & AP reset.' :
+                               config.boss_status === 'overkill' ? '✅ Overkill Mode triggered!' :
+                               `❌ ${config.boss_status}`}
+                            </span>
+                          )}
+                        </div>
+                      </>
+                    );
+                  }}
                 </FeatureCard>
               </div>
             </div>

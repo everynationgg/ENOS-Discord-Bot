@@ -69,70 +69,10 @@ Do not wrap in markdown or write any extra text.`;
   return defaultBoss;
 }
 
-async function generateBossImage(bossName: string): Promise<string | null> {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) return null;
-
-  const match = bossName.match(/Corrupted\s+(.+)$/);
-  const characterName = match ? match[1].trim() : bossName;
-
-  const imagePrompt = `Full-body dramatic anime-style portrait of a glitched, corrupted, digital anomaly version of ${characterName}. Dark cyberspace background with green matrix code streams. Red and cyan chromatic aberration glitch distortion effects layered over the character. Digital scanlines, corrupted data particle effects. Cinematic RPG boss art. No text, no UI, no watermarks.`;
-
-  try {
-    const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-preview-image-generation:generateContent?key=${apiKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: imagePrompt }] }],
-          generationConfig: { responseModalities: ['IMAGE', 'TEXT'] },
-        }),
-      }
-    );
-
-    if (!res.ok) {
-      console.error('[BOSS IMAGE] Gemini image API returned', res.status, await res.text());
-      return null;
-    }
-
-    const data = await res.json();
-    const parts = data.candidates?.[0]?.content?.parts || [];
-    const imagePart = parts.find((p: any) => p.inlineData?.mimeType?.startsWith('image/'));
-    if (!imagePart) {
-      console.warn('[BOSS IMAGE] No image part in Gemini response');
-      return null;
-    }
-
-    const imageBuffer = Buffer.from(imagePart.inlineData.data, 'base64');
-    const fileName = `boss-${Date.now()}.png`;
-
-    const { error: uploadError } = await supabaseAdmin.storage
-      .from('boss-images')
-      .upload(fileName, imageBuffer, { contentType: 'image/png', upsert: true });
-
-    if (uploadError) {
-      console.error('[BOSS IMAGE] Supabase Storage upload failed:', uploadError.message);
-      return null;
-    }
-
-    const { data: publicUrlData } = supabaseAdmin.storage
-      .from('boss-images')
-      .getPublicUrl(fileName);
-
-    console.log('[BOSS IMAGE] Generated and stored:', publicUrlData.publicUrl);
-    return publicUrlData.publicUrl;
-  } catch (e: any) {
-    console.error('[BOSS IMAGE] Gemini image generation failed:', e.message);
-    return null;
-  }
-}
-
 async function postBossCardToDiscord(guildId: string, boss: any) {
   const token = process.env.DISCORD_TOKEN || process.env.DISCORD_BOT_TOKEN;
   if (!token) return;
 
-  // Fetch guild_config for weekly_boss
   const { data: featureRow } = await supabaseAdmin
     .from('guild_config')
     .select('config')
@@ -145,7 +85,6 @@ async function postBossCardToDiscord(guildId: string, boss: any) {
 
   const currentWeek = boss.week_identifier;
 
-  // Fetch Class Distribution
   const { data: allPlayers } = await supabaseAdmin
     .from('boss_player_states')
     .select('class_key')
@@ -159,7 +98,6 @@ async function postBossCardToDiscord(guildId: string, boss: any) {
     }
   });
 
-  // Render Canvas Buffer
   let imageBuffer: Buffer | null = null;
   try {
     imageBuffer = await renderBossImage({
@@ -172,39 +110,42 @@ async function postBossCardToDiscord(guildId: string, boss: any) {
       viewMode: 'spawn',
       momBuff: boss.mom_buff,
       dadDebuff: boss.dad_debuff,
-      lastAction: boss.last_action,
       classCounts,
+      lastAction: boss.last_action,
     });
-  } catch (err) {
-    console.error('[BOSS CANVAS] Failed to render image in dashboard route:', err);
+  } catch (e) {
+    console.error('[BOSS POST] Error rendering boss canvas:', e);
   }
 
-  const embed: any = {
-    title: `🎮 Weekly Boss Bounty — ${boss.boss_name}`,
+  const hpPct = Math.round((Number(boss.current_hp) / Number(boss.max_hp)) * 100);
+  const filled = Math.round(hpPct / 10);
+  const hpBar = '🟩'.repeat(filled) + '⬛'.repeat(10 - filled);
+
+  const embed = {
+    title: `${boss.is_overkill ? '💀 OVERKILL MODE' : '⚔️ Weekly Boss Bounty'} — ${boss.boss_name}`,
     description:
       `**Lore**: ${boss.lore}\n\n` +
-      `⚔️ **Last Action**: ${boss.last_action}\n` +
-      `🛡️ **M.O.M. Buff**: ${boss.mom_buff ? '✅ **ACTIVE**' : '❌ Inactive'}\n` +
-      `🔨 **D.A.D. Debuff**: ${boss.dad_debuff ? '✅ **ACTIVE**' : '❌ Inactive'}\n\n` +
-      `HP: **${Number(boss.current_hp).toLocaleString()} / ${Number(boss.max_hp).toLocaleString()}** (100%)\n` +
-      `👤 *Click a button below to pick your class and join the battle!*`,
-    color: boss.is_overkill ? 15671108 : 6514417,
-    footer: { text: `ENOS Weekly RPG System • Week ${currentWeek}` },
-    timestamp: new Date().toISOString(),
+      `**Last Action**: ${boss.last_action || 'None'}\n` +
+      `**M.O.M. Buff**: ${boss.mom_buff ? '✅ Active' : '❌ Inactive'}\n` +
+      `**D.A.D. Debuff**: ${boss.dad_debuff ? '✅ Active' : '❌ Inactive'}\n\n` +
+      `HP: **${Number(boss.current_hp).toLocaleString()} / ${Number(boss.max_hp).toLocaleString()}** (${hpPct}%)\n` +
+      `${hpBar}\n` +
+      `*Click a button below to pick your class and join the battle!*`,
+    color: boss.is_overkill ? 0xdc2626 : 0x6d28d9,
+    footer: {
+      text: `ENOS Weekly RPG System • Week ${boss.week_identifier} • Today at ${new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}`,
+    },
+    image: imageBuffer ? { url: 'attachment://weekly_boss_arena.png' } : undefined,
   };
-
-  if (imageBuffer) {
-    embed.image = { url: 'attachment://weekly_boss_arena.png' };
-  }
 
   const components = [
     {
       type: 1,
       components: [
-        { type: 2, style: 1, label: 'Pick M.O.M.', custom_id: 'boss_pick:mom', emoji: { name: '🛡️' } },
-        { type: 2, style: 3, label: 'Pick D.A.D.', custom_id: 'boss_pick:dad', emoji: { name: '🔨' } },
-        { type: 2, style: 4, label: 'Pick K.I.D.', custom_id: 'boss_pick:kid', emoji: { name: '⚡' } },
-        { type: 2, style: 2, label: 'Skills Info', custom_id: 'boss_info', emoji: { name: '📖' } },
+        { type: 2, custom_id: 'boss_pick:mom', label: 'Pick M.O.M.', style: 1, emoji: { name: '🛡️' } },
+        { type: 2, custom_id: 'boss_pick:dad', label: 'Pick D.A.D.', style: 3, emoji: { name: '🔨' } },
+        { type: 2, custom_id: 'boss_pick:kid', label: 'Pick K.I.D.', style: 4, emoji: { name: '⚡' } },
+        { type: 2, custom_id: 'boss_info', label: 'Skills Info', style: 2, emoji: { name: '📖' } },
       ],
     },
   ];
@@ -222,9 +163,7 @@ async function postBossCardToDiscord(guildId: string, boss: any) {
 
     await fetch(`https://discord.com/api/v10/channels/${channelId}/messages`, {
       method: 'POST',
-      headers: {
-        Authorization: `Bot ${token}`,
-      },
+      headers: { Authorization: `Bot ${token}` },
       body: formData,
     }).catch((e) => console.error('[BOSS POST] Error posting boss card with image to Discord:', e));
   } else {
@@ -234,10 +173,7 @@ async function postBossCardToDiscord(guildId: string, boss: any) {
         Authorization: `Bot ${token}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        embeds: [embed],
-        components,
-      }),
+      body: JSON.stringify({ embeds: [embed], components }),
     }).catch((e) => console.error('[BOSS POST] Error posting boss card to Discord:', e));
   }
 }
@@ -251,11 +187,10 @@ export async function POST(req: NextRequest) {
 
     const body = await req.json();
     const guildId = getGuildId(req, body);
-    const { action, customName, customHp } = body;
+    const { action, customName, customHp, customImageUrl } = body;
     const currentWeek = getWeekIdentifier();
 
     if (action === 'spawn') {
-      // Generate lore (fast, text-only, well within Vercel timeout)
       let bossName = customName ? customName.trim() : null;
       let bossTitle = 'Glitched System Threat';
       let lore = 'System anomaly detected in the gaming realm. Coordinate your triad skills to neutralize!';
@@ -268,7 +203,6 @@ export async function POST(req: NextRequest) {
         lore = aiData.lore;
       }
 
-      // Delete existing non-overkill boss for current week
       await supabaseAdmin
         .from('boss_seasons')
         .delete()
@@ -276,8 +210,6 @@ export async function POST(req: NextRequest) {
         .eq('week_identifier', currentWeek)
         .eq('is_overkill', false);
 
-      // Insert new boss with custom_image_url = 'PENDING'
-      // The bot cron will detect this, generate the AI image on Fly.io, and post the Discord card
       const { data: newBoss, error } = await supabaseAdmin
         .from('boss_seasons')
         .insert({
@@ -292,7 +224,7 @@ export async function POST(req: NextRequest) {
           is_defeated: false,
           mom_buff: false,
           dad_debuff: false,
-          custom_image_url: 'PENDING',
+          custom_image_url: customImageUrl || null,
           last_action: '⚡ Admin force spawned a new Weekly Boss!',
         })
         .select()
@@ -302,19 +234,41 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: error.message }, { status: 500 });
       }
 
+      await postBossCardToDiscord(guildId, newBoss);
+
       return NextResponse.json({ success: true, action: 'spawn', boss: newBoss });
     }
 
+    if (action === 'update_image') {
+      // Update custom_image_url for current active boss season
+      const { data: updatedBoss, error } = await supabaseAdmin
+        .from('boss_seasons')
+        .update({
+          custom_image_url: customImageUrl || null,
+          last_action: '🎨 Boss Artwork updated from Admin Dashboard!',
+        })
+        .eq('guild_id', guildId)
+        .eq('week_identifier', currentWeek)
+        .eq('is_overkill', false)
+        .select()
+        .single();
+
+      if (error || !updatedBoss) {
+        return NextResponse.json({ error: error?.message || 'No active boss season found to update' }, { status: 500 });
+      }
+
+      await postBossCardToDiscord(guildId, updatedBoss);
+
+      return NextResponse.json({ success: true, action: 'update_image', boss: updatedBoss });
+    }
 
     if (action === 'end') {
-      // Mark active boss as defeated & current_hp = 0
       await supabaseAdmin
         .from('boss_seasons')
         .update({ is_defeated: true, current_hp: 0 })
         .eq('guild_id', guildId)
         .eq('week_identifier', currentWeek);
 
-      // Reset all player AP for the week
       await supabaseAdmin
         .from('boss_player_states')
         .update({ ap_remaining: 5, is_locked: false })
@@ -325,50 +279,39 @@ export async function POST(req: NextRequest) {
     }
 
     if (action === 'overkill') {
-      // Find active boss
-      const { data: activeBoss } = await supabaseAdmin
+      const { data: currentBoss } = await supabaseAdmin
         .from('boss_seasons')
         .select('*')
         .eq('guild_id', guildId)
         .eq('week_identifier', currentWeek)
-        .order('is_overkill', { ascending: false })
-        .limit(1)
+        .eq('is_overkill', false)
         .maybeSingle();
 
-      if (!activeBoss) {
-        return NextResponse.json({ error: 'No active boss season found to trigger overkill.' }, { status: 400 });
+      if (!currentBoss) {
+        return NextResponse.json({ error: 'No active normal boss found to transition to Overkill.' }, { status: 400 });
       }
 
-      // Defeat current boss
       await supabaseAdmin
         .from('boss_seasons')
         .update({ is_defeated: true, current_hp: 0 })
-        .eq('id', activeBoss.id);
+        .eq('id', currentBoss.id);
 
-      // Delete existing overkill boss season for current week before inserting new overkill spawn
-      await supabaseAdmin
-        .from('boss_seasons')
-        .delete()
-        .eq('guild_id', guildId)
-        .eq('week_identifier', currentWeek)
-        .eq('is_overkill', true);
-
-      // Spawn Overkill Boss
-      const overkillName = `ERROR-MOD: Backup System Activated! (${activeBoss.boss_name.replace(/^ERROR-MOD: Corrupted /, '')})`;
+      const overkillHp = Math.round(Number(currentBoss.max_hp) * 1.5);
       const { data: overkillBoss, error: okErr } = await supabaseAdmin
         .from('boss_seasons')
         .insert({
           guild_id: guildId,
           week_identifier: currentWeek,
-          boss_name: overkillName,
-          boss_title: '🔥 OVERKILL RECOVERY PHASE (1.5x BONUS XP & POINTS)',
-          lore: 'Emergency backup matrix online! Defeat the Overkill Boss to earn 1.5x bonus points and XP for your server!',
-          max_hp: activeBoss.max_hp,
-          current_hp: activeBoss.max_hp,
+          boss_name: `[OVERKILL] ${currentBoss.boss_name}`,
+          boss_title: `${currentBoss.boss_title} (Unbound)`,
+          lore: `EMERGENCY OVERDRIVE: ${currentBoss.boss_name} evolved into an unstoppable system threat! All players receive bonus points for extra damage!`,
+          max_hp: overkillHp,
+          current_hp: overkillHp,
           is_overkill: true,
           is_defeated: false,
           mom_buff: false,
           dad_debuff: false,
+          custom_image_url: currentBoss.custom_image_url,
           last_action: '⚡ OVERKILL MODE ACTIVATED! Emergency Backup System online.',
         })
         .select()
@@ -378,7 +321,6 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: okErr.message }, { status: 500 });
       }
 
-      // Post overkill boss card embed to Discord
       await postBossCardToDiscord(guildId, overkillBoss);
 
       return NextResponse.json({ success: true, action: 'overkill', boss: overkillBoss });
@@ -386,6 +328,6 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
   } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ error: err.message || 'Internal Server Error' }, { status: 500 });
   }
 }

@@ -167,113 +167,66 @@ function drawKidSprite(ctx: any, cx: number, cy: number) {
 }
 
 /**
- * Draws High-Detail Corrupted Sephiroth Glitched Boss Character Model
+ * Draws High-Tech Corrupted Cyberspace Glitch Emblem (Fallback when no image URL set)
  */
-function drawSephirothSprite(ctx: any, cx: number, cy: number, isOverkill: boolean) {
+function drawGlitchedBossEntity(ctx: any, cx: number, cy: number, isOverkill: boolean) {
   ctx.save();
 
   // 1. Digital Glitch Energy Glow
-  const glowGrad = ctx.createRadialGradient(cx, cy, 20, cx, cy, 160);
+  const glowGrad = ctx.createRadialGradient(cx, cy, 20, cx, cy, 140);
   if (isOverkill) {
-    glowGrad.addColorStop(0, 'rgba(239, 68, 68, 0.7)');
-    glowGrad.addColorStop(0.5, 'rgba(185, 28, 28, 0.3)');
+    glowGrad.addColorStop(0, 'rgba(239, 68, 68, 0.6)');
+    glowGrad.addColorStop(0.5, 'rgba(185, 28, 28, 0.2)');
     glowGrad.addColorStop(1, 'rgba(0,0,0,0)');
   } else {
-    glowGrad.addColorStop(0, 'rgba(168, 85, 247, 0.7)');
-    glowGrad.addColorStop(0.5, 'rgba(56, 189, 248, 0.3)');
+    glowGrad.addColorStop(0, 'rgba(168, 85, 247, 0.6)');
+    glowGrad.addColorStop(0.5, 'rgba(56, 189, 248, 0.2)');
     glowGrad.addColorStop(1, 'rgba(0,0,0,0)');
   }
   ctx.fillStyle = glowGrad;
   ctx.beginPath();
-  ctx.arc(cx, cy, 160, 0, Math.PI * 2);
+  ctx.arc(cx, cy, 140, 0, Math.PI * 2);
   ctx.fill();
 
-  // 2. Iconic Single Black Wing (Left Wing extending back)
-  ctx.fillStyle = isOverkill ? '#450a0a' : '#0f172a';
-  ctx.beginPath();
-  ctx.moveTo(cx - 10, cy - 20);
-  ctx.bezierCurveTo(cx - 110, cy - 140, cx - 180, cy - 70, cx - 140, cy + 60);
-  ctx.bezierCurveTo(cx - 90, cy + 20, cx - 40, cy + 30, cx - 10, cy - 20);
-  ctx.fill();
+  // 2. Cyber Hexagon / Matrix Core Emblem
   ctx.strokeStyle = isOverkill ? '#ef4444' : '#a855f7';
-  ctx.lineWidth = 1.5;
-  ctx.stroke();
-
-  // 3. Torso & Leather Trench Coat
-  ctx.fillStyle = '#090d16';
-  ctx.fillRect(cx - 30, cy - 20, 60, 110);
-  ctx.fillStyle = '#1e293b';
-  ctx.fillRect(cx - 24, cy - 15, 48, 100);
-
-  // Silver Belt Buckle & Straps
-  ctx.fillStyle = '#cbd5e1';
-  ctx.fillRect(cx - 12, cy + 25, 24, 6);
-  ctx.fillRect(cx - 16, cy - 10, 32, 4);
-
-  // Silver Shoulder Pauldrons
-  ctx.fillStyle = '#cbd5e1';
-  ctx.beginPath();
-  ctx.ellipse(cx - 32, cy - 25, 14, 8, -Math.PI / 6, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.beginPath();
-  ctx.ellipse(cx + 32, cy - 25, 14, 8, Math.PI / 6, 0, Math.PI * 2);
-  ctx.fill();
-
-  // 4. Face & Stern Eyes
-  ctx.fillStyle = '#f8fafc';
-  ctx.fillRect(cx - 14, cy - 55, 28, 30);
-
-  // Cyan Glowing Eyes
-  ctx.fillStyle = isOverkill ? '#ef4444' : '#38bdf8';
-  ctx.fillRect(cx - 9, cy - 43, 6, 4);
-  ctx.fillRect(cx + 3, cy - 43, 6, 4);
-
-  // 5. Long Flowing Silver Hair
-  ctx.fillStyle = '#f1f5f9';
-  ctx.beginPath();
-  ctx.moveTo(cx - 18, cy - 65);
-  ctx.lineTo(cx - 4, cy - 35);
-  ctx.lineTo(cx, cy - 65);
-  ctx.lineTo(cx + 4, cy - 35);
-  ctx.lineTo(cx + 18, cy - 65);
-  ctx.fill();
-
-  ctx.fillRect(cx - 20, cy - 65, 8, 85);
-  ctx.fillRect(cx + 12, cy - 65, 8, 85);
-
-  ctx.beginPath();
-  ctx.moveTo(cx - 18, cy - 65);
-  ctx.quadraticCurveTo(cx + 70, cy - 100, cx + 110, cy + 80);
-  ctx.lineTo(cx + 85, cy + 90);
-  ctx.quadraticCurveTo(cx + 40, cy - 70, cx - 18, cy - 65);
-  ctx.fill();
-
-  // 6. Iconic Long Masamune Katana Sword
-  ctx.strokeStyle = isOverkill ? '#dc2626' : '#e2e8f0';
   ctx.lineWidth = 3;
   ctx.beginPath();
-  ctx.moveTo(cx - 50, cy + 90);
-  ctx.lineTo(cx + 140, cy - 120);
+  for (let i = 0; i < 6; i++) {
+    const angle = (Math.PI / 3) * i;
+    const x = cx + 80 * Math.cos(angle);
+    const y = cy + 80 * Math.sin(angle);
+    if (i === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  }
+  ctx.closePath();
   ctx.stroke();
 
-  ctx.strokeStyle = isOverkill ? '#ef4444' : '#38bdf8';
-  ctx.lineWidth = 1;
+  // Inner Ring
+  ctx.strokeStyle = isOverkill ? '#f87171' : '#38bdf8';
+  ctx.lineWidth = 2;
   ctx.beginPath();
-  ctx.moveTo(cx - 50, cy + 90);
-  ctx.lineTo(cx + 140, cy - 120);
+  ctx.arc(cx, cy, 55, 0, Math.PI * 2);
   ctx.stroke();
 
-  // 7. Digital Glitch Line Overlays & Chromatic Aberration Bands
-  ctx.fillStyle = isOverkill ? 'rgba(239, 68, 68, 0.7)' : 'rgba(56, 189, 248, 0.7)';
-  ctx.fillRect(cx - 70, cy - 35, 140, 5);
-  ctx.fillRect(cx - 40, cy + 25, 110, 6);
+  // 3. Central Threat Icon Text
+  ctx.fillStyle = isOverkill ? '#fca5a5' : '#e0e7ff';
+  ctx.font = 'bold 22px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('ANOMALY', cx, cy - 10);
 
-  ctx.fillStyle = isOverkill ? 'rgba(255, 255, 255, 0.6)' : 'rgba(236, 72, 153, 0.6)';
-  ctx.fillRect(cx - 90, cy - 5, 180, 4);
+  ctx.fillStyle = isOverkill ? '#ef4444' : '#38bdf8';
+  ctx.font = 'bold 12px monospace';
+  ctx.fillText('UNBOUND ENTITY', cx, cy + 15);
+
+  // 4. Glitch Scanline Bars
+  ctx.fillStyle = isOverkill ? 'rgba(239, 68, 68, 0.6)' : 'rgba(56, 189, 248, 0.6)';
+  ctx.fillRect(cx - 90, cy - 30, 180, 4);
+  ctx.fillRect(cx - 60, cy + 35, 120, 5);
 
   ctx.restore();
 }
-
 export async function renderBossImage(data: {
   bossName?: string;
   bossTitle?: string;
@@ -354,7 +307,7 @@ export async function renderBossImage(data: {
   if (viewMode === 'spawn') {
     // ─── PHASE A: INITIAL BOSS SPAWN BANNER (Full-Bleed Art) ────────────────
     if (!customLoaded) {
-      drawSephirothSprite(ctx, 480, 210, isOverkill);
+      drawGlitchedBossEntity(ctx, 480, 210, isOverkill);
     }
 
     // Dark Vignette Frame
@@ -395,7 +348,7 @@ export async function renderBossImage(data: {
   });
 
   if (!customLoaded) {
-    drawSephirothSprite(ctx, 580, 210, isOverkill);
+    drawGlitchedBossEntity(ctx, 580, 210, isOverkill);
   }
 
   if (lastAction) {
