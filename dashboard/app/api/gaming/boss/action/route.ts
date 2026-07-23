@@ -109,6 +109,7 @@ async function postBossCardToDiscord(guildId: string, boss: any) {
       currentHp: Number(boss.current_hp),
       maxHp: Number(boss.max_hp),
       isOverkill: boss.is_overkill,
+      viewMode: 'spawn',
       momBuff: boss.mom_buff,
       dadDebuff: boss.dad_debuff,
       lastAction: boss.last_action,

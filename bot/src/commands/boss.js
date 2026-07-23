@@ -76,12 +76,16 @@ async function buildBossEmbedPayload(guildId, userId) {
   });
 
   // Render Canvas Buffer
+  const isFreshSpawn = !playerState?.class_key && (boss.last_action?.includes('Spawned') || boss.last_action?.includes('spawned'));
+  const viewMode = isFreshSpawn ? 'spawn' : 'combat';
+
   const buffer = await renderBossImage({
     bossName: boss.boss_name,
     bossTitle: boss.boss_title,
     currentHp: Number(boss.current_hp),
     maxHp: Number(boss.max_hp),
     isOverkill: boss.is_overkill,
+    viewMode,
     momBuff: boss.mom_buff,
     dadDebuff: boss.dad_debuff,
     lastAction: boss.last_action,
