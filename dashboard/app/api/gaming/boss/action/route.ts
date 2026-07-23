@@ -68,6 +68,62 @@ Do not wrap in markdown or write any extra text.`;
   return defaultBoss;
 }
 
+async function postBossCardToDiscord(guildId: string, boss: any) {
+  const token = process.env.DISCORD_TOKEN || process.env.DISCORD_BOT_TOKEN;
+  if (!token) return;
+
+  // Fetch guild_config for weekly_boss
+  const { data: featureRow } = await supabaseAdmin
+    .from('guild_config')
+    .select('config')
+    .eq('guild_id', guildId)
+    .eq('feature_key', 'weekly_boss')
+    .maybeSingle();
+
+  const channelId = featureRow?.config?.channel_id;
+  if (!channelId) return;
+
+  const currentWeek = boss.week_identifier;
+
+  const embed = {
+    title: `🎮 Weekly Boss Bounty — ${boss.boss_name}`,
+    description:
+      `**Lore**: ${boss.lore}\n\n` +
+      `⚔️ **Last Action**: ${boss.last_action}\n` +
+      `🛡️ **M.O.M. Buff**: ❌ Inactive\n` +
+      `🔨 **D.A.D. Debuff**: ❌ Inactive\n\n` +
+      `HP: **${Number(boss.current_hp).toLocaleString()} / ${Number(boss.max_hp).toLocaleString()}** (100%)\n` +
+      `👤 *Click a button below to pick your class and join the battle!*`,
+    color: boss.is_overkill ? 15671108 : 6514417,
+    footer: { text: `ENOS Weekly RPG System • Week ${currentWeek}` },
+    timestamp: new Date().toISOString(),
+  };
+
+  const components = [
+    {
+      type: 1,
+      components: [
+        { type: 2, style: 1, label: 'Pick M.O.M.', custom_id: 'boss_pick:mom', emoji: { name: '🛡️' } },
+        { type: 2, style: 3, label: 'Pick D.A.D.', custom_id: 'boss_pick:dad', emoji: { name: '🔨' } },
+        { type: 2, style: 4, label: 'Pick K.I.D.', custom_id: 'boss_pick:kid', emoji: { name: '⚡' } },
+        { type: 2, style: 2, label: 'Skills Info', custom_id: 'boss_info', emoji: { name: '📖' } },
+      ],
+    },
+  ];
+
+  await fetch(`https://discord.com/api/v10/channels/${channelId}/messages`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bot ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      embeds: [embed],
+      components,
+    }),
+  }).catch((e) => console.error('[BOSS POST] Error posting boss card to Discord:', e));
+}
+
 export async function POST(req: NextRequest) {
   try {
     const session = await auth();
@@ -124,6 +180,9 @@ export async function POST(req: NextRequest) {
       if (error) {
         return NextResponse.json({ error: error.message }, { status: 500 });
       }
+
+      // Post boss card embed directly to configured Discord channel
+      await postBossCardToDiscord(guildId, newBoss);
 
       return NextResponse.json({ success: true, action: 'spawn', boss: newBoss });
     }
@@ -191,7 +250,7 @@ export async function POST(req: NextRequest) {
           is_defeated: false,
           mom_buff: false,
           dad_debuff: false,
-          last_action: '⚡ Admin force-triggered OVERKILL MODE!',
+          last_action: '⚡ OVERKILL MODE ACTIVATED! Emergency Backup System online.',
         })
         .select()
         .single();
@@ -199,6 +258,9 @@ export async function POST(req: NextRequest) {
       if (okErr) {
         return NextResponse.json({ error: okErr.message }, { status: 500 });
       }
+
+      // Post overkill boss card embed to Discord
+      await postBossCardToDiscord(guildId, overkillBoss);
 
       return NextResponse.json({ success: true, action: 'overkill', boss: overkillBoss });
     }
