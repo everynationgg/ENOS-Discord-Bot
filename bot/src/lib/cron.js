@@ -73,6 +73,32 @@ function initCrons(client) {
     { timezone: tz }
   );
 
+  // ─── Weekly Boss Reset & AI Lore Generation: Every Monday at 00:00 ─────────────
+  cron.schedule(
+    '0 0 * * 1',
+    async () => {
+      logger.info('[CRON] Resetting Weekly Boss & generating AI lore for new week...');
+      try {
+        const { getOrCreateActiveBoss } = require('../modules/gaming/boss');
+        const { data: configs } = await supabase
+          .from('guild_config')
+          .select('guild_id')
+          .eq('enabled', true);
+
+        for (const c of configs || []) {
+          try {
+            await getOrCreateActiveBoss(c.guild_id);
+          } catch (err) {
+            logger.error(`[CRON] Weekly Boss spawn failed for guild ${c.guild_id}:`, err.message);
+          }
+        }
+      } catch (err) {
+        logger.error('[CRON] Weekly Boss cron failed:', err.message);
+      }
+    },
+    { timezone: tz }
+  );
+
   // ─── LFG Session Expiry: Every 10 minutes ─────────────────────────────────────
   cron.schedule('*/10 * * * *', async () => {
     try {

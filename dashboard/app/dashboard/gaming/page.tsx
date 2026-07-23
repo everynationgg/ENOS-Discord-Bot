@@ -73,6 +73,13 @@ export default function GamingPage() {
           >
             🧠 Trivia Drop
           </button>
+          <button
+            className={`sidebar-item ${activeTab === 'boss' ? 'active' : ''}`}
+            onClick={() => setActiveTab('boss')}
+            id="sidebar-game-boss"
+          >
+            🐉 Weekly Boss
+          </button>
         </aside>
 
         {/* Detail Content Area */}
@@ -102,6 +109,13 @@ export default function GamingPage() {
                 <h3>🧠 Trivia Drop</h3>
                 <p>
                   Auto-drops a daily AI-generated trivia question in a weighted random channel. Anti-cheat ephemeral shuffling per user, microsecond speed scoring, and podium point rewards all in one.
+                </p>
+              </div>
+
+              <div className="overview-item">
+                <h3>🐉 Weekly Boss Bounty RPG</h3>
+                <p>
+                  Self-balancing weekly boss RPG with M.O.M., D.A.D., and K.I.D. combat triad synergy, 5 AP weekly budgets, dynamic participant scaling, and Overkill Mode.
                 </p>
               </div>
             </div>
@@ -678,6 +692,69 @@ export default function GamingPage() {
                       </>
                     );
                   }}
+                </FeatureCard>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'boss' && (
+            <div className="split-layout-detail">
+              <div className="feature-instructions">
+                <h3>Weekly Boss Bounty RPG Guide</h3>
+                <p>
+                  A self-balancing, zero-cost Discord RPG system where players choose a class and coordinate 3-class synergy loops to defeat a corrupted glitch boss.
+                </p>
+                <ol>
+                  <li>Enable the feature below and set your target <strong>Boss Announcement Channel ID</strong>.</li>
+                  <li>Players use <code>/boss status</code> or click the interactive Discord buttons to select a class (<strong>M.O.M.</strong>, <strong>D.A.D.</strong>, or <strong>K.I.D.</strong>) and spend 5 weekly AP.</li>
+                  <li>Executing 3-class triad combos (M.O.M. Buff + D.A.D. Debuff + K.I.D. Nuke) deals <strong>60,000 DMG</strong> (Full Triad Meltdown).</li>
+                  <li>Defeating the boss unlocks <strong>Overkill Mode</strong> with 1.5x bonus points and XP!</li>
+                </ol>
+              </div>
+
+              <div className="feature-form-card">
+                <FeatureCard
+                  id="weekly-boss"
+                  icon="🐉"
+                  title="Weekly Boss Bounty RPG"
+                  description="Self-balancing weekly boss RPG with M.O.M., D.A.D., and K.I.D. combat triad synergy, 5 AP weekly budgets, dynamic participant scaling, and Overkill Mode."
+                  featureKey="weekly_boss"
+                  initialEnabled={configs['weekly_boss']?.enabled ?? true}
+                  initialConfig={configs['weekly_boss']?.config ?? {}}
+                >
+                  {(config, setConfig) => (
+                    <>
+                      <div className="section-divider">
+                        <div className="section-divider-line" />
+                        <span className="section-divider-text">Boss Settings</span>
+                        <div className="section-divider-line" />
+                      </div>
+
+                      <div className="form-group">
+                        <label className="form-label">Boss Announcement Channel ID</label>
+                        <input
+                          id="boss-channel-id"
+                          className="form-input"
+                          placeholder="Channel ID for boss card posts (e.g. 1234567890)"
+                          value={config.channel_id || ''}
+                          onChange={(e) => setConfig('channel_id', e.target.value)}
+                        />
+                        <span className="form-hint">Channel where /boss status cards are posted</span>
+                      </div>
+
+                      <div className="form-group">
+                        <label className="form-label">Custom Boss Image URL (Optional)</label>
+                        <input
+                          id="boss-image-url"
+                          className="form-input"
+                          placeholder="https://.../transparent_boss.png"
+                          value={config.custom_image_url || ''}
+                          onChange={(e) => setConfig('custom_image_url', e.target.value)}
+                        />
+                        <span className="form-hint">Direct link to a transparent PNG for custom weekly boss rendering</span>
+                      </div>
+                    </>
+                  )}
                 </FeatureCard>
               </div>
             </div>

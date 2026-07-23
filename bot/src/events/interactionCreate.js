@@ -83,6 +83,10 @@ module.exports = {
           const { handleTriviaAnswerClick } = require('../modules/gaming/trivia');
           return handleTriviaAnswerClick(interaction);
         }
+        if (interaction.customId.startsWith('boss_')) {
+          const { handleBossButton } = require('../commands/boss');
+          return handleBossButton(interaction);
+        }
         return;
       }
 
