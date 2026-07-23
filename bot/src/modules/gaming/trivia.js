@@ -134,7 +134,7 @@ async function triggerTriviaDrop(client, guildId) {
 
     if (existingActive && existingActive.length > 0) {
       for (const oldDrop of existingActive) {
-        await forceCloseDrop(client, guildId, oldDrop.id, 'skipped');
+        await forceCloseDrop(client, guildId, oldDrop.id, 'superseded');
       }
     }
 
@@ -632,7 +632,13 @@ async function forceCloseDrop(client, guildId, dropId, status = 'completed') {
         return `${medal} <@${w.user_id}> — **${(w.speed_ms / 1000).toFixed(6)}s** (+${w.points} pts)`;
       });
       let podiumText = podiumLines.length > 0 ? podiumLines.join('\n') : '*No winners.*';
-      podiumText += status === 'skipped' ? '\n\n❌ **Trivia Session was Cancelled/Skipped by Admin.**' : '\n\n🏁 **Trivia Session is now Closed!**';
+      if (status === 'skipped') {
+        podiumText += '\n\n❌ **Trivia Session was Cancelled/Skipped by Admin.**';
+      } else if (status === 'superseded') {
+        podiumText += '\n\n🏁 **Trivia Session closed (superseded by new drop).**';
+      } else {
+        podiumText += '\n\n🏁 **Trivia Session is now Closed!**';
+      }
 
       const updatedEmbed = EmbedBuilder.from(currentEmbed)
         .setFields(

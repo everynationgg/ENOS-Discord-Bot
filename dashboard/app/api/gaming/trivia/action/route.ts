@@ -76,7 +76,7 @@ Do not wrap in markdown, backticks, or write any extra text.`;
   return parsed;
 }
 
-async function closeActiveDrop(guildId: string, status: 'completed' | 'skipped' = 'skipped') {
+async function closeActiveDrop(guildId: string, status: 'completed' | 'skipped' | 'superseded' = 'skipped') {
   const token = process.env.DISCORD_TOKEN || process.env.DISCORD_BOT_TOKEN;
 
   // Find all active drops for this guild
@@ -104,7 +104,13 @@ async function closeActiveDrop(guildId: string, status: 'completed' | 'skipped' 
           return `${medal} <@${w.user_id}> — **${(w.speed_ms / 1000).toFixed(6)}s** (+${w.points} pts)`;
         });
         let podiumText = podiumLines.length > 0 ? podiumLines.join('\n') : '*No winners.*';
-        podiumText += status === 'skipped' ? '\n\n❌ **Trivia Session was Cancelled/Skipped by Admin.**' : '\n\n🏁 **Trivia Session is now Closed!**';
+        if (status === 'skipped') {
+          podiumText += '\n\n❌ **Trivia Session was Cancelled/Skipped by Admin.**';
+        } else if (status === 'superseded') {
+          podiumText += '\n\n🏁 **Trivia Session closed (superseded by new drop).**';
+        } else {
+          podiumText += '\n\n🏁 **Trivia Session is now Closed!**';
+        }
 
         await fetch(`https://discord.com/api/v10/channels/${drop.channel_id}/messages/${drop.message_id}`, {
           method: 'PATCH',
@@ -155,7 +161,7 @@ async function triggerInstantDrop(guildId: string) {
   if (!token) throw new Error('Missing DISCORD_TOKEN in dashboard environment variables.');
 
   // Close existing active drops first
-  await closeActiveDrop(guildId, 'skipped');
+  await closeActiveDrop(guildId, 'superseded');
 
   // Fetch config
   const { data: featureRow } = await supabaseAdmin
