@@ -72,8 +72,6 @@ async function postBossCardToDiscord(guildId: string, boss: any) {
   const filled = Math.round(hpPct / 10);
   const hpBar = '🟩'.repeat(filled) + '⬛'.repeat(10 - filled);
 
-  const embedImage = boss.custom_image_url ? { url: boss.custom_image_url } : (imageBuffer ? { url: 'attachment://weekly_boss_arena.png' } : undefined);
-
   const embed = {
     title: `${boss.is_overkill ? '💀 OVERKILL MODE' : '⚔️ Weekly Boss Bounty'} — ${boss.boss_name}`,
     description:
@@ -88,7 +86,7 @@ async function postBossCardToDiscord(guildId: string, boss: any) {
     footer: {
       text: `ENOS Weekly RPG System • Week ${boss.week_identifier} • Today at ${new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}`,
     },
-    image: embedImage,
+    image: imageBuffer ? { url: 'attachment://weekly_boss_arena.png' } : undefined,
   };
 
   const components = [
@@ -103,7 +101,7 @@ async function postBossCardToDiscord(guildId: string, boss: any) {
     },
   ];
 
-  if (!boss.custom_image_url && imageBuffer) {
+  if (imageBuffer) {
     const formData = new FormData();
     formData.append(
       'payload_json',

@@ -291,14 +291,16 @@ async function renderBossImage(data) {
         const arrayBuf = await res.arrayBuffer();
         const img = await loadImage(Buffer.from(arrayBuf));
         if (viewMode === 'spawn') {
-          ctx.drawImage(img, 250, 40, 340, 340);
+          ctx.drawImage(img, 380, 20, 380, 380);
         } else {
           ctx.drawImage(img, 450, 50, 300, 300);
         }
         customLoaded = true;
+      } else {
+        logger.warn(`[BOSS CANVAS] Failed to fetch custom image URL: HTTP ${res.status}`);
       }
     } catch (e) {
-      // fallback to emblem
+      logger.warn(`[BOSS CANVAS] Error loading custom image buffer: ${e.message}`);
     }
   }
 
