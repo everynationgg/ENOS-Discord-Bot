@@ -723,9 +723,12 @@ export default function GamingPage() {
                   initialConfig={configs['weekly_boss']?.config ?? {}}
                 >
                   {(config, setConfig) => {
-                    const [selectedGame, setSelectedGame] = useState<string>('Where Winds Meet');
+                    const [selectedGame, setSelectedGame] = useState<string>('D4');
                     const [targetBossName, setTargetBossName] = useState<string>('');
+                    const [artStyle, setArtStyle] = useState<string>('gothic');
                     const [customStyle, setCustomStyle] = useState<string>('');
+                    const [customFullPrompt, setCustomFullPrompt] = useState<string>('');
+                    const [usedPromptText, setUsedPromptText] = useState<string>('');
                     const [aiPreviewUrl, setAiPreviewUrl] = useState<string>('');
                     const [aiGenStatus, setAiGenStatus] = useState<string>('');
 
@@ -738,7 +741,9 @@ export default function GamingPage() {
                           body: JSON.stringify({
                             gameUniverse: selectedGame,
                             bossName: targetBossName || config.override_name || 'Corrupted Boss Entity',
+                            artStyle,
                             customStyle,
+                            customFullPrompt,
                           }),
                         });
                         const data = await res.json();
@@ -746,6 +751,7 @@ export default function GamingPage() {
                           setAiGenStatus(`error: ${data.error}`);
                         } else {
                           setAiPreviewUrl(data.imageUrl);
+                          if (data.usedPrompt) setUsedPromptText(data.usedPrompt);
                           setConfig('custom_image_url', data.imageUrl);
                           setAiGenStatus('success');
                         }
@@ -817,7 +823,7 @@ export default function GamingPage() {
                             Generate custom RPG boss artwork on-demand using Gemini AI. Preview the image first, then push it live to your Discord channel when ready!
                           </p>
 
-                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.75rem' }}>
                             <div className="form-group" style={{ margin: 0 }}>
                               <label className="form-label">Game Universe / Branch</label>
                               <select
@@ -837,22 +843,39 @@ export default function GamingPage() {
                               <input
                                 id="boss-target-name"
                                 className="form-input"
-                                placeholder="e.g. Sephiroth, Malenia, Bowser"
+                                placeholder="e.g. Lilith, Sephiroth, Malenia"
                                 value={targetBossName}
                                 onChange={(e) => setTargetBossName(e.target.value)}
                               />
                             </div>
+
+                            <div className="form-group" style={{ margin: 0 }}>
+                              <label className="form-label">Art Style Preset</label>
+                              <select
+                                id="boss-art-style-select"
+                                className="form-input"
+                                value={artStyle}
+                                onChange={(e) => setArtStyle(e.target.value)}
+                              >
+                                <option value="gothic">🔮 Dark Fantasy (Diablo / Elden Ring)</option>
+                                <option value="anime">✨ Anime RPG (Hoyoverse / Genshin)</option>
+                                <option value="glitch">👾 Digital Matrix Glitch</option>
+                              </select>
+                            </div>
                           </div>
 
                           <div className="form-group" style={{ margin: 0 }}>
-                            <label className="form-label">Custom Style / Glitch Notes (Optional)</label>
-                            <input
-                              id="boss-custom-style"
+                            <label className="form-label">Custom Full Prompt (Optional Override)</label>
+                            <textarea
+                              id="boss-custom-full-prompt"
                               className="form-input"
-                              placeholder="e.g. Dark red fire dragon wings, cyan scanline matrix"
-                              value={customStyle}
-                              onChange={(e) => setCustomStyle(e.target.value)}
+                              rows={2}
+                              placeholder="Leave blank to use auto-built prompt, or type exact custom prompt here (e.g. Epic dark fantasy portrait of Lilith from Diablo 4 with demonic horns, black wings, dark gothic background, 16:9 ratio)"
+                              value={customFullPrompt}
+                              onChange={(e) => setCustomFullPrompt(e.target.value)}
+                              style={{ fontFamily: 'monospace', fontSize: '0.8125rem' }}
                             />
+                            <span className="form-hint">Type any custom image prompt here to bypass default templates.</span>
                           </div>
 
                           <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
@@ -907,6 +930,20 @@ export default function GamingPage() {
                                   border: '1px solid rgba(255,255,255,0.1)',
                                 }}
                               />
+                              {usedPromptText && (
+                                <div style={{
+                                  fontSize: '0.71875rem',
+                                  color: 'var(--text-muted)',
+                                  backgroundColor: 'rgba(0,0,0,0.5)',
+                                  padding: '0.375rem 0.625rem',
+                                  borderRadius: '0.25rem',
+                                  maxWidth: '100%',
+                                  wordBreak: 'break-word',
+                                  fontFamily: 'monospace',
+                                }}>
+                                  <strong>Prompt Used:</strong> "{usedPromptText}"
+                                </div>
+                              )}
                               <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                                 <button
                                   id="boss-apply-to-discord-btn"

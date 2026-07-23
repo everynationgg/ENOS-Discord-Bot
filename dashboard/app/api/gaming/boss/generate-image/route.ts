@@ -2,6 +2,23 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { supabaseAdmin } from '@/lib/supabase';
 
+const GAME_NAME_MAP: Record<string, string> = {
+  D4: 'Diablo 4 (Diablo IV)',
+  POE: 'Path of Exile',
+  BG3: "Baldur's Gate 3",
+  Wuwa: 'Wuthering Waves',
+  Hoyoverse: 'Genshin Impact and Honkai Star Rail',
+  Enfi: 'Enshrouded',
+  Phasmo: 'Phasmophobia',
+  REPO: 'R.E.P.O.',
+  PEAK: 'Peak',
+  ML: 'Mobile Legends: Bang Bang',
+  HoK: 'Honor of Kings',
+  LOL: 'League of Legends',
+  CS2: 'Counter-Strike 2',
+  COD: 'Call of Duty',
+};
+
 export async function POST(req: NextRequest) {
   try {
     const session = await auth();
@@ -9,14 +26,28 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { gameUniverse, bossName, customStyle } = await req.json();
+    const { gameUniverse, bossName, customStyle, artStyle, customFullPrompt } = await req.json();
     const apiKey = process.env.GEMINI_API_KEY;
 
-    const targetCharacter = bossName || 'Corrupted RPG Boss';
-    const targetGame = gameUniverse || 'Popular RPG Universe';
-    const extraStyle = customStyle ? `, ${customStyle}` : '';
+    const targetCharacter = bossName ? bossName.trim() : 'Corrupted RPG Boss';
+    const targetGame = GAME_NAME_MAP[gameUniverse] || gameUniverse || 'Popular RPG Universe';
 
-    const prompt = `Full-body dramatic anime pixel-art style portrait of a glitched, corrupted boss entity inspired by ${targetCharacter} from ${targetGame}. Dark cyberspace background with matrix code streams. Red and cyan chromatic aberration glitch distortion overlays, digital scanlines, corrupted particle artifacts${extraStyle}. Cinematic 16:9 ratio RPG boss art banner. High contrast, highly detailed, no text, no logos.`;
+    let prompt = '';
+
+    if (customFullPrompt && customFullPrompt.trim().length > 5) {
+      prompt = customFullPrompt.trim();
+    } else {
+      const extraStyle = customStyle ? `, ${customStyle}` : '';
+      const styleType = artStyle || 'gothic';
+
+      if (styleType === 'gothic') {
+        prompt = `Epic cinematic dark fantasy RPG portrait of ${targetCharacter} from ${targetGame}. Dark gothic aesthetic, intricate demonic details, dramatic dark lighting, subtle digital scanline glitch overlays, corrupted energy particle embers background, high resolution 8k quality, cinematic 16:9 banner${extraStyle}. Highly detailed, no text, no watermarks.`;
+      } else if (styleType === 'anime') {
+        prompt = `High-detail anime RPG character portrait of ${targetCharacter} from ${targetGame}. Vivid cinematic lighting, digital cyberspace background with glowing matrix code streams, subtle chromatic aberration glitch artifacts${extraStyle}. High resolution 16:9 wallpaper quality banner, no text, no watermarks.`;
+      } else {
+        prompt = `Full-body dramatic pixel-art style portrait of glitched boss entity ${targetCharacter} from ${targetGame}. Dark cyberspace background with matrix code streams, red and cyan chromatic aberration glitch distortion overlays, digital scanlines${extraStyle}. Cinematic 16:9 RPG boss banner, no text, no logos.`;
+      }
+    }
 
     let imageBuffer: Buffer | null = null;
     let mimeType = 'image/png';
@@ -52,7 +83,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // 2. High-Performance Fallback: Pollinations AI (FLUX / SDXL Engine — 100% Guaranteed, Free, No API Key Required)
+    // 2. High-Performance Fallback: Pollinations AI (FLUX Engine)
     if (!imageBuffer) {
       try {
         const seed = Math.floor(Math.random() * 1000000);
@@ -66,11 +97,9 @@ export async function POST(req: NextRequest) {
             imageBuffer = Buffer.from(arrayBuf);
             mimeType = res.headers.get('content-type') || 'image/jpeg';
           }
-        } else {
-          console.warn('[BOSS AI IMAGE] Pollinations flux returned status:', res.status);
         }
       } catch (e: any) {
-        console.warn('[BOSS AI IMAGE] Pollinations AI fetch failed:', e.message);
+        console.warn('[BOSS AI IMAGE] Pollinations flux fetch failed:', e.message);
       }
     }
 
@@ -110,12 +139,11 @@ export async function POST(req: NextRequest) {
       .upload(fileName, imageBuffer, { contentType: mimeType, upsert: true });
 
     if (uploadError) {
-      // If bucket does not exist or upload error, return base64 preview directly
       return NextResponse.json({
         success: true,
         imageUrl: `data:${mimeType};base64,${imageBuffer.toString('base64')}`,
         previewBase64: `data:${mimeType};base64,${imageBuffer.toString('base64')}`,
-        note: `Storage upload note: ${uploadError.message}`,
+        usedPrompt: prompt,
       });
     }
 
@@ -129,6 +157,7 @@ export async function POST(req: NextRequest) {
       success: true,
       imageUrl: publicUrl,
       previewBase64: `data:${mimeType};base64,${imageBuffer.toString('base64')}`,
+      usedPrompt: prompt,
     });
   } catch (err: any) {
     console.error('[BOSS AI GENERATOR API] Unexpected error:', err);
