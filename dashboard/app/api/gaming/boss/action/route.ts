@@ -106,6 +106,7 @@ async function postBossCardToDiscord(guildId: string, boss: any) {
     imageBuffer = await renderBossImage({
       bossName: boss.boss_name,
       bossTitle: boss.boss_title,
+      customImageUrl: boss.custom_image_url,
       currentHp: Number(boss.current_hp),
       maxHp: Number(boss.max_hp),
       isOverkill: boss.is_overkill,

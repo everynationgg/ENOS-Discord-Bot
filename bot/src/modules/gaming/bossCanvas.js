@@ -1,4 +1,4 @@
-const { createCanvas } = require('@napi-rs/canvas');
+const { createCanvas, loadImage } = require('@napi-rs/canvas');
 
 function drawRoundedRect(ctx, x, y, width, height, radius) {
   ctx.beginPath();
@@ -167,72 +167,118 @@ function drawKidSprite(ctx, cx, cy) {
 }
 
 /**
- * Draws the Glitched Boss Entity on the right side of the canvas
+ * Draws High-Detail Corrupted Sephiroth Glitched Boss Character Model
  */
-function drawGlitchedBossEntity(ctx, cx, cy, isOverkill) {
+function drawSephirothSprite(ctx, cx, cy, isOverkill) {
   ctx.save();
 
-  // Outer Digital Matrix Aura
-  const auraGrad = ctx.createRadialGradient(cx, cy, 10, cx, cy, 130);
+  // 1. Digital Glitch Energy Glow
+  const glowGrad = ctx.createRadialGradient(cx, cy, 20, cx, cy, 160);
   if (isOverkill) {
-    auraGrad.addColorStop(0, 'rgba(239, 68, 68, 0.85)');
-    auraGrad.addColorStop(0.5, 'rgba(185, 28, 28, 0.4)');
-    auraGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    glowGrad.addColorStop(0, 'rgba(239, 68, 68, 0.7)');
+    glowGrad.addColorStop(0.5, 'rgba(185, 28, 28, 0.3)');
+    glowGrad.addColorStop(1, 'rgba(0,0,0,0)');
   } else {
-    auraGrad.addColorStop(0, 'rgba(168, 85, 247, 0.85)');
-    auraGrad.addColorStop(0.5, 'rgba(126, 34, 206, 0.4)');
-    auraGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    glowGrad.addColorStop(0, 'rgba(168, 85, 247, 0.7)');
+    glowGrad.addColorStop(0.5, 'rgba(56, 189, 248, 0.3)');
+    glowGrad.addColorStop(1, 'rgba(0,0,0,0)');
   }
-  ctx.fillStyle = auraGrad;
+  ctx.fillStyle = glowGrad;
   ctx.beginPath();
-  ctx.arc(cx, cy, 130, 0, Math.PI * 2);
+  ctx.arc(cx, cy, 160, 0, Math.PI * 2);
   ctx.fill();
 
-  // Cyber Wing Silhouette (Left Wing)
-  ctx.fillStyle = isOverkill ? 'rgba(220, 38, 38, 0.7)' : 'rgba(147, 51, 234, 0.7)';
+  // 2. Iconic Single Black Wing (Left Wing extending back)
+  ctx.fillStyle = isOverkill ? '#450a0a' : '#0f172a';
   ctx.beginPath();
-  ctx.moveTo(cx - 20, cy - 30);
-  ctx.bezierCurveTo(cx - 90, cy - 120, cx - 140, cy - 80, cx - 110, cy + 40);
-  ctx.bezierCurveTo(cx - 80, cy + 10, cx - 40, cy + 20, cx - 20, cy - 30);
+  ctx.moveTo(cx - 10, cy - 20);
+  ctx.bezierCurveTo(cx - 110, cy - 140, cx - 180, cy - 70, cx - 140, cy + 60);
+  ctx.bezierCurveTo(cx - 90, cy + 20, cx - 40, cy + 30, cx - 10, cy - 20);
   ctx.fill();
-
-  // Boss Body Silhouette
-  ctx.fillStyle = '#090d16';
-  ctx.beginPath();
-  ctx.ellipse(cx, cy + 10, 45, 95, 0, 0, Math.PI * 2);
-  ctx.fill();
-
-  // Silver Hair Streams
-  ctx.fillStyle = '#e2e8f0';
-  ctx.beginPath();
-  ctx.moveTo(cx - 15, cy - 75);
-  ctx.quadraticCurveTo(cx + 40, cy - 110, cx + 85, cy + 60);
-  ctx.lineTo(cx + 65, cy + 70);
-  ctx.quadraticCurveTo(cx + 25, cy - 80, cx - 15, cy - 75);
-  ctx.fill();
-
-  // Glitched Katana Energy Blade
-  ctx.strokeStyle = isOverkill ? '#ef4444' : '#38bdf8';
-  ctx.lineWidth = 4;
-  ctx.beginPath();
-  ctx.moveTo(cx - 40, cy + 80);
-  ctx.lineTo(cx + 110, cy - 110);
+  ctx.strokeStyle = isOverkill ? '#ef4444' : '#a855f7';
+  ctx.lineWidth = 1.5;
   ctx.stroke();
 
-  // Chromatic Aberration & Glitch Distortion Bands
-  ctx.fillStyle = isOverkill ? 'rgba(239, 68, 68, 0.6)' : 'rgba(56, 189, 248, 0.6)';
-  ctx.fillRect(cx - 65, cy - 40, 130, 6);
-  ctx.fillRect(cx - 45, cy + 15, 90, 8);
-  ctx.fillStyle = isOverkill ? 'rgba(255, 255, 255, 0.5)' : 'rgba(236, 72, 153, 0.5)';
-  ctx.fillRect(cx - 80, cy - 10, 160, 5);
+  // 3. Torso & Leather Trench Coat
+  ctx.fillStyle = '#090d16';
+  ctx.fillRect(cx - 30, cy - 20, 60, 110);
+  ctx.fillStyle = '#1e293b';
+  ctx.fillRect(cx - 24, cy - 15, 48, 100);
+
+  // Silver Belt Buckle & Straps
+  ctx.fillStyle = '#cbd5e1';
+  ctx.fillRect(cx - 12, cy + 25, 24, 6);
+  ctx.fillRect(cx - 16, cy - 10, 32, 4);
+
+  // Silver Shoulder Pauldrons
+  ctx.fillStyle = '#cbd5e1';
+  ctx.beginPath();
+  ctx.ellipse(cx - 32, cy - 25, 14, 8, -Math.PI / 6, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.ellipse(cx + 32, cy - 25, 14, 8, Math.PI / 6, 0, Math.PI * 2);
+  ctx.fill();
+
+  // 4. Face & Stern Eyes
+  ctx.fillStyle = '#f8fafc';
+  ctx.fillRect(cx - 14, cy - 55, 28, 30);
+
+  // Cyan Glowing Eyes
+  ctx.fillStyle = isOverkill ? '#ef4444' : '#38bdf8';
+  ctx.fillRect(cx - 9, cy - 43, 6, 4);
+  ctx.fillRect(cx + 3, cy - 43, 6, 4);
+
+  // 5. Long Flowing Silver Hair
+  ctx.fillStyle = '#f1f5f9';
+  // Front Bangs
+  ctx.beginPath();
+  ctx.moveTo(cx - 18, cy - 65);
+  ctx.lineTo(cx - 4, cy - 35);
+  ctx.lineTo(cx, cy - 65);
+  ctx.lineTo(cx + 4, cy - 35);
+  ctx.lineTo(cx + 18, cy - 65);
+  ctx.fill();
+
+  // Long Side Locks
+  ctx.fillRect(cx - 20, cy - 65, 8, 85);
+  ctx.fillRect(cx + 12, cy - 65, 8, 85);
+
+  // Back Flowing Hair
+  ctx.beginPath();
+  ctx.moveTo(cx - 18, cy - 65);
+  ctx.quadraticCurveTo(cx + 70, cy - 100, cx + 110, cy + 80);
+  ctx.lineTo(cx + 85, cy + 90);
+  ctx.quadraticCurveTo(cx + 40, cy - 70, cx - 18, cy - 65);
+  ctx.fill();
+
+  // 6. Iconic Long Masamune Katana Sword
+  ctx.strokeStyle = isOverkill ? '#dc2626' : '#e2e8f0';
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(cx - 50, cy + 90);
+  ctx.lineTo(cx + 140, cy - 120);
+  ctx.stroke();
+
+  ctx.strokeStyle = isOverkill ? '#ef4444' : '#38bdf8';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(cx - 50, cy + 90);
+  ctx.lineTo(cx + 140, cy - 120);
+  ctx.stroke();
+
+  // 7. Digital Glitch Line Overlays & Chromatic Aberration Bands
+  ctx.fillStyle = isOverkill ? 'rgba(239, 68, 68, 0.7)' : 'rgba(56, 189, 248, 0.7)';
+  ctx.fillRect(cx - 70, cy - 35, 140, 5);
+  ctx.fillRect(cx - 40, cy + 25, 110, 6);
+
+  ctx.fillStyle = isOverkill ? 'rgba(255, 255, 255, 0.6)' : 'rgba(236, 72, 153, 0.6)';
+  ctx.fillRect(cx - 90, cy - 5, 180, 4);
 
   ctx.restore();
 }
 
 /**
  * Renders the Weekly Boss graphics canvas.
- * - viewMode === 'spawn': Full-bleed Glitched Boss Banner (Zero UI boxes)
- * - viewMode === 'combat': Combat Arena view (Chibi Heroes vs Boss)
  */
 async function renderBossImage(data) {
   const width = 800;
@@ -242,8 +288,9 @@ async function renderBossImage(data) {
 
   const {
     bossName = 'ERROR-MOD: Corrupted Boss',
+    customImageUrl = null,
     isOverkill = false,
-    viewMode = 'spawn', // 'spawn' or 'combat'
+    viewMode = 'spawn',
     lastAction = '',
   } = data;
 
@@ -282,22 +329,39 @@ async function renderBossImage(data) {
     }
   }
 
+  // Draw Boss Image / Sprite
+  let customLoaded = false;
+  if (customImageUrl) {
+    try {
+      const img = await loadImage(customImageUrl);
+      if (viewMode === 'spawn') {
+        ctx.drawImage(img, 250, 40, 340, 340);
+      } else {
+        ctx.drawImage(img, 450, 50, 300, 300);
+      }
+      customLoaded = true;
+    } catch (e) {
+      // fallback to Sephiroth sprite
+    }
+  }
+
   if (viewMode === 'spawn') {
     // ─── PHASE A: INITIAL BOSS SPAWN BANNER (Full-Bleed Art) ────────────────
-    // Draw Glitched Boss Entity centered in 16:9 banner
-    drawGlitchedBossEntity(ctx, 480, 210, isOverkill);
+    if (!customLoaded) {
+      drawSephirothSprite(ctx, 480, 210, isOverkill);
+    }
 
     // Dark Vignette Frame
     const frameGrad = ctx.createRadialGradient(400, 210, 200, 400, 210, 420);
     frameGrad.addColorStop(0, 'rgba(0,0,0,0)');
-    frameGrad.addColorStop(1, 'rgba(0,0,0,0.75)');
+    frameGrad.addColorStop(1, 'rgba(0,0,0,0.8)');
     ctx.fillStyle = frameGrad;
     ctx.fillRect(0, 0, width, height);
 
-    // Left Glitch Title Accent
+    // Left Title Text (No emoji to prevent Linux Node Canvas font failure)
     ctx.fillStyle = isOverkill ? '#ef4444' : '#38bdf8';
     ctx.font = 'bold 24px sans-serif';
-    ctx.fillText('⚡ SYSTEM ANOMALY DETECTED', 35, 60);
+    ctx.fillText('SYSTEM ANOMALY DETECTED', 35, 60);
 
     ctx.fillStyle = '#f8fafc';
     ctx.font = 'bold 30px sans-serif';
@@ -307,7 +371,6 @@ async function renderBossImage(data) {
   }
 
   // ─── PHASE B: COMBAT ARENA VIEW (Chibi Heroes vs Glitched Boss) ─────────────
-  // Left Side: Three Chibi Pixel Heroes Lined Up Facing Boss
   const heroPositions = [
     { label: 'M.O.M.', draw: drawMomSprite, x: 80, y: 150 },
     { label: 'D.A.D.', draw: drawDadSprite, x: 180, y: 220 },
@@ -315,7 +378,6 @@ async function renderBossImage(data) {
   ];
 
   heroPositions.forEach((hero) => {
-    // Spotlight pedestal under hero
     ctx.fillStyle = 'rgba(30, 41, 59, 0.6)';
     ctx.beginPath();
     ctx.ellipse(hero.x, hero.y + 25, 32, 10, 0, 0, Math.PI * 2);
@@ -326,10 +388,10 @@ async function renderBossImage(data) {
     hero.draw(ctx, hero.x, hero.y);
   });
 
-  // Right Side: Glitched Boss Entity
-  drawGlitchedBossEntity(ctx, 580, 210, isOverkill);
+  if (!customLoaded) {
+    drawSephirothSprite(ctx, 580, 210, isOverkill);
+  }
 
-  // Action Line at Bottom
   if (lastAction) {
     ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
     drawRoundedRect(ctx, 20, 365, width - 40, 38, 8);
@@ -337,9 +399,11 @@ async function renderBossImage(data) {
     ctx.strokeStyle = isOverkill ? 'rgba(239, 68, 68, 0.4)' : 'rgba(99, 102, 241, 0.4)';
     ctx.stroke();
 
+    // Clean text without emoji unicode issue
+    const cleanLastAction = lastAction.replace(/[^\x00-\x7F]/g, '');
     ctx.fillStyle = '#f1f5f9';
     ctx.font = 'bold 13px sans-serif';
-    ctx.fillText(`⚡ ${lastAction}`, 35, 389);
+    ctx.fillText(`ACTION: ${cleanLastAction || lastAction}`, 35, 389);
   }
 
   return canvas.toBuffer('image/png');
