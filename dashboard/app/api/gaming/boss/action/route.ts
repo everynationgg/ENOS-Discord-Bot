@@ -22,24 +22,33 @@ function getWeekIdentifier(date = new Date()) {
 
 async function postBossCardToDiscord(guildId: string, boss: any) {
   const token = process.env.DISCORD_TOKEN || process.env.DISCORD_BOT_TOKEN;
-  if (!token) return;
+  if (!token) {
+    console.error('[BOSS POST] DISCORD_TOKEN is missing!');
+    return;
+  }
 
-  const { data: featureRow } = await supabaseAdmin
+  // Fetch channel ID for weekly_boss
+  const { data: featureRows } = await supabaseAdmin
     .from('guild_config')
-    .select('config')
-    .eq('guild_id', guildId)
-    .eq('feature_key', 'weekly_boss')
-    .maybeSingle();
+    .select('config, guild_id')
+    .eq('feature_key', 'weekly_boss');
 
-  const channelId = featureRow?.config?.channel_id;
-  if (!channelId) return;
+  let channelId: string | null = null;
+  if (featureRows && featureRows.length > 0) {
+    const matched = featureRows.find((r: any) => r.guild_id === guildId) || featureRows[0];
+    channelId = matched?.config?.channel_id || null;
+  }
+
+  if (!channelId) {
+    console.error('[BOSS POST] Channel ID not configured for weekly_boss!');
+    return;
+  }
 
   const currentWeek = boss.week_identifier;
 
   const { data: allPlayers } = await supabaseAdmin
     .from('boss_player_states')
     .select('class_key')
-    .eq('guild_id', guildId)
     .eq('week_identifier', currentWeek);
 
   const classCounts = { mom: 0, dad: 0, kid: 0 };
@@ -142,68 +151,109 @@ export async function POST(req: NextRequest) {
     const currentWeek = getWeekIdentifier();
 
     if (action === 'spawn') {
-      const charName = customName ? customName.trim() : 'Corrupted Anomaly';
-      const gameLabel = gameName ? gameName.trim() : 'Gaming Realm';
+      const charName = customName && customName.trim() ? customName.trim() : 'Corrupted Anomaly';
+      const gameLabel = gameName && gameName.trim() ? gameName.trim() : 'Gaming Realm';
 
-      const bossName = `ERROR-MOD: Corrupted ${charName}`;
+      const bossName = charName.startsWith('ERROR-MOD:') ? charName : `ERROR-MOD: Corrupted ${charName}`;
       const bossTitle = `System Threat (${gameLabel})`;
       const lore = `A space-time realm rift merged ${gameLabel} data with ENOS core protocols. ${charName} has manifested in the server! Coordinate your triad skills to neutralize!`;
       const hp = customHp ? parseInt(customHp, 10) : 150000;
 
-      await supabaseAdmin
+      // Check for existing active boss row for current week
+      const { data: existingBoss } = await supabaseAdmin
         .from('boss_seasons')
-        .delete()
-        .eq('guild_id', guildId)
+        .select('*')
         .eq('week_identifier', currentWeek)
-        .eq('is_overkill', false);
+        .eq('is_overkill', false)
+        .maybeSingle();
 
-      const { data: newBoss, error } = await supabaseAdmin
-        .from('boss_seasons')
-        .insert({
-          guild_id: guildId,
-          week_identifier: currentWeek,
-          boss_name: bossName,
-          boss_title: bossTitle,
-          lore,
-          max_hp: hp,
-          current_hp: hp,
-          is_overkill: false,
-          is_defeated: false,
-          mom_buff: false,
-          dad_debuff: false,
-          custom_image_url: customImageUrl || null,
-          last_action: '⚡ Admin force spawned a new Weekly Boss!',
-        })
-        .select()
-        .single();
+      let activeBoss: any = null;
+      if (existingBoss) {
+        // Update existing row
+        const { data: updated, error: updErr } = await supabaseAdmin
+          .from('boss_seasons')
+          .update({
+            boss_name: bossName,
+            boss_title: bossTitle,
+            lore,
+            max_hp: hp,
+            current_hp: hp,
+            is_defeated: false,
+            mom_buff: false,
+            dad_debuff: false,
+            custom_image_url: customImageUrl || null,
+            last_action: '⚡ Admin force spawned a new Weekly Boss!',
+          })
+          .eq('id', existingBoss.id)
+          .select()
+          .single();
 
-      if (error) {
-        return NextResponse.json({ error: error.message }, { status: 500 });
+        if (updErr) {
+          return NextResponse.json({ error: updErr.message }, { status: 500 });
+        }
+        activeBoss = updated;
+      } else {
+        // Insert new row
+        const { data: inserted, error: insErr } = await supabaseAdmin
+          .from('boss_seasons')
+          .insert({
+            guild_id: guildId,
+            week_identifier: currentWeek,
+            boss_name: bossName,
+            boss_title: bossTitle,
+            lore,
+            max_hp: hp,
+            current_hp: hp,
+            is_overkill: false,
+            is_defeated: false,
+            mom_buff: false,
+            dad_debuff: false,
+            custom_image_url: customImageUrl || null,
+            last_action: '⚡ Admin force spawned a new Weekly Boss!',
+          })
+          .select()
+          .single();
+
+        if (insErr) {
+          return NextResponse.json({ error: insErr.message }, { status: 500 });
+        }
+        activeBoss = inserted;
       }
 
-      await postBossCardToDiscord(guildId, newBoss);
+      const targetGuildId = activeBoss.guild_id || guildId;
+      await postBossCardToDiscord(targetGuildId, activeBoss);
 
-      return NextResponse.json({ success: true, action: 'spawn', boss: newBoss });
+      return NextResponse.json({ success: true, action: 'spawn', boss: activeBoss });
     }
 
     if (action === 'update_image') {
+      const { data: existingBoss } = await supabaseAdmin
+        .from('boss_seasons')
+        .select('*')
+        .eq('week_identifier', currentWeek)
+        .eq('is_overkill', false)
+        .maybeSingle();
+
+      if (!existingBoss) {
+        return NextResponse.json({ error: 'No active boss season found to update' }, { status: 400 });
+      }
+
       const { data: updatedBoss, error } = await supabaseAdmin
         .from('boss_seasons')
         .update({
           custom_image_url: customImageUrl || null,
           last_action: '🎨 Boss Artwork updated from Admin Dashboard!',
         })
-        .eq('guild_id', guildId)
-        .eq('week_identifier', currentWeek)
-        .eq('is_overkill', false)
+        .eq('id', existingBoss.id)
         .select()
         .single();
 
       if (error || !updatedBoss) {
-        return NextResponse.json({ error: error?.message || 'No active boss season found to update' }, { status: 500 });
+        return NextResponse.json({ error: error?.message || 'Failed to update boss image' }, { status: 500 });
       }
 
-      await postBossCardToDiscord(guildId, updatedBoss);
+      const targetGuildId = updatedBoss.guild_id || guildId;
+      await postBossCardToDiscord(targetGuildId, updatedBoss);
 
       return NextResponse.json({ success: true, action: 'update_image', boss: updatedBoss });
     }
@@ -212,13 +262,11 @@ export async function POST(req: NextRequest) {
       await supabaseAdmin
         .from('boss_seasons')
         .update({ is_defeated: true, current_hp: 0 })
-        .eq('guild_id', guildId)
         .eq('week_identifier', currentWeek);
 
       await supabaseAdmin
         .from('boss_player_states')
         .update({ ap_remaining: 5, is_locked: false })
-        .eq('guild_id', guildId)
         .eq('week_identifier', currentWeek);
 
       return NextResponse.json({ success: true, action: 'end' });
@@ -228,7 +276,6 @@ export async function POST(req: NextRequest) {
       const { data: currentBoss } = await supabaseAdmin
         .from('boss_seasons')
         .select('*')
-        .eq('guild_id', guildId)
         .eq('week_identifier', currentWeek)
         .eq('is_overkill', false)
         .maybeSingle();
@@ -246,7 +293,7 @@ export async function POST(req: NextRequest) {
       const { data: overkillBoss, error: okErr } = await supabaseAdmin
         .from('boss_seasons')
         .insert({
-          guild_id: guildId,
+          guild_id: currentBoss.guild_id || guildId,
           week_identifier: currentWeek,
           boss_name: `[OVERKILL] ${currentBoss.boss_name}`,
           boss_title: `${currentBoss.boss_title} (Unbound)`,
@@ -267,7 +314,8 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: okErr.message }, { status: 500 });
       }
 
-      await postBossCardToDiscord(guildId, overkillBoss);
+      const targetGuildId = overkillBoss.guild_id || guildId;
+      await postBossCardToDiscord(targetGuildId, overkillBoss);
 
       return NextResponse.json({ success: true, action: 'overkill', boss: overkillBoss });
     }
