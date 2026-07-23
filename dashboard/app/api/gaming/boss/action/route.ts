@@ -61,6 +61,12 @@ async function postBossCardToDiscord(guildId: string, boss: any) {
     }
   });
 
+  const classImageUrls = {
+    mom: featureRows?.[0]?.config?.mom_image_url || null,
+    dad: featureRows?.[0]?.config?.dad_image_url || null,
+    kid: featureRows?.[0]?.config?.kid_image_url || null,
+  };
+
   let imageBuffer: Buffer | null = null;
   try {
     imageBuffer = await renderBossImage({
@@ -68,6 +74,7 @@ async function postBossCardToDiscord(guildId: string, boss: any) {
       bossTitle: boss.boss_title,
       customImageUrl: boss.custom_image_url,
       customBgUrl: boss.custom_bg_url,
+      classImageUrls,
       currentHp: Number(boss.current_hp),
       maxHp: Number(boss.max_hp),
       isOverkill: boss.is_overkill,

@@ -728,6 +728,9 @@ export default function GamingPage() {
                     const [baseHP, setBaseHP] = useState<string>(config.override_hp || '');
                     const [imageUrl, setImageUrl] = useState<string>(config.custom_image_url || '');
                     const [bgUrl, setBgUrl] = useState<string>(config.custom_bg_url || '');
+                    const [momImageUrl, setMomImageUrl] = useState<string>(config.mom_image_url || '');
+                    const [dadImageUrl, setDadImageUrl] = useState<string>(config.dad_image_url || '');
+                    const [kidImageUrl, setKidImageUrl] = useState<string>(config.kid_image_url || '');
 
                     return (
                       <>
@@ -807,20 +810,20 @@ export default function GamingPage() {
                           <span className="form-hint">Leave blank for automatic player-scaled HP</span>
                         </div>
 
-                        {/* Dual Layer Image Section */}
+                        {/* Boss & Background Image Section */}
                         <div className="section-divider">
                           <div className="section-divider-line" />
-                          <span className="section-divider-text">🖼️ Boss Artwork & Layering</span>
+                          <span className="section-divider-text">🖼️ Boss Artwork & Environment</span>
                           <div className="section-divider-line" />
                         </div>
 
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
                           <div className="form-group">
-                            <label className="form-label">🧌 Boss Character Image (Transparent PNG recommended)</label>
+                            <label className="form-label">🧌 Boss Artwork Image URL (Displayed on Spawn & Combat)</label>
                             <input
                               id="boss-image-url"
                               className="form-input"
-                              placeholder="https://.../boss_character.png"
+                              placeholder="https://.../boss_environment_art.png"
                               value={imageUrl}
                               onChange={(e) => {
                                 let val = e.target.value.trim();
@@ -829,7 +832,7 @@ export default function GamingPage() {
                               }}
                             />
                             <span className="form-hint">
-                              Layer 2: Boss character art <em>(Transparent PNG layers on top of background!)</em>
+                              Full boss artwork image. Displayed ONLY on initial spawn, and on the right side during combat.
                             </span>
                           </div>
 
@@ -847,8 +850,65 @@ export default function GamingPage() {
                               }}
                             />
                             <span className="form-hint">
-                              Layer 1: Custom background landscape/arena image
+                              Optional custom background landscape/arena image
                             </span>
+                          </div>
+                        </div>
+
+                        {/* Player Class Custom Images */}
+                        <div className="section-divider">
+                          <div className="section-divider-line" />
+                          <span className="section-divider-text">🎭 Player Class Character Images (Transparent PNGs)</span>
+                          <div className="section-divider-line" />
+                        </div>
+
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.75rem' }}>
+                          <div className="form-group">
+                            <label className="form-label">🛡️ M.O.M. Class Image</label>
+                            <input
+                              id="boss-mom-image-url"
+                              className="form-input"
+                              placeholder="https://.../mom_character.png"
+                              value={momImageUrl}
+                              onChange={(e) => {
+                                let val = e.target.value.trim();
+                                setMomImageUrl(val);
+                                setConfig('mom_image_url', val);
+                              }}
+                            />
+                            <span className="form-hint">Placed on left side when M.O.M. class is selected</span>
+                          </div>
+
+                          <div className="form-group">
+                            <label className="form-label">🔨 D.A.D. Class Image</label>
+                            <input
+                              id="boss-dad-image-url"
+                              className="form-input"
+                              placeholder="https://.../dad_character.png"
+                              value={dadImageUrl}
+                              onChange={(e) => {
+                                let val = e.target.value.trim();
+                                setDadImageUrl(val);
+                                setConfig('dad_image_url', val);
+                              }}
+                            />
+                            <span className="form-hint">Placed on left side when D.A.D. class is selected</span>
+                          </div>
+
+                          <div className="form-group">
+                            <label className="form-label">⚡ K.I.D. Class Image</label>
+                            <input
+                              id="boss-kid-image-url"
+                              className="form-input"
+                              placeholder="https://.../kid_character.png"
+                              value={kidImageUrl}
+                              onChange={(e) => {
+                                let val = e.target.value.trim();
+                                setKidImageUrl(val);
+                                setConfig('kid_image_url', val);
+                              }}
+                            />
+                            <span className="form-hint">Placed on left side when K.I.D. class is selected</span>
                           </div>
                         </div>
 

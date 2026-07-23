@@ -75,7 +75,19 @@ async function buildBossEmbedPayload(guildId, userId) {
     }
   });
 
-  // Render Canvas Buffer
+  const { data: featureRow } = await supabase
+    .from('guild_config')
+    .select('config')
+    .eq('guild_id', guildId)
+    .eq('feature_key', 'weekly_boss')
+    .maybeSingle();
+
+  const classImageUrls = {
+    mom: featureRow?.config?.mom_image_url || null,
+    dad: featureRow?.config?.dad_image_url || null,
+    kid: featureRow?.config?.kid_image_url || null,
+  };
+
   const isFreshSpawn = !playerState?.class_key && (boss.last_action?.includes('Spawned') || boss.last_action?.includes('spawned'));
   const viewMode = isFreshSpawn ? 'spawn' : 'combat';
 
@@ -84,6 +96,8 @@ async function buildBossEmbedPayload(guildId, userId) {
     bossTitle: boss.boss_title,
     customImageUrl: boss.custom_image_url,
     customBgUrl: boss.custom_bg_url,
+    userClassKey: playerState?.class_key || null,
+    classImageUrls,
     currentHp: Number(boss.current_hp),
     maxHp: Number(boss.max_hp),
     isOverkill: boss.is_overkill,

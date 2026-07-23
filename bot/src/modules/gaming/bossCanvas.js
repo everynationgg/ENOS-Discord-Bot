@@ -1,233 +1,42 @@
 const { createCanvas, loadImage } = require('@napi-rs/canvas');
+const logger = require('../../lib/logger');
 
-function drawRoundedRect(ctx, x, y, width, height, radius) {
-  ctx.beginPath();
-  ctx.moveTo(x + radius, y);
-  ctx.lineTo(x + width - radius, y);
-  ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
-  ctx.lineTo(x + width, y + height - radius);
-  ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
-  ctx.lineTo(x + radius, y + height);
-  ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
-  ctx.lineTo(x, y + radius);
-  ctx.quadraticCurveTo(x, y, x + radius, y);
-  ctx.closePath();
-}
+async function resolveDirectImageUrl(url) {
+  if (!url || typeof url !== 'string' || !url.startsWith('http')) return url;
+  if (/\.(png|jpg|jpeg|gif|webp)(\?.*)?$/i.test(url)) return url;
 
-/**
- * Draws pixel-art M.O.M. avatar (Straw hat, blue ribbon, purple dress, red slipper)
- */
-function drawMomSprite(ctx, cx, cy) {
-  ctx.save();
-  ctx.fillStyle = '#0f172a';
-  ctx.beginPath();
-  ctx.arc(cx, cy, 22, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.strokeStyle = '#38bdf8';
-  ctx.lineWidth = 2;
-  ctx.stroke();
-
-  // Wavy Brown Hair
-  ctx.fillStyle = '#65350f';
-  ctx.fillRect(cx - 12, cy - 8, 24, 20);
-
-  // Face
-  ctx.fillStyle = '#fbcfe8';
-  ctx.fillRect(cx - 8, cy - 10, 16, 14);
-
-  // Angry Brows & Eyes
-  ctx.fillStyle = '#1e1b4b';
-  ctx.fillRect(cx - 6, cy - 7, 5, 3);
-  ctx.fillRect(cx + 1, cy - 7, 5, 3);
-
-  // Purple Dress
-  ctx.fillStyle = '#c084fc';
-  ctx.fillRect(cx - 8, cy + 4, 16, 14);
-
-  // Green Sash Belt
-  ctx.fillStyle = '#22c55e';
-  ctx.fillRect(cx - 8, cy + 7, 16, 3);
-
-  // Straw Hat
-  ctx.fillStyle = '#fde047';
-  ctx.fillRect(cx - 15, cy - 16, 30, 5);
-  ctx.fillRect(cx - 10, cy - 21, 20, 6);
-
-  // Blue Hat Ribbon
-  ctx.fillStyle = '#3b82f6';
-  ctx.fillRect(cx - 10, cy - 16, 20, 2);
-
-  // Red Slipper (Weapon)
-  ctx.fillStyle = '#ef4444';
-  ctx.fillRect(cx + 9, cy - 5, 6, 10);
-  ctx.fillStyle = '#dc2626';
-  ctx.fillRect(cx + 10, cy - 3, 5, 5);
-
-  ctx.restore();
-}
-
-/**
- * Draws pixel-art D.A.D. avatar (Blonde mustache, flannel shirt, jeans, tools)
- */
-function drawDadSprite(ctx, cx, cy) {
-  ctx.save();
-  ctx.fillStyle = '#0f172a';
-  ctx.beginPath();
-  ctx.arc(cx, cy, 22, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.strokeStyle = '#f59e0b';
-  ctx.lineWidth = 2;
-  ctx.stroke();
-
-  // Face
-  ctx.fillStyle = '#fde68a';
-  ctx.fillRect(cx - 8, cy - 10, 16, 14);
-
-  // Blonde Hair
-  ctx.fillStyle = '#facc15';
-  ctx.fillRect(cx - 10, cy - 17, 20, 8);
-
-  // Eyes
-  ctx.fillStyle = '#1e3a8a';
-  ctx.fillRect(cx - 6, cy - 6, 4, 3);
-  ctx.fillRect(cx + 2, cy - 6, 4, 3);
-
-  // Thick Blonde Mustache
-  ctx.fillStyle = '#eab308';
-  ctx.fillRect(cx - 7, cy - 1, 14, 5);
-
-  // Plaid Flannel Shirt
-  ctx.fillStyle = '#2563eb';
-  ctx.fillRect(cx - 8, cy + 4, 16, 10);
-  ctx.fillStyle = '#78350f';
-  ctx.fillRect(cx - 5, cy + 4, 3, 10);
-  ctx.fillRect(cx + 2, cy + 4, 3, 10);
-
-  // Blue Jeans
-  ctx.fillStyle = '#1d4ed8';
-  ctx.fillRect(cx - 7, cy + 14, 14, 5);
-
-  // Red Screwdriver Tool
-  ctx.fillStyle = '#ef4444';
-  ctx.fillRect(cx + 9, cy, 4, 9);
-  ctx.fillStyle = '#94a3b8';
-  ctx.fillRect(cx + 10, cy + 9, 2, 5);
-
-  ctx.restore();
-}
-
-/**
- * Draws pixel-art K.I.D. avatar (Propeller hat, purple EN shirt, iPad tablet)
- */
-function drawKidSprite(ctx, cx, cy) {
-  ctx.save();
-  ctx.fillStyle = '#0f172a';
-  ctx.beginPath();
-  ctx.arc(cx, cy, 22, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.strokeStyle = '#ec4899';
-  ctx.lineWidth = 2;
-  ctx.stroke();
-
-  // Face
-  ctx.fillStyle = '#fed7aa';
-  ctx.fillRect(cx - 8, cy - 9, 16, 13);
-
-  // Brown Hair
-  ctx.fillStyle = '#78350f';
-  ctx.fillRect(cx - 9, cy - 13, 18, 6);
-
-  // Red Propeller Hat (Backward)
-  ctx.fillStyle = '#ef4444';
-  ctx.fillRect(cx - 10, cy - 16, 20, 6);
-
-  // Spinning Yellow Propeller
-  ctx.fillStyle = '#facc15';
-  ctx.fillRect(cx - 1, cy - 21, 2, 5);
-  ctx.fillRect(cx - 8, cy - 22, 16, 2);
-
-  // Angry Eyes focusing on iPad
-  ctx.fillStyle = '#1e1b4b';
-  ctx.fillRect(cx - 6, cy - 5, 4, 3);
-  ctx.fillRect(cx + 2, cy - 5, 4, 3);
-
-  // Purple & Yellow Shirt
-  ctx.fillStyle = '#a855f7';
-  ctx.fillRect(cx - 8, cy + 4, 16, 10);
-  ctx.fillStyle = '#eab308';
-  ctx.fillRect(cx - 8, cy + 4, 6, 10);
-
-  // Glowing iPad Tablet
-  ctx.fillStyle = '#cbd5e1';
-  ctx.fillRect(cx - 6, cy + 8, 12, 10);
-  ctx.fillStyle = '#38bdf8';
-  ctx.fillRect(cx - 5, cy + 9, 10, 8);
-
-  ctx.restore();
-}
-
-/**
- * Draws High-Tech Corrupted Cyberspace Glitch Emblem (Fallback when no image URL set)
- */
-function drawGlitchedBossEntity(ctx, cx, cy, isOverkill) {
-  ctx.save();
-
-  // 1. Digital Glitch Energy Glow
-  const glowGrad = ctx.createRadialGradient(cx, cy, 20, cx, cy, 140);
-  if (isOverkill) {
-    glowGrad.addColorStop(0, 'rgba(239, 68, 68, 0.6)');
-    glowGrad.addColorStop(0.5, 'rgba(185, 28, 28, 0.2)');
-    glowGrad.addColorStop(1, 'rgba(0,0,0,0)');
-  } else {
-    glowGrad.addColorStop(0, 'rgba(168, 85, 247, 0.6)');
-    glowGrad.addColorStop(0.5, 'rgba(56, 189, 248, 0.2)');
-    glowGrad.addColorStop(1, 'rgba(0,0,0,0)');
+  try {
+    const res = await fetch(url, {
+      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) ENOS-Bot/1.0' },
+    });
+    if (res.ok) {
+      const html = await res.text();
+      const ogMatch = html.match(/<meta\s+property=["']og:image["']\s+content=["']([^"']+)["']/i) ||
+                      html.match(/<meta\s+name=["']twitter:image["']\s+content=["']([^"']+)["']/i) ||
+                      html.match(/<img\s+src=["'](https:\/\/i\.ibb\.co\/[^"']+)["']/i);
+      if (ogMatch && ogMatch[1]) {
+        return ogMatch[1];
+      }
+    }
+  } catch (e) {
+    // ignore
   }
-  ctx.fillStyle = glowGrad;
-  ctx.beginPath();
-  ctx.arc(cx, cy, 140, 0, Math.PI * 2);
-  ctx.fill();
-
-  // 2. Cyber Hexagon / Matrix Core Emblem
-  ctx.strokeStyle = isOverkill ? '#ef4444' : '#a855f7';
-  ctx.lineWidth = 3;
-  ctx.beginPath();
-  for (let i = 0; i < 6; i++) {
-    const angle = (Math.PI / 3) * i;
-    const x = cx + 80 * Math.cos(angle);
-    const y = cy + 80 * Math.sin(angle);
-    if (i === 0) ctx.moveTo(x, y);
-    else ctx.lineTo(x, y);
-  }
-  ctx.closePath();
-  ctx.stroke();
-
-  // Inner Ring
-  ctx.strokeStyle = isOverkill ? '#f87171' : '#38bdf8';
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.arc(cx, cy, 55, 0, Math.PI * 2);
-  ctx.stroke();
-
-  // 3. Central Skull / Threat Icon Text
-  ctx.fillStyle = isOverkill ? '#fca5a5' : '#e0e7ff';
-  ctx.font = 'bold 22px sans-serif';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText('ANOMALY', cx, cy - 10);
-
-  ctx.fillStyle = isOverkill ? '#ef4444' : '#38bdf8';
-  ctx.font = 'bold 12px monospace';
-  ctx.fillText('UNBOUND ENTITY', cx, cy + 15);
-
-  // 4. Glitch Scanline Bars
-  ctx.fillStyle = isOverkill ? 'rgba(239, 68, 68, 0.6)' : 'rgba(56, 189, 248, 0.6)';
-  ctx.fillRect(cx - 90, cy - 30, 180, 4);
-  ctx.fillRect(cx - 60, cy + 35, 120, 5);
-
-  ctx.restore();
+  return url;
 }
 
+function drawRoundedRect(c, rx, ry, rw, rh, rad) {
+  c.beginPath();
+  c.moveTo(rx + rad, ry);
+  c.lineTo(rx + rw - rad, ry);
+  c.quadraticCurveTo(rx + rw, ry, rx + rw, ry + rad);
+  c.lineTo(rx + rw, ry + rh - rad);
+  c.quadraticCurveTo(rx + rw, ry + rh, rx + rw - rad, ry + rh);
+  c.lineTo(rx + rad, ry + rh);
+  c.quadraticCurveTo(rx, ry + rh, rx, ry + rh - rad);
+  c.lineTo(rx, ry + rad);
+  c.quadraticCurveTo(rx, ry, rx + rad, ry);
+  c.closePath();
+}
 
 /**
  * Renders the Weekly Boss graphics canvas.
@@ -242,12 +51,14 @@ async function renderBossImage(data) {
     bossName = 'ERROR-MOD: Corrupted Boss',
     customImageUrl = null,
     customBgUrl = null,
+    userClassKey = null,
+    classImageUrls = {},
     isOverkill = false,
     viewMode = 'spawn',
     lastAction = '',
   } = data;
 
-  // ─── LAYER 1: BACKGROUND (Custom Background Image or Dark Cyber Gradient) ───
+  // ─── LAYER 1: ARENA BACKGROUND ─────────────────────────────────────────────
   let customBgLoaded = false;
   if (customBgUrl && typeof customBgUrl === 'string' && customBgUrl.startsWith('http')) {
     try {
@@ -261,9 +72,7 @@ async function renderBossImage(data) {
         ctx.drawImage(bgImg, 0, 0, width, height);
         customBgLoaded = true;
       }
-    } catch (e) {
-      logger.warn(`[BOSS CANVAS] Error loading custom background buffer: ${e.message}`);
-    }
+    } catch (e) {}
   }
 
   if (!customBgLoaded) {
@@ -280,7 +89,7 @@ async function renderBossImage(data) {
     ctx.fillStyle = bgGrad;
     ctx.fillRect(0, 0, width, height);
 
-    // Subtle Scanline Grid
+    // Subtle Grid Lines
     ctx.strokeStyle = isOverkill ? 'rgba(239, 68, 68, 0.08)' : 'rgba(99, 102, 241, 0.09)';
     ctx.lineWidth = 1;
     for (let y = 0; y < height; y += 8) {
@@ -291,45 +100,33 @@ async function renderBossImage(data) {
     }
   }
 
-  // ─── LAYER 2: BOSS CHARACTER IMAGE (Transparent PNG or Banner) ─────────────
-  let customBossLoaded = false;
-  if (customImageUrl && typeof customImageUrl === 'string' && customImageUrl.startsWith('http')) {
-    try {
-      const directUrl = await resolveDirectImageUrl(customImageUrl);
-      const res = await fetch(directUrl, {
-        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) ENOS-Bot/1.0' },
-      });
-      if (res.ok) {
-        const arrayBuf = await res.arrayBuffer();
-        const bossImg = await loadImage(Buffer.from(arrayBuf));
-        if (viewMode === 'spawn') {
+  // ─── PHASE A: INITIAL BOSS SPAWN BANNER (Boss Upload Only) ─────────────────
+  if (viewMode === 'spawn') {
+    if (customImageUrl && typeof customImageUrl === 'string' && customImageUrl.startsWith('http')) {
+      try {
+        const directUrl = await resolveDirectImageUrl(customImageUrl);
+        const res = await fetch(directUrl, {
+          headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) ENOS-Bot/1.0' },
+        });
+        if (res.ok) {
+          const arrayBuf = await res.arrayBuffer();
+          const bossImg = await loadImage(Buffer.from(arrayBuf));
           if (customBgLoaded) {
-            // Drawn on top of custom background
             ctx.drawImage(bossImg, 380, 20, 380, 380);
           } else {
-            // Full-bleed if single image provided
             ctx.drawImage(bossImg, 0, 0, width, height);
           }
-        } else {
-          ctx.drawImage(bossImg, 380, 20, 380, 340);
         }
-        customBossLoaded = true;
-      }
-    } catch (e) {
-      logger.warn(`[BOSS CANVAS] Error loading boss image buffer: ${e.message}`);
+      } catch (e) {}
     }
-  }
 
-  if (viewMode === 'spawn') {
-    // ─── PHASE A: INITIAL BOSS SPAWN BANNER ──────────────────────────────────
-    // Dark Vignette Frame
+    // Dark Vignette Frame & Title Overlay
     const frameGrad = ctx.createRadialGradient(400, 210, 200, 400, 210, 420);
     frameGrad.addColorStop(0, 'rgba(0,0,0,0)');
     frameGrad.addColorStop(1, 'rgba(0,0,0,0.8)');
     ctx.fillStyle = frameGrad;
     ctx.fillRect(0, 0, width, height);
 
-    // Left Title Text
     ctx.fillStyle = isOverkill ? '#ef4444' : '#38bdf8';
     ctx.font = 'bold 24px sans-serif';
     ctx.fillText('SYSTEM ANOMALY DETECTED', 35, 60);
@@ -341,36 +138,73 @@ async function renderBossImage(data) {
     return canvas.toBuffer('image/png');
   }
 
-  // ─── PHASE B: COMBAT ARENA VIEW (Chibi Heroes vs Glitched Boss) ─────────────
-  const heroPositions = [
-    { label: 'M.O.M.', draw: drawMomSprite, x: 80, y: 150 },
-    { label: 'D.A.D.', draw: drawDadSprite, x: 180, y: 220 },
-    { label: 'K.I.D.', draw: drawKidSprite, x: 280, y: 290 },
-  ];
+  // ─── PHASE B: COMBAT ARENA VIEW (Selected Class PNG vs Boss Upload PNG) ────
 
-  heroPositions.forEach((hero) => {
-    ctx.fillStyle = 'rgba(30, 41, 59, 0.6)';
-    ctx.beginPath();
-    ctx.ellipse(hero.x, hero.y + 25, 32, 10, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.strokeStyle = 'rgba(148, 163, 184, 0.3)';
-    ctx.stroke();
-
-    hero.draw(ctx, hero.x, hero.y);
-  });
-
-  if (!customLoaded) {
-    drawGlitchedBossEntity(ctx, 580, 210, isOverkill);
+  // 1. Draw Boss Image on Right Side
+  if (customImageUrl && typeof customImageUrl === 'string' && customImageUrl.startsWith('http')) {
+    try {
+      const directUrl = await resolveDirectImageUrl(customImageUrl);
+      const res = await fetch(directUrl, {
+        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) ENOS-Bot/1.0' },
+      });
+      if (res.ok) {
+        const arrayBuf = await res.arrayBuffer();
+        const bossImg = await loadImage(Buffer.from(arrayBuf));
+        ctx.drawImage(bossImg, 400, 20, 380, 330);
+      }
+    } catch (e) {}
   }
 
+  // 2. Draw Selected Class Character Image on Left Side
+  const activeClass = userClassKey || 'mom';
+  const targetClassUrl = classImageUrls[activeClass] || classImageUrls.mom || classImageUrls.dad || classImageUrls.kid;
+
+  let classLoaded = false;
+  if (targetClassUrl && typeof targetClassUrl === 'string' && targetClassUrl.startsWith('http')) {
+    try {
+      const directClassUrl = await resolveDirectImageUrl(targetClassUrl);
+      const res = await fetch(directClassUrl, {
+        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) ENOS-Bot/1.0' },
+      });
+      if (res.ok) {
+        const arrayBuf = await res.arrayBuffer();
+        const classImg = await loadImage(Buffer.from(arrayBuf));
+        // Draw transparent class character PNG on left side opposite the boss
+        ctx.drawImage(classImg, 20, 30, 340, 320);
+        classLoaded = true;
+      }
+    } catch (e) {}
+  }
+
+  if (!classLoaded) {
+    // Sleek Class Badge Frame if no custom class image uploaded yet
+    ctx.fillStyle = 'rgba(15, 23, 42, 0.7)';
+    drawRoundedRect(ctx, 30, 60, 320, 260, 12);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(99, 102, 241, 0.3)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    const classTitles = { mom: '🛡️ M.O.M. COMBAT TRIAD', dad: '🔨 D.A.D. COMBAT TRIAD', kid: '⚡ K.I.D. COMBAT TRIAD' };
+    ctx.fillStyle = '#38bdf8';
+    ctx.font = 'bold 20px sans-serif';
+    ctx.fillText(classTitles[activeClass] || 'COMBAT TRIAD', 50, 110);
+
+    ctx.fillStyle = '#94a3b8';
+    ctx.font = '14px sans-serif';
+    ctx.fillText('Class Engaged in Battle', 50, 140);
+    ctx.fillText('Upload custom class PNG in Admin Panel!', 50, 170);
+  }
+
+  // 3. Action Log Footer Bar
   if (lastAction) {
     ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
     drawRoundedRect(ctx, 20, 365, width - 40, 38, 8);
     ctx.fill();
     ctx.strokeStyle = isOverkill ? 'rgba(239, 68, 68, 0.4)' : 'rgba(99, 102, 241, 0.4)';
+    ctx.lineWidth = 1;
     ctx.stroke();
 
-    // Clean text without emoji unicode issue
     const cleanLastAction = lastAction.replace(/[^\x00-\x7F]/g, '');
     ctx.fillStyle = '#f1f5f9';
     ctx.font = 'bold 13px sans-serif';
