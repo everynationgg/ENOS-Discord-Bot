@@ -93,11 +93,11 @@ async function buildBossEmbedPayload(guildId, userId) {
     classCounts,
   });
 
-  const attachment = new AttachmentBuilder(buffer, { name: 'weekly_boss_arena.png' });
-
   // Class Names & Descriptions
   const classNames = { mom: '🛡️ M.O.M. (Buff Support)', dad: '🔨 D.A.D. (Debuff Setup)', kid: '⚡ K.I.D. (Nuke Combo)' };
   const userClassStr = playerState?.class_key ? classNames[playerState.class_key] : '*No class selected (Click button below to join)*';
+
+  const embedImage = boss.custom_image_url || 'attachment://weekly_boss_arena.png';
 
   const embed = new EmbedBuilder()
     .setColor(boss.is_overkill ? 0xEF4444 : 0x6366F1)
@@ -109,12 +109,17 @@ async function buildBossEmbedPayload(guildId, userId) {
       `🔨 **D.A.D. Debuff**: ${boss.dad_debuff ? '✅ **ACTIVE** (Ready for Nuke)' : '❌ Inactive'}\n\n` +
       `👤 **Your Status**: ${userClassStr} | **AP Remaining**: \`${playerState?.ap_remaining ?? 5}/5 AP\` ${playerState?.is_locked ? '*(Locked for week)*' : '*(Can swap class)*'}`
     )
-    .setImage('attachment://weekly_boss_arena.png')
+    .setImage(embedImage)
     .setFooter({ text: `ENOS Weekly RPG System • Week ${currentWeek}` })
     .setTimestamp();
 
   const components = await buildBossActionRows(guildId, userId);
 
+  if (boss.custom_image_url) {
+    return { embeds: [embed], components };
+  }
+
+  const attachment = new AttachmentBuilder(buffer, { name: 'weekly_boss_arena.png' });
   return { embeds: [embed], files: [attachment], components };
 }
 

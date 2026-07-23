@@ -281,19 +281,24 @@ async function renderBossImage(data) {
     }
   }
 
-  // Draw Boss Image / Sprite
   let customLoaded = false;
-  if (customImageUrl) {
+  if (customImageUrl && typeof customImageUrl === 'string' && customImageUrl.startsWith('http')) {
     try {
-      const img = await loadImage(customImageUrl);
-      if (viewMode === 'spawn') {
-        ctx.drawImage(img, 250, 40, 340, 340);
-      } else {
-        ctx.drawImage(img, 450, 50, 300, 300);
+      const res = await fetch(customImageUrl, {
+        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) ENOS-Bot/1.0' },
+      });
+      if (res.ok) {
+        const arrayBuf = await res.arrayBuffer();
+        const img = await loadImage(Buffer.from(arrayBuf));
+        if (viewMode === 'spawn') {
+          ctx.drawImage(img, 250, 40, 340, 340);
+        } else {
+          ctx.drawImage(img, 450, 50, 300, 300);
+        }
+        customLoaded = true;
       }
-      customLoaded = true;
     } catch (e) {
-      // fallback to Sephiroth sprite
+      // fallback to emblem
     }
   }
 
