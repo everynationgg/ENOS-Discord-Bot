@@ -10,6 +10,7 @@ const { resetDailyQuests } = require('../modules/gaming/vault');
 const { expireOldLFGSessions } = require('../modules/gaming/lfg');
 const { loadBirthdayQueue, dispatchBirthdays } = require('../modules/social/birthdays');
 const { checkAndProcessTrivia } = require('../modules/gaming/trivia');
+const { processPendingBossSpawns } = require('../modules/gaming/bossSpawn');
 
 /**
  * Initializes all scheduled cron jobs.
@@ -168,6 +169,15 @@ function initCrons(client) {
       await checkAndProcessTrivia(client);
     } catch (err) {
       logger.error('[CRON] Trivia check failed:', err.message);
+    }
+  });
+
+  // ─── Boss Spawn Processor: Every 60 seconds — picks up PENDING image jobs ─────
+  cron.schedule('* * * * *', async () => {
+    try {
+      await processPendingBossSpawns(client);
+    } catch (err) {
+      logger.error('[CRON] Boss spawn processor failed:', err.message);
     }
   });
 

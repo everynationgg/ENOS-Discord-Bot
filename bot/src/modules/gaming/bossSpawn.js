@@ -1,7 +1,7 @@
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, AttachmentBuilder } = require('discord.js');
 const { supabase } = require('../../lib/supabase');
 const logger = require('../../lib/logger');
-const { getOrCreateActiveBoss, getWeekIdentifier, generateGlitchBossLore, generateBossImage, forceCreateBoss } = require('./boss');
+const { getWeekIdentifier, generateGlitchBossLore, generateBossImage } = require('./boss');
 const { renderBossImage } = require('./bossCanvas');
 
 /**
@@ -171,4 +171,46 @@ function buildHpBar(pct) {
   return '🟩'.repeat(filled) + '⬛'.repeat(empty);
 }
 
-module.exports = { spawnBossForGuild, postBossCard };
+/**
+ * Cron-driven processor: finds boss_seasons rows with custom_image_url = 'PENDING',
+ * generates the AI image on Fly.io (no timeout), updates the DB, and posts the Discord card.
+ * Runs every 60 seconds via the bot cron system.
+ */
+async function processPendingBossSpawns(client) {
+  const { data: pendingBosses } = await supabase
+    .from('boss_seasons')
+    .select('*')
+    .eq('custom_image_url', 'PENDING')
+    .eq('is_defeated', false);
+
+  if (!pendingBosses || pendingBosses.length === 0) return;
+
+  for (const boss of pendingBosses) {
+    logger.info(`[BOSS SPAWN] Processing PENDING boss: ${boss.boss_name} (guild: ${boss.guild_id})`);
+
+    try {
+      // Generate image on Fly.io — no timeout constraints
+      const imageUrl = await generateBossImage(boss.boss_name);
+
+      // Update DB with real image URL (or null if generation failed)
+      await supabase
+        .from('boss_seasons')
+        .update({ custom_image_url: imageUrl || null })
+        .eq('id', boss.id);
+
+      const updatedBoss = { ...boss, custom_image_url: imageUrl || null };
+
+      // Post the Discord card
+      await postBossCard(client, boss.guild_id, updatedBoss);
+    } catch (e) {
+      logger.error(`[BOSS SPAWN] Failed to process pending boss ${boss.id}:`, e.message);
+      // Clear PENDING so it doesn't get stuck in an infinite retry loop
+      await supabase
+        .from('boss_seasons')
+        .update({ custom_image_url: null })
+        .eq('id', boss.id);
+    }
+  }
+}
+
+module.exports = { spawnBossForGuild, postBossCard, processPendingBossSpawns };

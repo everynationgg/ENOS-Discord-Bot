@@ -9,24 +9,6 @@ primary_region = "ams"
 [env]
   NODE_ENV = "production"
   BOT_TIMEZONE = "Asia/Manila"
-  ADMIN_HTTP_PORT = "4080"
 
-[[services]]
-  internal_port = 4080
-  protocol = "tcp"
-  auto_stop_machines = false
-  auto_start_machines = true
-
-  [[services.ports]]
-    handlers = ["http"]
-    port = 80
-
-  [[services.ports]]
-    handlers = ["tls", "http"]
-    port = 443
-
-  [services.http_checks]
-    interval = "30s"
-    timeout = "5s"
-    path = "/health"
-    grace_period = "10s"
+# A Discord bot operates on outbound gateway connections only.
+# No internal HTTP service, ports, or scaling triggers are required.

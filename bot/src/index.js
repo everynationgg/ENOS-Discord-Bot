@@ -3,7 +3,6 @@ const { Client, GatewayIntentBits, Partials, Collection } = require('discord.js'
 const { loadEvents } = require('./lib/loader');
 const { loadCommands } = require('./lib/loader');
 const { initCrons } = require('./lib/cron');
-const { startAdminServer } = require('./lib/adminServer');
 const logger = require('./lib/logger');
 
 // ─── Client Setup ─────────────────────────────────────────────────────────────
@@ -34,8 +33,6 @@ client.cooldowns = new Collection();
   try {
     await loadCommands(client);
     await loadEvents(client);
-    // Start HTTP admin server BEFORE Discord login so Fly.io health checks pass immediately
-    startAdminServer(client);
     await client.login(process.env.DISCORD_TOKEN);
     logger.info('Bot login sequence initiated.');
   } catch (err) {
