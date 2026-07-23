@@ -244,7 +244,9 @@ module.exports = {
       await interaction.deferUpdate();
       const res = await setPlayerClass(guildId, userId, classKey);
       if (!res.success) {
-        return interaction.followUp({ content: res.message, ephemeral: true });
+        const msg = await interaction.followUp({ content: res.message, ephemeral: true });
+        setTimeout(() => msg.delete().catch(() => {}), 5000);
+        return;
       }
 
       const payload = await buildBossEmbedPayload(guildId, userId);
@@ -271,7 +273,9 @@ module.exports = {
 
       const res = await executeCombatAction(guildId, userId, actionType);
       if (!res.success) {
-        return interaction.followUp({ content: res.message, ephemeral: true });
+        const msg = await interaction.followUp({ content: res.message, ephemeral: true });
+        setTimeout(() => msg.delete().catch(() => {}), 5000);
+        return;
       }
 
       const payload = await buildBossEmbedPayload(guildId, userId);
@@ -282,18 +286,18 @@ module.exports = {
       if (res.isSynergy) combatNotice += ` 🔥 **${res.synergyType.toUpperCase()} TRIAD COMBO EXECUTED!**`;
       if (res.leveledUp) combatNotice += ` 🎉 **LEVEL UP! You are now Level ${res.newLevel}!** Check /boss stats to allocate stat points.`;
 
-      return interaction.followUp({ content: combatNotice, ephemeral: true });
+      const msg = await interaction.followUp({ content: combatNotice, ephemeral: true });
+      setTimeout(() => msg.delete().catch(() => {}), 5000);
+      return;
     }
 
     if (customId.startsWith('boss_stat_add:')) {
       const statType = customId.split(':')[1];
       await interaction.deferUpdate();
       const res = await allocateStatPoint(guildId, userId, statType);
-      if (!res.success) {
-        return interaction.followUp({ content: res.message, ephemeral: true });
-      }
-
-      return interaction.followUp({ content: res.message, ephemeral: true });
+      const msg = await interaction.followUp({ content: res.message, ephemeral: true });
+      setTimeout(() => msg.delete().catch(() => {}), 5000);
+      return;
     }
 
     if (customId === 'boss_profile') {
