@@ -19,6 +19,21 @@ const GAME_NAME_MAP: Record<string, string> = {
   COD: 'Call of Duty',
 };
 
+const DEFAULT_GAME_BOSSES: Record<string, string> = {
+  D4: 'Lilith, Daughter of Hatred',
+  POE: 'The Maven',
+  BG3: 'Netherbrain',
+  Wuwa: 'Crownless',
+  Hoyoverse: 'Arlecchino',
+  Palworld: 'Jetragon',
+  Minecraft: 'Ender Dragon',
+  Valorant: 'Cypher',
+  CS2: 'Corrupted Anomaly Agent',
+  COD: 'Ghost Anomaly',
+  LOL: 'Baron Nashor',
+  ML: 'Lord Anomaly',
+};
+
 export async function POST(req: NextRequest) {
   try {
     const session = await auth();
@@ -29,8 +44,11 @@ export async function POST(req: NextRequest) {
     const { gameUniverse, bossName, customStyle, artStyle, customFullPrompt } = await req.json();
     const apiKey = process.env.GEMINI_API_KEY;
 
-    const targetCharacter = bossName ? bossName.trim() : 'Corrupted RPG Boss';
-    const targetGame = GAME_NAME_MAP[gameUniverse] || gameUniverse || 'Popular RPG Universe';
+    const gameKey = gameUniverse || 'D4';
+    const targetGame = GAME_NAME_MAP[gameKey] || gameUniverse || 'Diablo 4 (Diablo IV)';
+    const targetCharacter = bossName && bossName.trim().length > 0
+      ? bossName.trim()
+      : (DEFAULT_GAME_BOSSES[gameKey] || 'Lilith, Daughter of Hatred');
 
     let prompt = '';
 
@@ -41,9 +59,9 @@ export async function POST(req: NextRequest) {
       const styleType = artStyle || 'gothic';
 
       if (styleType === 'gothic') {
-        prompt = `Epic cinematic dark fantasy RPG portrait of ${targetCharacter} from ${targetGame}. Dark gothic aesthetic, intricate demonic details, dramatic dark lighting, subtle digital scanline glitch overlays, corrupted energy particle embers background, high resolution 8k quality, cinematic 16:9 banner${extraStyle}. Highly detailed, no text, no watermarks.`;
+        prompt = `Epic dark fantasy portrait of ${targetCharacter} from ${targetGame}. Majestic demonic aesthetic, dramatic dark lighting, red glowing accents, cinematic 16:9 ratio wallpaper banner${extraStyle}. Highly detailed, 8k resolution fantasy RPG character artwork, no text, no logos.`;
       } else if (styleType === 'anime') {
-        prompt = `High-detail anime RPG character portrait of ${targetCharacter} from ${targetGame}. Vivid cinematic lighting, digital cyberspace background with glowing matrix code streams, subtle chromatic aberration glitch artifacts${extraStyle}. High resolution 16:9 wallpaper quality banner, no text, no watermarks.`;
+        prompt = `High-detail anime character portrait of ${targetCharacter} from ${targetGame}. Vivid cinematic lighting, cyberspace background with glowing matrix code streams, subtle chromatic aberration glitch artifacts${extraStyle}. High resolution 16:9 wallpaper quality banner, no text, no watermarks.`;
       } else {
         prompt = `Full-body dramatic pixel-art style portrait of glitched boss entity ${targetCharacter} from ${targetGame}. Dark cyberspace background with matrix code streams, red and cyan chromatic aberration glitch distortion overlays, digital scanlines${extraStyle}. Cinematic 16:9 RPG boss banner, no text, no logos.`;
       }
