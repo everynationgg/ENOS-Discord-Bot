@@ -318,7 +318,8 @@ async function resolveDirectImageUrl(url) {
           // Draw full-bleed custom artwork across entire banner
           ctx.drawImage(img, 0, 0, width, height);
         } else {
-          ctx.drawImage(img, 450, 50, 300, 300);
+          // Draw boss artwork on right side of combat arena
+          ctx.drawImage(img, 380, 20, 380, 340);
         }
         customLoaded = true;
       } else {
