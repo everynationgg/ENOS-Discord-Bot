@@ -323,7 +323,8 @@ async function resolveDirectImageUrl(url: string): Promise<string> {
         const arrayBuf = await res.arrayBuffer();
         const img = await loadImage(Buffer.from(arrayBuf));
         if (viewMode === 'spawn') {
-          ctx.drawImage(img, 380, 20, 380, 380);
+          // Draw full-bleed custom artwork across entire banner
+          ctx.drawImage(img, 0, 0, width, height);
         } else {
           ctx.drawImage(img, 450, 50, 300, 300);
         }
