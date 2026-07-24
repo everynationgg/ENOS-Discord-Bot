@@ -351,6 +351,17 @@ async function executeCombatAction(guildId, userId, actionType) {
   const baseXp = apCost * 100;
   const xpEarned = Math.round(baseXp * xpMultiplier * pointsMultiplier);
 
+  // User Account XP & Level Up Math
+  const newXp = profile.xp + xpEarned;
+  const xpPerLevel = profile.level * 500;
+  let newLevel = profile.level;
+  let newUnallocated = profile.unallocated_stats;
+
+  if (newXp >= xpPerLevel) {
+    newLevel += 1;
+    newUnallocated += 1; // 1 Stat Point per level
+  }
+
   // Atomic Update Boss HP & Synergy State in Supabase
   const newHp = Math.max(0, boss.current_hp - totalDmg);
   let actionText = `${classKey.toUpperCase()} used ${skillName} dealt ${totalDmg.toLocaleString()} DMG`;
@@ -390,17 +401,7 @@ async function executeCombatAction(guildId, userId, actionType) {
     })
     .eq('id', playerState.id);
 
-  // Update User Account XP & Check Level Up
-  const newXp = profile.xp + xpEarned;
-  const xpPerLevel = profile.level * 500;
-  let newLevel = profile.level;
-  let newUnallocated = profile.unallocated_stats;
-
-  if (newXp >= xpPerLevel) {
-    newLevel += 1;
-    newUnallocated += 1; // 1 Stat Point per level
-  }
-
+  // Update User Account Profile with calculated XP/level
   await supabase
     .from('boss_user_profiles')
     .update({
