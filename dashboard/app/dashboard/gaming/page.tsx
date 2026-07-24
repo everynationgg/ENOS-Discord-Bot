@@ -1156,14 +1156,14 @@ export default function GamingPage() {
                   initialConfig={configs['weekly_boss']?.config ?? {}}
                 >
                   {(config, setConfig) => {
-                    const [gameName, setGameName] = useState<string>(config.game_name || '');
-                    const [bossName, setBossName] = useState<string>(config.override_name || '');
-                    const [baseHP, setBaseHP] = useState<string>(config.override_hp || '');
-                    const [imageUrl, setImageUrl] = useState<string>(config.custom_image_url || '');
-                    const [bgUrl, setBgUrl] = useState<string>(config.custom_bg_url || '');
-                    const [momImageUrl, setMomImageUrl] = useState<string>(config.mom_image_url || '');
-                    const [dadImageUrl, setDadImageUrl] = useState<string>(config.dad_image_url || '');
-                    const [kidImageUrl, setKidImageUrl] = useState<string>(config.kid_image_url || '');
+                    const gameName = config.game_name || '';
+                    const bossName = config.override_name || '';
+                    const baseHP = config.override_hp || '';
+                    const imageUrl = config.custom_image_url || '';
+                    const bgUrl = config.custom_bg_url || '';
+                    const momImageUrl = config.mom_image_url || '';
+                    const dadImageUrl = config.dad_image_url || '';
+                    const kidImageUrl = config.kid_image_url || '';
 
                     return (
                       <>
@@ -1200,11 +1200,7 @@ export default function GamingPage() {
                               className="form-input"
                               placeholder="e.g. Diablo 4, Wuthering Waves, Elden Ring"
                               value={gameName}
-                              onChange={(e) => {
-                                const val = e.target.value;
-                                setGameName(val);
-                                setConfig('game_name', val);
-                              }}
+                              onChange={(e) => setConfig('game_name', e.target.value)}
                             />
                             <span className="form-hint">The game where the boss originates</span>
                           </div>
@@ -1216,11 +1212,7 @@ export default function GamingPage() {
                               className="form-input"
                               placeholder="e.g. Lilith, Aemeth, Malenia"
                               value={bossName}
-                              onChange={(e) => {
-                                const val = e.target.value;
-                                setBossName(val);
-                                setConfig('override_name', val);
-                              }}
+                              onChange={(e) => setConfig('override_name', e.target.value)}
                             />
                             <span className="form-hint">Name of the boss character</span>
                           </div>
@@ -1234,11 +1226,7 @@ export default function GamingPage() {
                             className="form-input"
                             placeholder="e.g. 150000"
                             value={baseHP}
-                            onChange={(e) => {
-                              const val = e.target.value;
-                              setBaseHP(val);
-                              setConfig('override_hp', val);
-                            }}
+                            onChange={(e) => setConfig('override_hp', e.target.value)}
                           />
                           <span className="form-hint">Leave blank for automatic player-scaled HP</span>
                         </div>
@@ -1258,11 +1246,7 @@ export default function GamingPage() {
                               className="form-input"
                               placeholder="https://.../boss_environment_art.png"
                               value={imageUrl}
-                              onChange={(e) => {
-                                let val = e.target.value.trim();
-                                setImageUrl(val);
-                                setConfig('custom_image_url', val);
-                              }}
+                              onChange={(e) => setConfig('custom_image_url', e.target.value.trim())}
                             />
                             <span className="form-hint">
                               Full boss artwork image. Displayed ONLY on initial spawn, and on the right side during combat.
@@ -1276,11 +1260,7 @@ export default function GamingPage() {
                               className="form-input"
                               placeholder="https://.../arena_background.png"
                               value={bgUrl}
-                              onChange={(e) => {
-                                let val = e.target.value.trim();
-                                setBgUrl(val);
-                                setConfig('custom_bg_url', val);
-                              }}
+                              onChange={(e) => setConfig('custom_bg_url', e.target.value.trim())}
                             />
                             <span className="form-hint">
                               Optional custom background landscape/arena image
@@ -1303,11 +1283,7 @@ export default function GamingPage() {
                               className="form-input"
                               placeholder="https://.../mom_character.png"
                               value={momImageUrl}
-                              onChange={(e) => {
-                                let val = e.target.value.trim();
-                                setMomImageUrl(val);
-                                setConfig('mom_image_url', val);
-                              }}
+                              onChange={(e) => setConfig('mom_image_url', e.target.value.trim())}
                             />
                             <span className="form-hint">Placed on left side when M.O.M. class is selected</span>
                           </div>
@@ -1319,11 +1295,7 @@ export default function GamingPage() {
                               className="form-input"
                               placeholder="https://.../dad_character.png"
                               value={dadImageUrl}
-                              onChange={(e) => {
-                                let val = e.target.value.trim();
-                                setDadImageUrl(val);
-                                setConfig('dad_image_url', val);
-                              }}
+                              onChange={(e) => setConfig('dad_image_url', e.target.value.trim())}
                             />
                             <span className="form-hint">Placed on left side when D.A.D. class is selected</span>
                           </div>
@@ -1335,11 +1307,7 @@ export default function GamingPage() {
                               className="form-input"
                               placeholder="https://.../kid_character.png"
                               value={kidImageUrl}
-                              onChange={(e) => {
-                                let val = e.target.value.trim();
-                                setKidImageUrl(val);
-                                setConfig('kid_image_url', val);
-                              }}
+                              onChange={(e) => setConfig('kid_image_url', e.target.value.trim())}
                             />
                             <span className="form-hint">Placed on left side when K.I.D. class is selected</span>
                           </div>
