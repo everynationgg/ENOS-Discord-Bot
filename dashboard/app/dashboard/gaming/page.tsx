@@ -10,10 +10,258 @@ const GAME_BRANCHES = [
   'COD', 'HoK', 'ML', 'LOL', 'Others',
 ];
 
+function TriviaStatusSection({ refreshKey }: { refreshKey: number }) {
+  const [data, setData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
+
+  const fetchStatus = async () => {
+    try {
+      const res = await fetch('/api/gaming/trivia/status');
+      if (res.ok) {
+        const json = await res.json();
+        setData(json);
+        setLastRefreshed(new Date());
+      }
+    } catch (e) {
+      console.error('Failed to fetch trivia status', e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchStatus();
+    const timer = setInterval(fetchStatus, 10000);
+    return () => clearInterval(timer);
+  }, [refreshKey]);
+
+  if (loading && !data) {
+    return (
+      <div style={{ padding: '1.25rem', background: 'var(--bg-card)', borderRadius: '12px', marginBottom: '1.25rem', border: '1px solid var(--border-color)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-muted)' }}>
+          <div className="spinner" style={{ width: 16, height: 16 }} /> Loading Trivia Live Status...
+        </div>
+      </div>
+    );
+  }
+
+  if (!data || !data.has_drop || !data.drop) {
+    return (
+      <div style={{ padding: '1.25rem', background: 'var(--bg-card)', borderRadius: '12px', marginBottom: '1.25rem', border: '1px solid var(--border-color)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <span style={{ fontSize: '1.5rem' }}>🧠</span>
+            <div>
+              <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 600 }}>Active Trivia Drop Status</h3>
+              <span style={{ fontSize: '0.8125rem', color: 'var(--text-muted)' }}>No active or recent trivia drops found for this server. Use Force Trigger below to drop one.</span>
+            </div>
+          </div>
+          <button className="btn btn-secondary btn-sm" onClick={fetchStatus}>🔄 Refresh Status</button>
+        </div>
+      </div>
+    );
+  }
+
+  const drop = data.drop;
+  const stats = data.stats || { total_started: 0, total_answered: 0, total_correct: 0, total_incorrect: 0 };
+  const participants = data.participants || [];
+  const winners = drop.winners || [];
+  const isActive = data.is_active;
+
+  const statusColor = isActive
+    ? '#22c55e'
+    : drop.status === 'completed'
+    ? '#3b82f6'
+    : drop.status === 'skipped'
+    ? '#ef4444'
+    : '#a855f7';
+
+  const statusLabel = isActive
+    ? '🟢 ACTIVE DROP IN PROGRESS'
+    : drop.status === 'completed'
+    ? '🏁 SESSION COMPLETED'
+    : drop.status === 'skipped'
+    ? '❌ SESSION CANCELLED'
+    : `⚡ ${drop.status.toUpperCase()}`;
+
+  return (
+    <div style={{ padding: '1.25rem', background: 'var(--bg-card)', borderRadius: '12px', marginBottom: '1.25rem', border: '1px solid var(--border-color)', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}>
+      {/* Header */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '1rem', paddingBottom: '0.75rem', borderBottom: '1px solid var(--border-color)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <span style={{ fontSize: '1.5rem' }}>🧠</span>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700 }}>Trivia Drop Live Status</h3>
+              <span style={{
+                fontSize: '0.725rem',
+                fontWeight: 700,
+                padding: '0.2rem 0.55rem',
+                borderRadius: '9999px',
+                backgroundColor: `${statusColor}22`,
+                color: statusColor,
+                border: `1px solid ${statusColor}44`,
+                letterSpacing: '0.03em'
+              }}>
+                {statusLabel}
+              </span>
+            </div>
+            <span style={{ fontSize: '0.775rem', color: 'var(--text-muted)' }}>
+              Dropped: {new Date(drop.created_at).toLocaleString()} • Auto-Close: <strong>{drop.close_time}</strong> • Channel ID: <code>{drop.channel_id}</code>
+            </span>
+          </div>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          {lastRefreshed && (
+            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+              Updated {lastRefreshed.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+            </span>
+          )}
+          <button className="btn btn-secondary btn-sm" onClick={fetchStatus} title="Refresh Status">
+            🔄 Refresh Status
+          </button>
+        </div>
+      </div>
+
+      {/* Question Card */}
+      <div style={{
+        padding: '0.875rem 1rem',
+        background: 'rgba(255,255,255,0.03)',
+        borderRadius: '8px',
+        borderLeft: '4px solid var(--accent-primary, #facc15)',
+        marginBottom: '1rem'
+      }}>
+        <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', fontWeight: 700, marginBottom: '0.25rem' }}>
+          Active Question
+        </div>
+        <div style={{ fontSize: '0.95rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '0.5rem' }}>
+          {drop.question}
+        </div>
+        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
+          <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Correct Answer:</span>
+          <span style={{
+            fontSize: '0.8rem',
+            fontWeight: 700,
+            color: '#10b981',
+            background: 'rgba(16, 185, 129, 0.15)',
+            padding: '0.15rem 0.5rem',
+            borderRadius: '4px',
+            border: '1px solid rgba(16, 185, 129, 0.3)'
+          }}>
+            ✓ {drop.correct_answer}
+          </span>
+        </div>
+      </div>
+
+      {/* Stats Grid */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '0.75rem', marginBottom: '1rem' }}>
+        <div style={{ padding: '0.75rem', background: 'rgba(255,255,255,0.02)', borderRadius: '8px', border: '1px solid var(--border-color)', textAlign: 'center' }}>
+          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>👥 Total Started</div>
+          <div style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--text-primary)', marginTop: '0.2rem' }}>{stats.total_started}</div>
+        </div>
+        <div style={{ padding: '0.75rem', background: 'rgba(255,255,255,0.02)', borderRadius: '8px', border: '1px solid var(--border-color)', textAlign: 'center' }}>
+          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>📥 Answered</div>
+          <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#3b82f6', marginTop: '0.2rem' }}>{stats.total_answered}</div>
+        </div>
+        <div style={{ padding: '0.75rem', background: 'rgba(16, 185, 129, 0.05)', borderRadius: '8px', border: '1px solid rgba(16, 185, 129, 0.2)', textAlign: 'center' }}>
+          <div style={{ fontSize: '0.75rem', color: '#10b981', fontWeight: 600 }}>✅ Correct</div>
+          <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#10b981', marginTop: '0.2rem' }}>{stats.total_correct}</div>
+        </div>
+        <div style={{ padding: '0.75rem', background: 'rgba(239, 68, 68, 0.05)', borderRadius: '8px', border: '1px solid rgba(239, 68, 68, 0.2)', textAlign: 'center' }}>
+          <div style={{ fontSize: '0.75rem', color: '#ef4444', fontWeight: 600 }}>❌ Incorrect</div>
+          <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#ef4444', marginTop: '0.2rem' }}>{stats.total_incorrect}</div>
+        </div>
+      </div>
+
+      {/* Podium Winners */}
+      {winners && winners.length > 0 && (
+        <div style={{ marginBottom: '1rem', padding: '0.75rem 1rem', background: 'rgba(250, 204, 21, 0.05)', borderRadius: '8px', border: '1px solid rgba(250, 204, 21, 0.2)' }}>
+          <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#facc15', marginBottom: '0.5rem' }}>
+            🏆 Podium Winners
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.375rem' }}>
+            {winners.map((w: any, idx: number) => {
+              const medal = idx === 0 ? '🥇' : idx === 1 ? '🥈' : '🥉';
+              return (
+                <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.825rem' }}>
+                  <span>
+                    {medal} <strong>{w.tag || w.user_id}</strong> <span style={{ color: 'var(--text-muted)' }}>({w.place})</span>
+                  </span>
+                  <span style={{ fontWeight: 600, color: '#facc15' }}>
+                    {(w.speed_ms / 1000).toFixed(4)}s (+{w.points} pts)
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Participant Breakdown Table */}
+      <div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+          <span style={{ fontSize: '0.8125rem', fontWeight: 700, color: 'var(--text-secondary)' }}>
+            📊 Participant Answering Status ({participants.length})
+          </span>
+        </div>
+
+        {participants.length === 0 ? (
+          <div style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', fontStyle: 'italic', padding: '0.5rem 0' }}>
+            No members have clicked 'Start Trivia' yet for this drop.
+          </div>
+        ) : (
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8125rem' }}>
+              <thead>
+                <tr style={{ borderBottom: '1px solid var(--border-color)', textAlign: 'left', color: 'var(--text-muted)' }}>
+                  <th style={{ padding: '0.4rem 0.5rem' }}>User</th>
+                  <th style={{ padding: '0.4rem 0.5rem' }}>Status</th>
+                  <th style={{ padding: '0.4rem 0.5rem' }}>Speed</th>
+                  <th style={{ padding: '0.4rem 0.5rem' }}>Started At</th>
+                </tr>
+              </thead>
+              <tbody>
+                {participants.map((p: any) => {
+                  const isAnswered = !!p.answered_at;
+                  const speedSec = p.speed_ms ? (p.speed_ms / 1000).toFixed(3) + 's' : '—';
+                  return (
+                    <tr key={p.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                      <td style={{ padding: '0.4rem 0.5rem', fontWeight: 500 }}>
+                        {p.tag ? <span>{p.tag}</span> : <code style={{ fontSize: '0.75rem' }}>{p.user_id}</code>}
+                      </td>
+                      <td style={{ padding: '0.4rem 0.5rem' }}>
+                        {!isAnswered ? (
+                          <span style={{ color: '#eab308', fontWeight: 600 }}>⏱️ Thinking...</span>
+                        ) : p.is_correct ? (
+                          <span style={{ color: '#10b981', fontWeight: 600 }}>✅ Correct</span>
+                        ) : (
+                          <span style={{ color: '#ef4444', fontWeight: 600 }}>❌ Incorrect</span>
+                        )}
+                      </td>
+                      <td style={{ padding: '0.4rem 0.5rem', fontFamily: 'monospace' }}>
+                        {speedSec}
+                      </td>
+                      <td style={{ padding: '0.4rem 0.5rem', color: 'var(--text-muted)', fontSize: '0.75rem' }}>
+                        {new Date(p.started_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function GamingPage() {
   const [configs, setConfigs] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('overview');
+  const [triviaRefreshKey, setTriviaRefreshKey] = useState(0);
 
   useEffect(() => {
     fetch('/api/config')
@@ -411,7 +659,9 @@ export default function GamingPage() {
           )}
 
           {activeTab === 'trivia' && (
-            <div className="split-layout-detail">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0rem', width: '100%' }}>
+              <TriviaStatusSection refreshKey={triviaRefreshKey} />
+              <div className="split-layout-detail">
               <div className="feature-instructions">
                 <h3>Trivia Drop Configuration Guide</h3>
                 <p>
@@ -457,6 +707,7 @@ export default function GamingPage() {
                         });
                         const data = await res.json();
                         setManualStatus(data.error ? `error: ${data.error}` : action === 'trigger' ? 'triggered' : action === 'skip' ? 'skipped' : 'rerolled');
+                        if (!data.error) setTriviaRefreshKey((k) => k + 1);
                       } catch {
                         setManualStatus('error: request failed');
                       }
@@ -695,7 +946,8 @@ export default function GamingPage() {
                 </FeatureCard>
               </div>
             </div>
-          )}
+          </div>
+        )}
 
           {activeTab === 'boss' && (
             <div className="split-layout-detail">
