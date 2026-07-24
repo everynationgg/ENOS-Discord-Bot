@@ -264,6 +264,7 @@ function BossPreviewCard({
   momImageUrl,
   dadImageUrl,
   kidImageUrl,
+  onFixIbbLinks,
 }: {
   bossName: string;
   imageUrl: string;
@@ -271,6 +272,7 @@ function BossPreviewCard({
   momImageUrl: string;
   dadImageUrl: string;
   kidImageUrl: string;
+  onFixIbbLinks?: () => void;
 }) {
   const [viewMode, setViewMode] = useState<'spawn' | 'combat'>('spawn');
   const [activeClass, setActiveClass] = useState<'mom' | 'dad' | 'kid'>('mom');
@@ -389,8 +391,20 @@ function BossPreviewCard({
       </div>
 
       {hasIbbLinks && (
-        <div style={{ fontSize: '0.75rem', color: '#facc15', background: 'rgba(250, 204, 21, 0.1)', padding: '0.4rem 0.65rem', borderRadius: '4px', border: '1px solid rgba(250, 204, 21, 0.3)' }}>
-          ⚠️ <strong>ImgBB Webpage Link Detected (`ibb.co/`)</strong>: Cloud hosting servers (Vercel/AWS) get blocked by ImgBB Cloudflare anti-bot protection when fetching webpage links. Please copy the <strong>Direct Link</strong> (`https://i.ibb.co/.../image.png`) from ImgBB!
+        <div style={{ fontSize: '0.75rem', color: '#facc15', background: 'rgba(250, 204, 21, 0.1)', padding: '0.5rem 0.75rem', borderRadius: '4px', border: '1px solid rgba(250, 204, 21, 0.3)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+          <div>
+            ⚠️ <strong>ImgBB Webpage Link Detected (`ibb.co/`)</strong>: Serverless host (Vercel) prefers <strong>Direct Links</strong> (`https://i.ibb.co/.../image.png`).
+          </div>
+          {onFixIbbLinks && (
+            <button
+              type="button"
+              className="btn btn-sm btn-warning"
+              style={{ padding: '0.2rem 0.6rem', fontSize: '0.75rem', fontWeight: 600 }}
+              onClick={onFixIbbLinks}
+            >
+              ✨ Auto-Fix Links to Direct URLs
+            </button>
+          )}
         </div>
       )}
 
@@ -1321,6 +1335,39 @@ export default function GamingPage() {
                           momImageUrl={momImageUrl}
                           dadImageUrl={dadImageUrl}
                           kidImageUrl={kidImageUrl}
+                          onFixIbbLinks={async () => {
+                            const resolveUrl = async (url: string) => {
+                              if (!url || !url.startsWith('http') || url.includes('i.ibb.co/')) return url;
+                              try {
+                                const res = await fetch(url, {
+                                  headers: {
+                                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+                                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                                  }
+                                });
+                                if (res.ok) {
+                                  const html = await res.text();
+                                  const m = html.match(/<meta\s+property=["']og:image["']\s+content=["']([^"']+)["']/i) ||
+                                            html.match(/<img\s+src=["'](https:\/\/i\.ibb\.co\/[^"']+)["']/i) ||
+                                            html.match(/(https:\/\/i\.ibb\.co\/[a-zA-Z0-9_\-\.\/]+)/i);
+                                  if (m && m[1]) return m[1];
+                                }
+                              } catch (e) {}
+                              return url;
+                            };
+
+                            const newMom = await resolveUrl(momImageUrl);
+                            const newDad = await resolveUrl(dadImageUrl);
+                            const newKid = await resolveUrl(kidImageUrl);
+                            const newBg = await resolveUrl(bgUrl);
+                            const newImg = await resolveUrl(imageUrl);
+
+                            if (newMom !== momImageUrl) setConfig('mom_image_url', newMom);
+                            if (newDad !== dadImageUrl) setConfig('dad_image_url', newDad);
+                            if (newKid !== kidImageUrl) setConfig('kid_image_url', newKid);
+                            if (newBg !== bgUrl) setConfig('custom_bg_url', newBg);
+                            if (newImg !== imageUrl) setConfig('custom_image_url', newImg);
+                          }}
                         />
 
                         {/* Admin Quick Action Controls */}

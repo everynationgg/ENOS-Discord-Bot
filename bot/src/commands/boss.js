@@ -28,20 +28,32 @@ const logger = require('../lib/logger');
 async function resolveImageUrl(url) {
   if (!url || typeof url !== 'string') return null;
   if (!url.startsWith('http')) return null;
-  // Already a direct image link
   if (url.includes('i.ibb.co/') || /\.(png|jpg|jpeg|gif|webp)(\?.*)?$/i.test(url)) return url;
-  // Resolve ibb.co share pages to og:image direct link
   try {
     const controller = new AbortController();
-    const t = setTimeout(() => controller.abort(), 5000);
+    const t = setTimeout(() => controller.abort(), 8000);
     const res = await fetch(url, {
-      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/122.0.0.0 Safari/537.36' },
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Cache-Control': 'max-age=0',
+        'Sec-Ch-Ua': '"Chromium";v="124", "Google Chrome";v="124", "Not-A.Brand";v="99"',
+        'Sec-Ch-Ua-Mobile': '?0',
+        'Sec-Ch-Ua-Platform': '"Windows"',
+        'Sec-Fetch-Dest': 'document',
+        'Sec-Fetch-Mode': 'navigate',
+        'Sec-Fetch-Site': 'none',
+        'Sec-Fetch-User': '?1',
+        'Upgrade-Insecure-Requests': '1'
+      },
       signal: controller.signal,
     });
     clearTimeout(t);
     if (res.ok) {
       const html = await res.text();
       const m = html.match(/<meta\s+property=["']og:image["']\s+content=["']([^"']+)["']/i) ||
+                html.match(/<img\s+src=["'](https:\/\/i\.ibb\.co\/[^"']+)["']/i) ||
                 html.match(/(https:\/\/i\.ibb\.co\/[a-zA-Z0-9_\-\.\/]+)/i);
       if (m && m[1]) return m[1];
     }
