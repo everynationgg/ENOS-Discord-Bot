@@ -564,6 +564,8 @@ module.exports = {
         await interaction.editReply({ embeds: [embed], components: [row] });
       } else {
         await interaction.editReply({ embeds: [embed], components: [] });
+        // Schedule auto-expiry in 5 seconds now that all stat points are spent
+        scheduleEphemeralExpiry(interaction, 5000);
       }
       return;
     }
@@ -588,6 +590,8 @@ module.exports = {
 
       const row = new ActionRowBuilder();
       let replyMsg;
+      const timeoutMs = profile.unallocated_stats > 0 ? 15000 : 5000;
+
       if (profile.unallocated_stats > 0) {
         row.addComponents(
           new ButtonBuilder().setCustomId('boss_stat_add:dmg').setLabel('+2% DMG').setStyle(ButtonStyle.Primary).setEmoji('⚔️'),
@@ -598,7 +602,7 @@ module.exports = {
       } else {
         replyMsg = await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral, fetchReply: true });
       }
-      setTimeout(() => replyMsg.delete().catch(() => {}), 15000);
+      setTimeout(() => replyMsg.delete().catch(() => {}), timeoutMs);
       return;
     }
 
