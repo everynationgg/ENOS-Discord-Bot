@@ -58,6 +58,65 @@ function drawImageContain(
   c.drawImage(img, drawX, drawY, drawW, drawH);
 }
 
+function drawAttackFX(ctx: any, lastAction: string, isOverkill: boolean) {
+  const normAction = (lastAction || '').toLowerCase();
+  const isNuke = normAction.includes('meltdown') || normAction.includes('overkill') || normAction.includes('nuke');
+  const isSkill = normAction.includes('guilt') || normAction.includes('joke') || normAction.includes('meltdown') || normAction.includes('skill');
+
+  const impactX = 580;
+  const impactY = 180;
+
+  ctx.save();
+
+  // 1. Slash Arc / Laser Beam
+  ctx.strokeStyle = isNuke ? '#ef4444' : isSkill ? '#facc15' : '#38bdf8';
+  ctx.lineWidth = isNuke ? 6 : isSkill ? 4 : 3;
+  ctx.shadowColor = ctx.strokeStyle;
+  ctx.shadowBlur = 16;
+
+  ctx.beginPath();
+  ctx.arc(impactX - 20, impactY, 75, -0.6 * Math.PI, 0.4 * Math.PI, false);
+  ctx.stroke();
+
+  if (isSkill || isNuke) {
+    ctx.beginPath();
+    ctx.arc(impactX + 20, impactY, 75, 0.6 * Math.PI, 1.6 * Math.PI, false);
+    ctx.stroke();
+  }
+
+  // 2. Starburst Hit Sparks
+  const sparkCount = isNuke ? 12 : isSkill ? 8 : 6;
+  const sparkRadius = isNuke ? 65 : isSkill ? 45 : 30;
+
+  for (let i = 0; i < sparkCount; i++) {
+    const angle = (i * 2 * Math.PI) / sparkCount;
+    const innerR = 8;
+    const outerR = sparkRadius * (i % 2 === 0 ? 1 : 0.6);
+
+    const x1 = impactX + Math.cos(angle) * innerR;
+    const y1 = impactY + Math.sin(angle) * innerR;
+    const x2 = impactX + Math.cos(angle) * outerR;
+    const y2 = impactY + Math.sin(angle) * outerR;
+
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x2, y2);
+    ctx.stroke();
+  }
+
+  // 3. Impact Radial Glow Core
+  const flashGrad = ctx.createRadialGradient(impactX, impactY, 2, impactX, impactY, isNuke ? 60 : 35);
+  flashGrad.addColorStop(0, 'rgba(255, 255, 255, 0.95)');
+  flashGrad.addColorStop(0.5, isNuke ? 'rgba(239, 68, 68, 0.7)' : 'rgba(56, 189, 248, 0.6)');
+  flashGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+  ctx.fillStyle = flashGrad;
+  ctx.beginPath();
+  ctx.arc(impactX, impactY, isNuke ? 60 : 35, 0, 2 * Math.PI);
+  ctx.fill();
+
+  ctx.restore();
+}
+
 export async function renderBossImage(data: any): Promise<Buffer> {
   const width = 800;
   const height = 420;
@@ -74,6 +133,29 @@ export async function renderBossImage(data: any): Promise<Buffer> {
     viewMode = 'spawn',
     lastAction = '',
   } = data;
+
+  const normAction = (lastAction || '').toLowerCase();
+  const isAttackAction = normAction.includes('throw') ||
+    normAction.includes('slap') ||
+    normAction.includes('joke') ||
+    normAction.includes('guilt') ||
+    normAction.includes('meltdown') ||
+    normAction.includes('attack') ||
+    normAction.includes('skill') ||
+    normAction.includes('triad');
+
+  // Screen shake on heavy nuke/meltdown
+  let shakeX = 0;
+  let shakeY = 0;
+  if (normAction.includes('meltdown') || normAction.includes('overkill') || normAction.includes('nuke')) {
+    shakeX = Math.floor(Math.random() * 10) - 5;
+    shakeY = Math.floor(Math.random() * 10) - 5;
+  }
+
+  ctx.save();
+  if (shakeX !== 0 || shakeY !== 0) {
+    ctx.translate(shakeX, shakeY);
+  }
 
   // ─── LAYER 1: ARENA BACKGROUND ─────────────────────────────────────────────
   let customBgLoaded = false;
@@ -150,6 +232,7 @@ export async function renderBossImage(data: any): Promise<Buffer> {
     ctx.font = 'bold 30px sans-serif';
     ctx.fillText(bossName.toUpperCase(), 35, 100);
 
+    ctx.restore();
     return canvas.toBuffer('image/png');
   }
 
@@ -170,9 +253,12 @@ export async function renderBossImage(data: any): Promise<Buffer> {
     } catch (e) {}
   }
 
-  // 2. Draw Selected Class Character Image on Left Side (Aspect-Ratio Preserved)
+  // 2. Draw Selected Class Character Image on Left Side (With Attack Lunge Positional Shift!)
   const activeClass = userClassKey || 'mom';
   const targetClassUrl = classImageUrls[activeClass] || classImageUrls.mom || classImageUrls.dad || classImageUrls.kid;
+
+  // Lunge forward (+65px towards boss) during attack action
+  const classX = isAttackAction ? 85 : 20;
 
   let classLoaded = false;
   if (targetClassUrl && typeof targetClassUrl === 'string' && targetClassUrl.startsWith('http')) {
@@ -184,7 +270,7 @@ export async function renderBossImage(data: any): Promise<Buffer> {
       if (res.ok) {
         const arrayBuf = await res.arrayBuffer();
         const classImg = await loadImage(Buffer.from(arrayBuf));
-        drawImageContain(ctx, classImg, 20, 30, 340, 320, 0.5, 0.5);
+        drawImageContain(ctx, classImg, classX, 30, 340, 320, 0.5, 0.5);
         classLoaded = true;
       }
     } catch (e) {}
@@ -192,7 +278,7 @@ export async function renderBossImage(data: any): Promise<Buffer> {
 
   if (!classLoaded) {
     ctx.fillStyle = 'rgba(15, 23, 42, 0.7)';
-    drawRoundedRect(ctx, 30, 60, 320, 260, 12);
+    drawRoundedRect(ctx, classX + 10, 60, 320, 260, 12);
     ctx.fill();
     ctx.strokeStyle = 'rgba(99, 102, 241, 0.3)';
     ctx.lineWidth = 1;
@@ -201,13 +287,19 @@ export async function renderBossImage(data: any): Promise<Buffer> {
     const classTitles: Record<string, string> = { mom: '🛡️ M.O.M. COMBAT TRIAD', dad: '🔨 D.A.D. COMBAT TRIAD', kid: '⚡ K.I.D. COMBAT TRIAD' };
     ctx.fillStyle = '#38bdf8';
     ctx.font = 'bold 20px sans-serif';
-    ctx.fillText(classTitles[activeClass] || 'COMBAT TRIAD', 50, 110);
+    ctx.fillText(classTitles[activeClass] || 'COMBAT TRIAD', classX + 30, 110);
 
     ctx.fillStyle = '#94a3b8';
     ctx.font = '14px sans-serif';
-    ctx.fillText('Class Engaged in Battle', 50, 140);
+    ctx.fillText('Class Engaged in Battle', classX + 30, 140);
   }
 
+  // 3. Draw Attack Motion FX (Hit Slash Arcs, Starburst Sparks & Impact Flash Over Boss)
+  if (isAttackAction) {
+    drawAttackFX(ctx, lastAction, isOverkill);
+  }
+
+  // 4. Action Log Footer Bar
   if (lastAction) {
     ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
     drawRoundedRect(ctx, 20, 365, width - 40, 38, 8);
@@ -222,5 +314,6 @@ export async function renderBossImage(data: any): Promise<Buffer> {
     ctx.fillText(`ACTION: ${cleanLastAction || lastAction}`, 35, 389);
   }
 
+  ctx.restore();
   return canvas.toBuffer('image/png');
 }
