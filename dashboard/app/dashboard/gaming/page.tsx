@@ -257,6 +257,187 @@ function TriviaStatusSection({ refreshKey }: { refreshKey: number }) {
   );
 }
 
+function BossPreviewCard({
+  bossName,
+  imageUrl,
+  bgUrl,
+  momImageUrl,
+  dadImageUrl,
+  kidImageUrl,
+}: {
+  bossName: string;
+  imageUrl: string;
+  bgUrl: string;
+  momImageUrl: string;
+  dadImageUrl: string;
+  kidImageUrl: string;
+}) {
+  const [viewMode, setViewMode] = useState<'spawn' | 'combat'>('spawn');
+  const [activeClass, setActiveClass] = useState<'mom' | 'dad' | 'kid'>('mom');
+  const [previewSrc, setPreviewSrc] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchPreview = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch('/api/gaming/boss/render-preview', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          bossName: bossName || 'WEEKLY BOSS',
+          imageUrl,
+          bgUrl,
+          userClassKey: activeClass,
+          momImageUrl,
+          dadImageUrl,
+          kidImageUrl,
+          viewMode,
+        }),
+      });
+
+      if (!res.ok) {
+        throw new Error('Failed to render preview');
+      }
+
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      setPreviewSrc(url);
+    } catch (e: any) {
+      setError(e.message || 'Error rendering preview');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      fetchPreview();
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [bossName, imageUrl, bgUrl, momImageUrl, dadImageUrl, kidImageUrl, viewMode, activeClass]);
+
+  const hasIbbLinks = [imageUrl, bgUrl, momImageUrl, dadImageUrl, kidImageUrl].some(
+    (u) => u && u.includes('ibb.co/') && !u.includes('i.ibb.co/')
+  );
+
+  return (
+    <div
+      style={{
+        marginTop: '1rem',
+        marginBottom: '1.25rem',
+        padding: '1rem',
+        backgroundColor: '#020617',
+        borderRadius: '0.5rem',
+        border: '1px dashed rgba(99, 102, 241, 0.4)',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '0.75rem',
+      }}
+    >
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <span style={{ fontSize: '1rem' }}>🖼️</span>
+          <span style={{ fontSize: '0.875rem', color: 'var(--text-primary)', fontWeight: 700 }}>
+            Boss Live Canvas Card Preview
+          </span>
+        </div>
+        <div style={{ display: 'flex', gap: '0.375rem', alignItems: 'center', flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            className={`btn btn-sm ${viewMode === 'spawn' ? 'btn-primary' : 'btn-secondary'}`}
+            style={{ padding: '0.2rem 0.5rem', fontSize: '0.75rem' }}
+            onClick={() => setViewMode('spawn')}
+          >
+            📢 Spawn Card View
+          </button>
+          <button
+            type="button"
+            className={`btn btn-sm ${viewMode === 'combat' && activeClass === 'mom' ? 'btn-primary' : 'btn-secondary'}`}
+            style={{ padding: '0.2rem 0.5rem', fontSize: '0.75rem' }}
+            onClick={() => { setViewMode('combat'); setActiveClass('mom'); }}
+          >
+            🛡️ M.O.M. Battle View
+          </button>
+          <button
+            type="button"
+            className={`btn btn-sm ${viewMode === 'combat' && activeClass === 'dad' ? 'btn-primary' : 'btn-secondary'}`}
+            style={{ padding: '0.2rem 0.5rem', fontSize: '0.75rem' }}
+            onClick={() => { setViewMode('combat'); setActiveClass('dad'); }}
+          >
+            🔨 D.A.D. Battle View
+          </button>
+          <button
+            type="button"
+            className={`btn btn-sm ${viewMode === 'combat' && activeClass === 'kid' ? 'btn-primary' : 'btn-secondary'}`}
+            style={{ padding: '0.2rem 0.5rem', fontSize: '0.75rem' }}
+            onClick={() => { setViewMode('combat'); setActiveClass('kid'); }}
+          >
+            ⚡ K.I.D. Battle View
+          </button>
+          <button
+            type="button"
+            className="btn btn-secondary btn-sm"
+            style={{ padding: '0.2rem 0.5rem', fontSize: '0.75rem' }}
+            onClick={fetchPreview}
+            title="Re-render Canvas Preview"
+          >
+            🔄 Refresh
+          </button>
+        </div>
+      </div>
+
+      {hasIbbLinks && (
+        <div style={{ fontSize: '0.75rem', color: '#facc15', background: 'rgba(250, 204, 21, 0.1)', padding: '0.35rem 0.6rem', borderRadius: '4px', border: '1px solid rgba(250, 204, 21, 0.2)' }}>
+          💡 ImgBB webpage link detected (`ibb.co/`). ENOS backend auto-resolves direct image layers when rendering!
+        </div>
+      )}
+
+      <div
+        style={{
+          position: 'relative',
+          width: '100%',
+          minHeight: '220px',
+          borderRadius: '0.375rem',
+          overflow: 'hidden',
+          backgroundColor: '#0f172a',
+          border: '1px solid rgba(255,255,255,0.1)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        {loading && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-muted)', fontSize: '0.8125rem' }}>
+            <div className="spinner" style={{ width: 16, height: 16 }} /> Rendering Canvas Composite Preview...
+          </div>
+        )}
+
+        {!loading && previewSrc && (
+          <img
+            src={previewSrc}
+            alt="Boss Canvas Preview"
+            style={{
+              width: '100%',
+              height: 'auto',
+              maxHeight: '360px',
+              objectFit: 'contain',
+              display: 'block',
+            }}
+          />
+        )}
+
+        {!loading && !previewSrc && error && (
+          <div style={{ fontSize: '0.8125rem', color: '#ef4444' }}>
+            ❌ {error}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function GamingPage() {
   const [configs, setConfigs] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(true);
@@ -1164,69 +1345,15 @@ export default function GamingPage() {
                           </div>
                         </div>
 
-                        {/* Live Dual Image Preview Card */}
-                        {(imageUrl || bgUrl) && (
-                          <div style={{
-                            marginTop: '0.5rem',
-                            marginBottom: '1rem',
-                            padding: '0.75rem',
-                            backgroundColor: '#020617',
-                            borderRadius: '0.375rem',
-                            border: '1px dashed rgba(99, 102, 241, 0.4)',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            gap: '0.5rem',
-                            alignItems: 'center',
-                          }}>
-                            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>
-                              🖼️ Boss Live Layer Stack Preview:
-                            </span>
-                            <div style={{
-                              position: 'relative',
-                              width: '100%',
-                              maxHeight: '220px',
-                              height: '200px',
-                              borderRadius: '0.375rem',
-                              overflow: 'hidden',
-                              backgroundColor: '#0f172a',
-                              border: '1px solid rgba(255,255,255,0.1)',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                            }}>
-                              {bgUrl && (
-                                <img
-                                  src={bgUrl}
-                                  alt="Background Layer"
-                                  style={{
-                                    position: 'absolute',
-                                    top: 0,
-                                    left: 0,
-                                    width: '100%',
-                                    height: '100%',
-                                    objectFit: 'cover',
-                                  }}
-                                  onError={(e: any) => { e.target.style.display = 'none'; }}
-                                />
-                              )}
-                              {imageUrl && (
-                                <img
-                                  src={imageUrl}
-                                  alt="Boss Character Layer"
-                                  style={{
-                                    position: bgUrl ? 'absolute' : 'relative',
-                                    right: bgUrl ? '5%' : 'auto',
-                                    maxHeight: '90%',
-                                    maxWidth: bgUrl ? '50%' : '100%',
-                                    objectFit: 'contain',
-                                    zIndex: 2,
-                                  }}
-                                  onError={(e: any) => { e.target.style.display = 'none'; }}
-                                />
-                              )}
-                            </div>
-                          </div>
-                        )}
+                        {/* Live Canvas Composite Preview Card */}
+                        <BossPreviewCard
+                          bossName={bossName}
+                          imageUrl={imageUrl}
+                          bgUrl={bgUrl}
+                          momImageUrl={momImageUrl}
+                          dadImageUrl={dadImageUrl}
+                          kidImageUrl={kidImageUrl}
+                        />
 
                         {/* Admin Quick Action Controls */}
                         <div className="section-divider">
