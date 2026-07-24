@@ -19,6 +19,7 @@ const {
 } = require('../modules/gaming/boss');
 const { renderBossImage } = require('../modules/gaming/bossCanvas');
 const { supabase } = require('../lib/supabase');
+const logger = require('../lib/logger');
 
 /**
  * Resolves an ibb.co share page link to a direct i.ibb.co image URL.
