@@ -492,11 +492,38 @@ module.exports = {
         if (channelId && interaction.client) {
           const channel = await interaction.client.channels.fetch(channelId).catch(() => null);
           if (channel) {
-            const publicPayload = await buildPublicBossEmbedPayload(guildId);
+            let publicMsg = null;
             if (messageId) {
-              const publicMsg = await channel.messages.fetch(messageId).catch(() => null);
-              if (publicMsg) {
-                await publicMsg.edit(publicPayload).catch(() => {});
+              publicMsg = await channel.messages.fetch(messageId).catch(() => null);
+            }
+            // Fallback: search recent 15 messages in the channel for the bot's boss card
+            if (!publicMsg) {
+              const recent = await channel.messages.fetch({ limit: 15 }).catch(() => null);
+              if (recent) {
+                publicMsg = recent.find(
+                  (m) =>
+                    m.author.id === interaction.client.user.id &&
+                    m.embeds.some(
+                      (e) =>
+                        e.title?.includes('Weekly Boss Bounty') ||
+                        e.title?.includes('OVERKILL MODE')
+                    )
+                );
+              }
+            }
+
+            if (publicMsg) {
+              const publicPayload = await buildPublicBossEmbedPayload(guildId);
+              await publicMsg.edit(publicPayload).catch(() => {});
+
+              // Save the found messageId so subsequent updates are instant
+              if (!messageId && publicMsg.id) {
+                await supabase.from('guild_config').upsert({
+                  guild_id: guildId,
+                  feature_key: 'weekly_boss',
+                  config: { ...(featureRow?.config || {}), last_message_id: publicMsg.id, last_channel_id: channelId },
+                  updated_at: new Date().toISOString(),
+                });
               }
             }
           }
@@ -513,10 +540,35 @@ module.exports = {
       const statType = customId.split(':')[1];
       await interaction.deferUpdate();
       const res = await allocateStatPoint(guildId, userId, statType);
-      const isLevelUp = res.message?.includes('LEVEL UP');
-      const delayMs = isLevelUp ? 10000 : 5000;
-      const followMsg = await interaction.followUp({ content: res.message, flags: MessageFlags.Ephemeral, fetchReply: true });
-      setTimeout(() => followMsg.delete().catch(() => {}), delayMs);
+
+      // Re-fetch profile and player state to edit the profile embed directly in-place
+      const profile = await getUserProfile(guildId, userId);
+      const playerState = await getPlayerState(guildId, userId);
+
+      const embed = new EmbedBuilder()
+        .setColor(0x38bdf8)
+        .setTitle(`👤 ${interaction.user.username}'s RPG Profile`)
+        .setDescription(
+          `**Level**: \`${profile.level}\` | **XP**: \`${profile.xp}/${profile.level * 500}\`\n` +
+          `**Unallocated Stat Points**: \`${profile.unallocated_stats}\`\n\n` +
+          `**Attributes & Perks**:\n` +
+          `• ⚔️ **Damage Bonus**: \`+${profile.stat_dmg * 2}%\` (${profile.stat_dmg} pts)\n` +
+          `• ⚡ **AP Conservation**: \`+${profile.stat_ap_save * 5}%\` (${profile.stat_ap_save}/4 pts max - 0 AP chance)\n` +
+          `• 📈 **XP Rate Boost**: \`+${profile.stat_xp_boost * 5}%\` (${profile.stat_xp_boost} pts)\n\n` +
+          `**Active Week Status**: AP \`${playerState.ap_remaining}/5\` | Damage: \`${playerState.total_damage.toLocaleString()} DMG\``
+        );
+
+      const row = new ActionRowBuilder();
+      if (profile.unallocated_stats > 0) {
+        row.addComponents(
+          new ButtonBuilder().setCustomId('boss_stat_add:dmg').setLabel('+2% DMG').setStyle(ButtonStyle.Primary).setEmoji('⚔️'),
+          new ButtonBuilder().setCustomId('boss_stat_add:ap_save').setLabel('+5% AP Save').setStyle(ButtonStyle.Success).setEmoji('⚡'),
+          new ButtonBuilder().setCustomId('boss_stat_add:xp_boost').setLabel('+5% XP Rate').setStyle(ButtonStyle.Secondary).setEmoji('📈')
+        );
+        await interaction.editReply({ embeds: [embed], components: [row] });
+      } else {
+        await interaction.editReply({ embeds: [embed], components: [] });
+      }
       return;
     }
 
