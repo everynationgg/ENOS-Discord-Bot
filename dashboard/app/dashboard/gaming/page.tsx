@@ -389,8 +389,8 @@ function BossPreviewCard({
       </div>
 
       {hasIbbLinks && (
-        <div style={{ fontSize: '0.75rem', color: '#facc15', background: 'rgba(250, 204, 21, 0.1)', padding: '0.35rem 0.6rem', borderRadius: '4px', border: '1px solid rgba(250, 204, 21, 0.2)' }}>
-          💡 ImgBB webpage link detected (`ibb.co/`). ENOS backend auto-resolves direct image layers when rendering!
+        <div style={{ fontSize: '0.75rem', color: '#facc15', background: 'rgba(250, 204, 21, 0.1)', padding: '0.4rem 0.65rem', borderRadius: '4px', border: '1px solid rgba(250, 204, 21, 0.3)' }}>
+          ⚠️ <strong>ImgBB Webpage Link Detected (`ibb.co/`)</strong>: Cloud hosting servers (Vercel/AWS) get blocked by ImgBB Cloudflare anti-bot protection when fetching webpage links. Please copy the <strong>Direct Link</strong> (`https://i.ibb.co/.../image.png`) from ImgBB!
         </div>
       )}
 
