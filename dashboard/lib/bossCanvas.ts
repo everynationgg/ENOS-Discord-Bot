@@ -37,6 +37,27 @@ function drawRoundedRect(c: any, rx: number, ry: number, rw: number, rh: number,
   c.closePath();
 }
 
+function drawImageContain(
+  c: any,
+  img: any,
+  x: number,
+  y: number,
+  maxW: number,
+  maxH: number,
+  alignX: number = 0.5,
+  alignY: number = 0.5
+) {
+  const imgW = img.width;
+  const imgH = img.height;
+  if (!imgW || !imgH) return;
+  const scale = Math.min(maxW / imgW, maxH / imgH);
+  const drawW = imgW * scale;
+  const drawH = imgH * scale;
+  const drawX = x + (maxW - drawW) * alignX;
+  const drawY = y + (maxH - drawH) * alignY;
+  c.drawImage(img, drawX, drawY, drawW, drawH);
+}
+
 export async function renderBossImage(data: any): Promise<Buffer> {
   const width = 800;
   const height = 420;
@@ -107,9 +128,9 @@ export async function renderBossImage(data: any): Promise<Buffer> {
           const arrayBuf = await res.arrayBuffer();
           const bossImg = await loadImage(Buffer.from(arrayBuf));
           if (customBgLoaded) {
-            ctx.drawImage(bossImg, 380, 20, 380, 380);
+            drawImageContain(ctx, bossImg, 380, 20, 380, 380, 0.5, 0.5);
           } else {
-            ctx.drawImage(bossImg, 0, 0, width, height);
+            drawImageContain(ctx, bossImg, 0, 0, width, height, 0.5, 0.5);
           }
         }
       } catch (e) {}
@@ -134,7 +155,7 @@ export async function renderBossImage(data: any): Promise<Buffer> {
 
   // ─── PHASE B: COMBAT ARENA VIEW (Selected Class PNG vs Boss Upload PNG) ────
 
-  // 1. Draw Boss Image on Right Side
+  // 1. Draw Boss Image on Right Side (Aspect-Ratio Preserved)
   if (customImageUrl && typeof customImageUrl === 'string' && customImageUrl.startsWith('http')) {
     try {
       const directUrl = await resolveDirectImageUrl(customImageUrl);
@@ -144,12 +165,12 @@ export async function renderBossImage(data: any): Promise<Buffer> {
       if (res.ok) {
         const arrayBuf = await res.arrayBuffer();
         const bossImg = await loadImage(Buffer.from(arrayBuf));
-        ctx.drawImage(bossImg, 400, 20, 380, 330);
+        drawImageContain(ctx, bossImg, 400, 20, 380, 330, 0.5, 0.5);
       }
     } catch (e) {}
   }
 
-  // 2. Draw Selected Class Character Image on Left Side
+  // 2. Draw Selected Class Character Image on Left Side (Aspect-Ratio Preserved)
   const activeClass = userClassKey || 'mom';
   const targetClassUrl = classImageUrls[activeClass] || classImageUrls.mom || classImageUrls.dad || classImageUrls.kid;
 
@@ -163,7 +184,7 @@ export async function renderBossImage(data: any): Promise<Buffer> {
       if (res.ok) {
         const arrayBuf = await res.arrayBuffer();
         const classImg = await loadImage(Buffer.from(arrayBuf));
-        ctx.drawImage(classImg, 20, 30, 340, 320);
+        drawImageContain(ctx, classImg, 20, 30, 340, 320, 0.5, 0.5);
         classLoaded = true;
       }
     } catch (e) {}
