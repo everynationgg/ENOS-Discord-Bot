@@ -1,15 +1,18 @@
 const { createCanvas, loadImage } = require('@napi-rs/canvas');
 const logger = require('../../lib/logger');
 
+const imageBufferCache = new Map();
+const CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutes cache
+
 async function resolveDirectImageUrl(url) {
   if (!url || typeof url !== 'string' || !url.startsWith('http')) return url;
   if (url.includes('i.ibb.co/') || /\.(png|jpg|jpeg|gif|webp)(\?.*)?$/i.test(url)) return url;
 
   try {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 8000);
+    const timeout = setTimeout(() => controller.abort(), 6000);
     const res = await fetch(url, {
-      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) ENOS-Bot/1.0' },
+      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36' },
       signal: controller.signal,
     });
     clearTimeout(timeout);
@@ -31,19 +34,33 @@ async function resolveDirectImageUrl(url) {
 
 async function fetchImageBuffer(url) {
   if (!url || typeof url !== 'string' || !url.startsWith('http')) return null;
+
+  const cached = imageBufferCache.get(url);
+  if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
+    return cached.buffer;
+  }
+
   try {
     const directUrl = await resolveDirectImageUrl(url);
+    const cachedDirect = imageBufferCache.get(directUrl);
+    if (cachedDirect && Date.now() - cachedDirect.timestamp < CACHE_TTL_MS) {
+      return cachedDirect.buffer;
+    }
+
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 15000);
+    const timeout = setTimeout(() => controller.abort(), 25000); // 25s timeout for large ImgBB downloads
     const res = await fetch(directUrl, {
-      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) ENOS-Bot/1.0' },
+      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36' },
       signal: controller.signal,
     });
     clearTimeout(timeout);
+
     if (res.ok) {
       const arrayBuf = await res.arrayBuffer();
       const buf = Buffer.from(arrayBuf);
       if (buf.length > 100 && !buf.toString('utf8', 0, 50).includes('<!DOCTYPE')) {
+        imageBufferCache.set(url, { buffer: buf, timestamp: Date.now() });
+        imageBufferCache.set(directUrl, { buffer: buf, timestamp: Date.now() });
         return buf;
       }
     }
@@ -156,6 +173,15 @@ async function renderBossImage(data) {
     lastAction = '',
   } = data;
 
+  const activeClass = userClassKey || 'mom';
+  const targetClassUrl = classImageUrls[activeClass] || classImageUrls.mom || classImageUrls.dad || classImageUrls.kid;
+
+  const [bgBuf, bossBuf, classBuf] = await Promise.all([
+    fetchImageBuffer(customBgUrl),
+    fetchImageBuffer(customImageUrl),
+    fetchImageBuffer(targetClassUrl),
+  ]);
+
   const normAction = (lastAction || '').toLowerCase();
   const isAttackAction = normAction.includes('throw') ||
     normAction.includes('slap') ||
@@ -180,7 +206,6 @@ async function renderBossImage(data) {
 
   // ─── LAYER 1: ARENA BACKGROUND ─────────────────────────────────────────────
   let customBgLoaded = false;
-  const bgBuf = await fetchImageBuffer(customBgUrl);
   if (bgBuf) {
     try {
       const bgImg = await loadImage(bgBuf);
@@ -216,7 +241,6 @@ async function renderBossImage(data) {
 
   // ─── PHASE A: INITIAL BOSS SPAWN BANNER (Boss Upload Only) ─────────────────
   if (viewMode === 'spawn') {
-    const bossBuf = await fetchImageBuffer(customImageUrl);
     if (bossBuf) {
       try {
         const bossImg = await loadImage(bossBuf);
@@ -250,7 +274,6 @@ async function renderBossImage(data) {
   // ─── PHASE B: COMBAT ARENA VIEW (Selected Class PNG vs Boss Upload PNG) ────
 
   // 1. Draw Boss Image on Right Side (Aspect-Ratio Preserved)
-  const bossBuf = await fetchImageBuffer(customImageUrl);
   if (bossBuf) {
     try {
       const bossImg = await loadImage(bossBuf);
@@ -259,12 +282,8 @@ async function renderBossImage(data) {
   }
 
   // 2. Draw Selected Class Character Image on Left Side
-  const activeClass = userClassKey || 'mom';
-  const targetClassUrl = classImageUrls[activeClass] || classImageUrls.mom || classImageUrls.dad || classImageUrls.kid;
   const classX = isAttackAction ? 85 : 20;
-
   let classLoaded = false;
-  const classBuf = await fetchImageBuffer(targetClassUrl);
   if (classBuf) {
     try {
       const classImg = await loadImage(classBuf);
