@@ -1,67 +1,32 @@
-const { SlashCommandBuilder, PermissionFlagsBits, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, AttachmentBuilder } = require('discord.js');
-const { getOrCreateActiveBoss, getPlayerState, getUserProfile, setPlayerClass, allocateStatPoint, executeCombatAction, getWeekIdentifier } = require('../modules/gaming/boss');
+const {
+  SlashCommandBuilder,
+  PermissionFlagsBits,
+  EmbedBuilder,
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  AttachmentBuilder,
+} = require('discord.js');
+const {
+  getOrCreateActiveBoss,
+  getPlayerState,
+  getUserProfile,
+  setPlayerClass,
+  allocateStatPoint,
+  executeCombatAction,
+  getWeekIdentifier,
+} = require('../modules/gaming/boss');
 const { renderBossImage } = require('../modules/gaming/bossCanvas');
 const { supabase } = require('../lib/supabase');
 
 /**
- * Builds the interactive Discord ActionRow buttons based on player state.
+ * Builds the Public Channel Server Overview Card.
  */
-async function buildBossActionRows(guildId, userId) {
-  const playerState = await getPlayerState(guildId, userId);
-  const classKey = playerState?.class_key;
-  const isLocked = playerState?.is_locked;
-
-  const rows = [];
-  const primaryRow = new ActionRowBuilder();
-  const secondaryRow = new ActionRowBuilder();
-
-  if (!classKey) {
-    // Unregistered Player View
-    primaryRow.addComponents(
-      new ButtonBuilder().setCustomId('boss_pick:mom').setLabel('Pick M.O.M.').setStyle(ButtonStyle.Primary).setEmoji('🛡️'),
-      new ButtonBuilder().setCustomId('boss_pick:dad').setLabel('Pick D.A.D.').setStyle(ButtonStyle.Success).setEmoji('🔨'),
-      new ButtonBuilder().setCustomId('boss_pick:kid').setLabel('Pick K.I.D.').setStyle(ButtonStyle.Danger).setEmoji('⚡'),
-      new ButtonBuilder().setCustomId('boss_info').setLabel('Skills Info').setStyle(ButtonStyle.Secondary).setEmoji('📖')
-    );
-    rows.push(primaryRow);
-  } else {
-    // Registered Player View
-    const moveNames = {
-      mom: { basic: 'Slipper Throw (1 AP)', skill: 'Guilt Trip (3 AP)' },
-      dad: { basic: 'Dad Slap (1 AP)', skill: 'Dad Joke (3 AP)' },
-      kid: { basic: 'iPad Throw (1 AP)', skill: 'Grocery Meltdown (3 AP)' },
-    };
-
-    const moves = moveNames[classKey] || { basic: 'Basic Attack (1 AP)', skill: 'Class Skill (3 AP)' };
-
-    primaryRow.addComponents(
-      new ButtonBuilder().setCustomId('boss_act:basic').setLabel(moves.basic).setStyle(ButtonStyle.Primary).setEmoji('⚔️'),
-      new ButtonBuilder().setCustomId('boss_act:skill').setLabel(moves.skill).setStyle(ButtonStyle.Danger).setEmoji('🔥'),
-      new ButtonBuilder().setCustomId('boss_profile').setLabel('My Stats').setStyle(ButtonStyle.Secondary).setEmoji('👤'),
-      new ButtonBuilder().setCustomId('boss_leaderboard').setLabel('Leaderboard').setStyle(ButtonStyle.Secondary).setEmoji('📊')
-    );
-
-    if (!isLocked) {
-      primaryRow.addComponents(
-        new ButtonBuilder().setCustomId('boss_swap_class').setLabel('Change Class').setStyle(ButtonStyle.Secondary).setEmoji('🔄')
-      );
-    }
-
-    rows.push(primaryRow);
-  }
-
-  return rows;
-}
-
-/**
- * Builds the Boss Embed and Canvas Image attachment.
- */
-async function buildBossEmbedPayload(guildId, userId) {
+async function buildPublicBossEmbedPayload(guildId) {
   const boss = await getOrCreateActiveBoss(guildId);
-  const playerState = await getPlayerState(guildId, userId);
+  const currentWeek = getWeekIdentifier();
 
   // Fetch Class Distribution
-  const currentWeek = getWeekIdentifier();
   const { data: allPlayers } = await supabase
     .from('boss_player_states')
     .select('class_key')
@@ -69,11 +34,13 @@ async function buildBossEmbedPayload(guildId, userId) {
     .eq('week_identifier', currentWeek);
 
   const classCounts = { mom: 0, dad: 0, kid: 0 };
-  (allPlayers || []).forEach(p => {
+  (allPlayers || []).forEach((p) => {
     if (p.class_key && classCounts[p.class_key] !== undefined) {
       classCounts[p.class_key]++;
     }
   });
+
+  const totalParticipants = classCounts.mom + classCounts.dad + classCounts.kid;
 
   const { data: featureRow } = await supabase
     .from('guild_config')
@@ -88,70 +55,169 @@ async function buildBossEmbedPayload(guildId, userId) {
     kid: featureRow?.config?.kid_image_url || null,
   };
 
-  const isFreshSpawn = !playerState?.class_key && (boss.last_action?.includes('Spawned') || boss.last_action?.includes('spawned'));
-  const viewMode = isFreshSpawn ? 'spawn' : 'combat';
-
   const buffer = await renderBossImage({
     bossName: boss.boss_name,
     bossTitle: boss.boss_title,
     customImageUrl: boss.custom_image_url,
-    customBgUrl: boss.custom_bg_url,
-    userClassKey: playerState?.class_key || null,
+    customBgUrl: featureRow?.config?.custom_bg_url || null,
     classImageUrls,
     currentHp: Number(boss.current_hp),
     maxHp: Number(boss.max_hp),
     isOverkill: boss.is_overkill,
-    viewMode,
+    viewMode: 'spawn',
     momBuff: boss.mom_buff,
     dadDebuff: boss.dad_debuff,
     lastAction: boss.last_action,
     classCounts,
   });
 
-  const attachment = new AttachmentBuilder(buffer, { name: 'weekly_boss_arena.png' });
+  const filename = `boss_public_${Date.now()}.png`;
+  const attachment = new AttachmentBuilder(buffer, { name: filename });
 
-  // Class Names & Descriptions
-  const classNames = { mom: '🛡️ M.O.M. (Buff Support)', dad: '🔨 D.A.D. (Debuff Setup)', kid: '⚡ K.I.D. (Nuke Combo)' };
-  const userClassStr = playerState?.class_key ? classNames[playerState.class_key] : '*No class selected (Click button below to join)*';
+  const hpPct = Math.max(0, Math.round((Number(boss.current_hp) / Number(boss.max_hp)) * 100));
+  const filledBlocks = Math.round(hpPct / 10);
+  const hpBar = '🟩'.repeat(filledBlocks) + '⬛'.repeat(10 - filledBlocks);
 
   const embed = new EmbedBuilder()
-    .setColor(boss.is_overkill ? 0xEF4444 : 0x6366F1)
-    .setTitle(`🎮 Weekly Boss Bounty — ${boss.boss_name}`)
+    .setColor(boss.is_overkill ? 0xef4444 : 0x6366f1)
+    .setTitle(`${boss.is_overkill ? '🔥 OVERKILL MODE' : '⚔️ Weekly Boss Bounty'} — ${boss.boss_name}`)
     .setDescription(
       `**Lore**: ${boss.lore}\n\n` +
-      `⚔️ **Last Action**: ${boss.last_action}\n` +
+      `❤️ **HP Status**: ${hpBar} **${hpPct}%** (\`${Number(boss.current_hp).toLocaleString()} / ${Number(boss.max_hp).toLocaleString()} HP\`)\n` +
+      `⚡ **Last Action**: ${boss.last_action || 'None'}\n` +
       `🛡️ **M.O.M. Buff**: ${boss.mom_buff ? '✅ **ACTIVE** (Ready for Nuke)' : '❌ Inactive'}\n` +
       `🔨 **D.A.D. Debuff**: ${boss.dad_debuff ? '✅ **ACTIVE** (Ready for Nuke)' : '❌ Inactive'}\n\n` +
-      `👤 **Your Status**: ${userClassStr} | **AP Remaining**: \`${playerState?.ap_remaining ?? 5}/5 AP\` ${playerState?.is_locked ? '*(Locked for week)*' : '*(Can swap class)*'}`
+      `👥 **Class Distribution**: 🛡️ \`${classCounts.mom}\` M.O.M. | 🔨 \`${classCounts.dad}\` D.A.D. | ⚡ \`${classCounts.kid}\` K.I.D. (*${totalParticipants} Active Combatants*)\n\n` +
+      `*Click a button below to join a class or engage the boss in your personal private combat panel!*`
     )
-    .setImage('attachment://weekly_boss_arena.png')
+    .setImage(`attachment://${filename}`)
     .setFooter({ text: `ENOS Weekly RPG System • Week ${currentWeek}` })
     .setTimestamp();
 
-  const components = await buildBossActionRows(guildId, userId);
+  const publicRow = new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId('boss_join:mom').setLabel('Join M.O.M.').setStyle(ButtonStyle.Primary).setEmoji('🛡️'),
+    new ButtonBuilder().setCustomId('boss_join:dad').setLabel('Join D.A.D.').setStyle(ButtonStyle.Success).setEmoji('🔨'),
+    new ButtonBuilder().setCustomId('boss_join:kid').setLabel('Join K.I.D.').setStyle(ButtonStyle.Danger).setEmoji('⚡'),
+    new ButtonBuilder().setCustomId('boss_engage').setLabel('Engage Boss').setStyle(ButtonStyle.Secondary).setEmoji('⚔️'),
+    new ButtonBuilder().setCustomId('boss_leaderboard').setLabel('Leaderboard').setStyle(ButtonStyle.Secondary).setEmoji('📊')
+  );
 
-  return { embeds: [embed], files: [attachment], components };
+  return { embeds: [embed], files: [attachment], components: [publicRow] };
+}
+
+/**
+ * Builds a Player's Personal Ephemeral Combat View Payload.
+ */
+async function buildPersonalCombatPayload(guildId, userId) {
+  const boss = await getOrCreateActiveBoss(guildId);
+  const playerState = await getPlayerState(guildId, userId);
+  const currentWeek = getWeekIdentifier();
+
+  const { data: featureRow } = await supabase
+    .from('guild_config')
+    .select('config')
+    .eq('guild_id', guildId)
+    .eq('feature_key', 'weekly_boss')
+    .maybeSingle();
+
+  const classImageUrls = {
+    mom: featureRow?.config?.mom_image_url || null,
+    dad: featureRow?.config?.dad_image_url || null,
+    kid: featureRow?.config?.kid_image_url || null,
+  };
+
+  const activeClass = playerState?.class_key || 'mom';
+
+  const buffer = await renderBossImage({
+    bossName: boss.boss_name,
+    bossTitle: boss.boss_title,
+    customImageUrl: boss.custom_image_url,
+    customBgUrl: featureRow?.config?.custom_bg_url || null,
+    userClassKey: activeClass,
+    classImageUrls,
+    currentHp: Number(boss.current_hp),
+    maxHp: Number(boss.max_hp),
+    isOverkill: boss.is_overkill,
+    viewMode: 'combat',
+    momBuff: boss.mom_buff,
+    dadDebuff: boss.dad_debuff,
+    lastAction: boss.last_action,
+  });
+
+  const filename = `boss_combat_${userId}_${Date.now()}.png`;
+  const attachment = new AttachmentBuilder(buffer, { name: filename });
+
+  const moveNames = {
+    mom: { basic: 'Slipper Throw (1 AP)', skill: 'Guilt Trip (3 AP)' },
+    dad: { basic: 'Dad Slap (1 AP)', skill: 'Dad Joke (3 AP)' },
+    kid: { basic: 'iPad Throw (1 AP)', skill: 'Grocery Meltdown (3 AP)' },
+  };
+
+  const moves = moveNames[activeClass] || { basic: 'Basic Attack (1 AP)', skill: 'Class Skill (3 AP)' };
+
+  const classTitles = { mom: '🛡️ M.O.M. (Buff Support)', dad: '🔨 D.A.D. (Debuff Setup)', kid: '⚡ K.I.D. (Nuke Combo)' };
+
+  const hpPct = Math.max(0, Math.round((Number(boss.current_hp) / Number(boss.max_hp)) * 100));
+
+  const embed = new EmbedBuilder()
+    .setColor(boss.is_overkill ? 0xef4444 : 0x38bdf8)
+    .setTitle(`🗡️ Personal Arena — ${classTitles[activeClass]}`)
+    .setDescription(
+      `**Target**: ${boss.boss_name} (**${hpPct}% HP remaining**)\n` +
+      `⚔️ **Last Action**: ${boss.last_action || 'None'}\n\n` +
+      `⚡ **Your AP Remaining**: \`${playerState.ap_remaining}/5 AP\` ${playerState.is_locked ? '*(Class locked for week)*' : '*(Can swap class)*'}\n` +
+      `⏱️ *Note: This private combat view will auto-expire in 5 minutes.*`
+    )
+    .setImage(`attachment://${filename}`)
+    .setFooter({ text: `ENOS Personal Combat Panel • ${currentWeek}` });
+
+  const actionRow = new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId('boss_act:basic').setLabel(moves.basic).setStyle(ButtonStyle.Primary).setEmoji('⚔️'),
+    new ButtonBuilder().setCustomId('boss_act:skill').setLabel(moves.skill).setStyle(ButtonStyle.Danger).setEmoji('🔥'),
+    new ButtonBuilder().setCustomId('boss_profile').setLabel('My Stats').setStyle(ButtonStyle.Secondary).setEmoji('👤')
+  );
+
+  if (!playerState.is_locked) {
+    actionRow.addComponents(
+      new ButtonBuilder().setCustomId('boss_swap_class').setLabel('Change Class').setStyle(ButtonStyle.Secondary).setEmoji('🔄')
+    );
+  }
+
+  actionRow.addComponents(
+    new ButtonBuilder().setCustomId('boss_close_ephemeral').setLabel('Close').setStyle(ButtonStyle.Secondary).setEmoji('❌')
+  );
+
+  return { embeds: [embed], files: [attachment], components: [actionRow] };
+}
+
+/**
+ * Schedules a 5-minute auto-expiry for an ephemeral reply.
+ */
+function scheduleEphemeralExpiry(interaction) {
+  setTimeout(() => {
+    interaction.deleteReply().catch(() => {});
+  }, 5 * 60 * 1000); // 5 minutes (300,000 ms)
 }
 
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('boss')
     .setDescription('Weekly Boss Bounty RPG commands')
-    .addSubcommand(sub =>
-      sub.setName('status').setDescription('View the live Weekly Boss Arena & Combat Controls')
+    .addSubcommand((sub) =>
+      sub.setName('status').setDescription('View the live Weekly Boss Server Overview')
     )
-    .addSubcommand(sub =>
+    .addSubcommand((sub) =>
       sub.setName('stats').setDescription('View your RPG user profile, level, and allocate stat points')
     )
-    .addSubcommand(sub =>
+    .addSubcommand((sub) =>
       sub.setName('leaderboard').setDescription('View the top Weekly Boss damage dealers')
     )
-    .addSubcommand(sub =>
+    .addSubcommand((sub) =>
       sub.setName('spawn').setDescription('Force spawn/refresh the weekly boss (Admin only)')
     ),
 
   /**
-   * @param {import('discord.js').ChatInputCommandInteraction} interaction
+   * Slash Command Handler
    */
   async execute(interaction) {
     const sub = interaction.options.getSubcommand();
@@ -162,7 +228,7 @@ module.exports = {
       }
 
       await interaction.deferReply();
-      const payload = await buildBossEmbedPayload(interaction.guild.id, interaction.user.id);
+      const payload = await buildPublicBossEmbedPayload(interaction.guild.id);
       return interaction.editReply(payload);
     }
 
@@ -172,7 +238,7 @@ module.exports = {
       const playerState = await getPlayerState(interaction.guild.id, interaction.user.id);
 
       const embed = new EmbedBuilder()
-        .setColor(0x38BDF8)
+        .setColor(0x38bdf8)
         .setTitle(`👤 ${interaction.user.username}'s RPG Profile`)
         .setDescription(
           `**Level**: \`${profile.level}\` | **XP**: \`${profile.xp}/${profile.level * 500}\`\n` +
@@ -192,10 +258,14 @@ module.exports = {
           new ButtonBuilder().setCustomId('boss_stat_add:ap_save').setLabel('+5% AP Save').setStyle(ButtonStyle.Success).setEmoji('⚡'),
           new ButtonBuilder().setCustomId('boss_stat_add:xp_boost').setLabel('+5% XP Rate').setStyle(ButtonStyle.Secondary).setEmoji('📈')
         );
-        return interaction.editReply({ embeds: [embed], components: [row] });
+        const reply = await interaction.editReply({ embeds: [embed], components: [row] });
+        scheduleEphemeralExpiry(interaction);
+        return reply;
       }
 
-      return interaction.editReply({ embeds: [embed] });
+      const reply = await interaction.editReply({ embeds: [embed] });
+      scheduleEphemeralExpiry(interaction);
+      return reply;
     }
 
     if (sub === 'leaderboard') {
@@ -221,11 +291,10 @@ module.exports = {
       }
 
       const embed = new EmbedBuilder()
-        .setColor(0xFACC15)
+        .setColor(0xfacc15)
         .setTitle(`🏆 Weekly Boss Leaderboard (${currentWeek})`)
         .setDescription(lines.join('\n'))
-        .setFooter({ text: 'ENOS RPG Ranking System' })
-        .setTimestamp();
+        .setFooter({ text: 'ENOS RPG Ranking System' });
 
       return interaction.editReply({ embeds: [embed] });
     }
@@ -233,16 +302,19 @@ module.exports = {
 
   /**
    * Button Interaction Handler for Weekly Boss Buttons
-   * @param {import('discord.js').ButtonInteraction} interaction
    */
   async handleBossButton(interaction) {
     const customId = interaction.customId;
     const guildId = interaction.guild.id;
     const userId = interaction.user.id;
 
+    if (customId === 'boss_close_ephemeral') {
+      return interaction.deleteReply().catch(() => {});
+    }
+
     if (customId === 'boss_info') {
       const embed = new EmbedBuilder()
-        .setColor(0x38BDF8)
+        .setColor(0x38bdf8)
         .setTitle('📖 Weekly Boss Skill & Synergy Guide')
         .setDescription(
           `**Combat Triad Classes & Moves**:\n` +
@@ -259,34 +331,54 @@ module.exports = {
       return interaction.reply({ embeds: [embed], ephemeral: true });
     }
 
-    if (customId.startsWith('boss_pick:')) {
-      const classKey = customId.split(':')[1];
-      await interaction.deferUpdate();
-      const res = await setPlayerClass(guildId, userId, classKey);
-      if (!res.success) {
-        const msg = await interaction.followUp({ content: res.message, ephemeral: true });
-        setTimeout(() => msg.delete().catch(() => {}), 5000);
+    // ─── 1. JOIN CLASS / ENGAGE BOSS (Launches Personal Ephemeral Combat View) ───
+    if (customId.startsWith('boss_join:') || customId === 'boss_engage') {
+      await interaction.deferReply({ ephemeral: true });
+
+      if (customId.startsWith('boss_join:')) {
+        const targetClass = customId.split(':')[1];
+        const res = await setPlayerClass(guildId, userId, targetClass);
+        if (!res.success) {
+          await interaction.editReply({ content: res.message });
+          scheduleEphemeralExpiry(interaction);
+          return;
+        }
+      }
+
+      const playerState = await getPlayerState(guildId, userId);
+      if (!playerState?.class_key && customId === 'boss_engage') {
+        const row = new ActionRowBuilder().addComponents(
+          new ButtonBuilder().setCustomId('boss_join:mom').setLabel('Join M.O.M.').setStyle(ButtonStyle.Primary).setEmoji('🛡️'),
+          new ButtonBuilder().setCustomId('boss_join:dad').setLabel('Join D.A.D.').setStyle(ButtonStyle.Success).setEmoji('🔨'),
+          new ButtonBuilder().setCustomId('boss_join:kid').setLabel('Join K.I.D.').setStyle(ButtonStyle.Danger).setEmoji('⚡')
+        );
+        await interaction.editReply({
+          content: '❌ **Please select a combat class first to enter the battle arena:**',
+          components: [row],
+        });
+        scheduleEphemeralExpiry(interaction);
         return;
       }
 
-      const payload = await buildBossEmbedPayload(guildId, userId);
-      return interaction.editReply(payload);
+      const payload = await buildPersonalCombatPayload(guildId, userId);
+      await interaction.editReply(payload);
+      scheduleEphemeralExpiry(interaction);
+      return;
     }
 
+    // ─── 2. SWAP CLASS (Inside Ephemeral View) ──────────────────────────────
     if (customId === 'boss_swap_class') {
-      // Re-open class selection
       await interaction.deferUpdate();
       const row = new ActionRowBuilder().addComponents(
-        new ButtonBuilder().setCustomId('boss_pick:mom').setLabel('Pick M.O.M.').setStyle(ButtonStyle.Primary).setEmoji('🛡️'),
-        new ButtonBuilder().setCustomId('boss_pick:dad').setLabel('Pick D.A.D.').setStyle(ButtonStyle.Success).setEmoji('🔨'),
-        new ButtonBuilder().setCustomId('boss_pick:kid').setLabel('Pick K.I.D.').setStyle(ButtonStyle.Danger).setEmoji('⚡'),
-        new ButtonBuilder().setCustomId('boss_info').setLabel('Skills Info').setStyle(ButtonStyle.Secondary).setEmoji('📖')
+        new ButtonBuilder().setCustomId('boss_join:mom').setLabel('Pick M.O.M.').setStyle(ButtonStyle.Primary).setEmoji('🛡️'),
+        new ButtonBuilder().setCustomId('boss_join:dad').setLabel('Pick D.A.D.').setStyle(ButtonStyle.Success).setEmoji('🔨'),
+        new ButtonBuilder().setCustomId('boss_join:kid').setLabel('Pick K.I.D.').setStyle(ButtonStyle.Danger).setEmoji('⚡')
       );
-      const payload = await buildBossEmbedPayload(guildId, userId);
-      payload.components = [row];
-      return interaction.editReply(payload);
+      await interaction.editReply({ content: 'Select your new combat class:', components: [row] });
+      return;
     }
 
+    // ─── 3. COMBAT ATTACK ACTIONS (Inside Ephemeral View) ───────────────────
     if (customId.startsWith('boss_act:')) {
       const actionType = customId.split(':')[1];
       await interaction.deferUpdate();
@@ -294,30 +386,40 @@ module.exports = {
       const res = await executeCombatAction(guildId, userId, actionType);
       if (!res.success) {
         await interaction.followUp({ content: res.message, ephemeral: true });
-        setTimeout(() => interaction.deleteReply().catch(() => {}), 5000);
         return;
       }
 
-      const payload = await buildBossEmbedPayload(guildId, userId);
+      // Re-render ephemeral combat view
+      const payload = await buildPersonalCombatPayload(guildId, userId);
       await interaction.editReply(payload);
+
+      // Update Public Channel Card asynchronously if present
+      try {
+        const publicPayload = await buildPublicBossEmbedPayload(guildId);
+        if (interaction.message && !interaction.message.flags.has('Ephemeral')) {
+          await interaction.message.edit(publicPayload).catch(() => {});
+        }
+      } catch (e) {}
+
       return;
     }
 
+    // ─── 4. STAT ALLOCATION (Inside Ephemeral View / Profile) ────────────────
     if (customId.startsWith('boss_stat_add:')) {
       const statType = customId.split(':')[1];
       await interaction.deferUpdate();
       const res = await allocateStatPoint(guildId, userId, statType);
-      const msg = await interaction.followUp({ content: res.message, ephemeral: true });
-      setTimeout(() => msg.delete().catch(() => {}), 5000);
+      await interaction.followUp({ content: res.message, ephemeral: true });
       return;
     }
 
+    // ─── 5. MY STATS PROFILE ────────────────────────────────────────────────
     if (customId === 'boss_profile') {
       const profile = await getUserProfile(guildId, userId);
       const playerState = await getPlayerState(guildId, userId);
 
       const embed = new EmbedBuilder()
-        .setColor(0x38BDF8)
+        .setColor(0x38bdf8)
         .setTitle(`👤 ${interaction.user.username}'s RPG Profile`)
         .setDescription(
           `**Level**: \`${profile.level}\` | **XP**: \`${profile.xp}/${profile.level * 500}\`\n` +
@@ -342,6 +444,7 @@ module.exports = {
       return interaction.reply({ embeds: [embed], ephemeral: true });
     }
 
+    // ─── 6. LEADERBOARD ─────────────────────────────────────────────────────
     if (customId === 'boss_leaderboard') {
       const currentWeek = getWeekIdentifier();
       const { data: topPlayers } = await supabase
@@ -363,7 +466,7 @@ module.exports = {
       }
 
       const embed = new EmbedBuilder()
-        .setColor(0xFACC15)
+        .setColor(0xfacc15)
         .setTitle(`🏆 Weekly Boss Leaderboard (${currentWeek})`)
         .setDescription(lines.join('\n'))
         .setFooter({ text: 'ENOS RPG Ranking System' });
