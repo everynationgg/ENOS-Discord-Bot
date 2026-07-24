@@ -3,17 +3,22 @@ const logger = require('../../lib/logger');
 
 async function resolveDirectImageUrl(url) {
   if (!url || typeof url !== 'string' || !url.startsWith('http')) return url;
-  if (/\.(png|jpg|jpeg|gif|webp)(\?.*)?$/i.test(url)) return url;
+  if (url.includes('i.ibb.co/') || /\.(png|jpg|jpeg|gif|webp)(\?.*)?$/i.test(url)) return url;
 
   try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8000);
     const res = await fetch(url, {
       headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) ENOS-Bot/1.0' },
+      signal: controller.signal,
     });
+    clearTimeout(timeout);
     if (res.ok) {
       const html = await res.text();
       const ogMatch = html.match(/<meta\s+property=["']og:image["']\s+content=["']([^"']+)["']/i) ||
                       html.match(/<meta\s+name=["']twitter:image["']\s+content=["']([^"']+)["']/i) ||
-                      html.match(/<img\s+src=["'](https:\/\/i\.ibb\.co\/[^"']+)["']/i);
+                      html.match(/<img\s+src=["'](https:\/\/i\.ibb\.co\/[^"']+)["']/i) ||
+                      html.match(/(https:\/\/i\.ibb\.co\/[a-zA-Z0-9_\-\.\/]+)/i);
       if (ogMatch && ogMatch[1]) {
         return ogMatch[1];
       }
@@ -22,6 +27,28 @@ async function resolveDirectImageUrl(url) {
     // ignore
   }
   return url;
+}
+
+async function fetchImageBuffer(url) {
+  if (!url || typeof url !== 'string' || !url.startsWith('http')) return null;
+  try {
+    const directUrl = await resolveDirectImageUrl(url);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15000);
+    const res = await fetch(directUrl, {
+      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) ENOS-Bot/1.0' },
+      signal: controller.signal,
+    });
+    clearTimeout(timeout);
+    if (res.ok) {
+      const arrayBuf = await res.arrayBuffer();
+      const buf = Buffer.from(arrayBuf);
+      if (buf.length > 100 && !buf.toString('utf8', 0, 50).includes('<!DOCTYPE')) {
+        return buf;
+      }
+    }
+  } catch (e) {}
+  return null;
 }
 
 function drawRoundedRect(c, rx, ry, rw, rh, rad) {
@@ -139,7 +166,6 @@ async function renderBossImage(data) {
     normAction.includes('skill') ||
     normAction.includes('triad');
 
-  // Screen shake on heavy nuke/meltdown
   let shakeX = 0;
   let shakeY = 0;
   if (normAction.includes('meltdown') || normAction.includes('overkill') || normAction.includes('nuke')) {
@@ -154,18 +180,12 @@ async function renderBossImage(data) {
 
   // ─── LAYER 1: ARENA BACKGROUND ─────────────────────────────────────────────
   let customBgLoaded = false;
-  if (customBgUrl && typeof customBgUrl === 'string' && customBgUrl.startsWith('http')) {
+  const bgBuf = await fetchImageBuffer(customBgUrl);
+  if (bgBuf) {
     try {
-      const directBgUrl = await resolveDirectImageUrl(customBgUrl);
-      const res = await fetch(directBgUrl, {
-        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) ENOS-Bot/1.0' },
-      });
-      if (res.ok) {
-        const arrayBuf = await res.arrayBuffer();
-        const bgImg = await loadImage(Buffer.from(arrayBuf));
-        ctx.drawImage(bgImg, 0, 0, width, height);
-        customBgLoaded = true;
-      }
+      const bgImg = await loadImage(bgBuf);
+      ctx.drawImage(bgImg, 0, 0, width, height);
+      customBgLoaded = true;
     } catch (e) {}
   }
 
@@ -196,20 +216,14 @@ async function renderBossImage(data) {
 
   // ─── PHASE A: INITIAL BOSS SPAWN BANNER (Boss Upload Only) ─────────────────
   if (viewMode === 'spawn') {
-    if (customImageUrl && typeof customImageUrl === 'string' && customImageUrl.startsWith('http')) {
+    const bossBuf = await fetchImageBuffer(customImageUrl);
+    if (bossBuf) {
       try {
-        const directUrl = await resolveDirectImageUrl(customImageUrl);
-        const res = await fetch(directUrl, {
-          headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) ENOS-Bot/1.0' },
-        });
-        if (res.ok) {
-          const arrayBuf = await res.arrayBuffer();
-          const bossImg = await loadImage(Buffer.from(arrayBuf));
-          if (customBgLoaded) {
-            drawImageContain(ctx, bossImg, 380, 20, 380, 380, 0.5, 0.5);
-          } else {
-            drawImageContain(ctx, bossImg, 0, 0, width, height, 0.5, 0.5);
-          }
+        const bossImg = await loadImage(bossBuf);
+        if (customBgLoaded) {
+          drawImageContain(ctx, bossImg, 380, 20, 380, 380, 0.5, 0.5);
+        } else {
+          drawImageContain(ctx, bossImg, 0, 0, width, height, 0.5, 0.5);
         }
       } catch (e) {}
     }
@@ -236,40 +250,26 @@ async function renderBossImage(data) {
   // ─── PHASE B: COMBAT ARENA VIEW (Selected Class PNG vs Boss Upload PNG) ────
 
   // 1. Draw Boss Image on Right Side (Aspect-Ratio Preserved)
-  if (customImageUrl && typeof customImageUrl === 'string' && customImageUrl.startsWith('http')) {
+  const bossBuf = await fetchImageBuffer(customImageUrl);
+  if (bossBuf) {
     try {
-      const directUrl = await resolveDirectImageUrl(customImageUrl);
-      const res = await fetch(directUrl, {
-        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) ENOS-Bot/1.0' },
-      });
-      if (res.ok) {
-        const arrayBuf = await res.arrayBuffer();
-        const bossImg = await loadImage(Buffer.from(arrayBuf));
-        drawImageContain(ctx, bossImg, 400, 20, 380, 330, 0.5, 0.5);
-      }
+      const bossImg = await loadImage(bossBuf);
+      drawImageContain(ctx, bossImg, 400, 20, 380, 330, 0.5, 0.5);
     } catch (e) {}
   }
 
-  // 2. Draw Selected Class Character Image on Left Side (With Attack Lunge Positional Shift!)
+  // 2. Draw Selected Class Character Image on Left Side
   const activeClass = userClassKey || 'mom';
   const targetClassUrl = classImageUrls[activeClass] || classImageUrls.mom || classImageUrls.dad || classImageUrls.kid;
-
-  // Lunge forward (+65px towards boss) during attack action
   const classX = isAttackAction ? 85 : 20;
 
   let classLoaded = false;
-  if (targetClassUrl && typeof targetClassUrl === 'string' && targetClassUrl.startsWith('http')) {
+  const classBuf = await fetchImageBuffer(targetClassUrl);
+  if (classBuf) {
     try {
-      const directClassUrl = await resolveDirectImageUrl(targetClassUrl);
-      const res = await fetch(directClassUrl, {
-        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) ENOS-Bot/1.0' },
-      });
-      if (res.ok) {
-        const arrayBuf = await res.arrayBuffer();
-        const classImg = await loadImage(Buffer.from(arrayBuf));
-        drawImageContain(ctx, classImg, classX, 30, 340, 320, 0.5, 0.5);
-        classLoaded = true;
-      }
+      const classImg = await loadImage(classBuf);
+      drawImageContain(ctx, classImg, classX, 30, 340, 320, 0.5, 0.5);
+      classLoaded = true;
     } catch (e) {}
   }
 
@@ -293,7 +293,7 @@ async function renderBossImage(data) {
     ctx.fillText('Upload custom class PNG in Admin Panel!', classX + 30, 170);
   }
 
-  // 3. Draw Attack Motion FX (Hit Slash Arcs, Starburst Sparks & Impact Flash Over Boss)
+  // 3. Draw Attack Motion FX
   if (isAttackAction) {
     drawAttackFX(ctx, lastAction, isOverkill);
   }
