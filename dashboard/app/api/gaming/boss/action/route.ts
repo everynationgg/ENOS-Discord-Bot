@@ -121,65 +121,66 @@ async function postBossCardToDiscord(guildId: string, boss: any) {
     },
   ];
 
-      let res: Response | null = null;
-      if (imageBuffer) {
-        const formData = new FormData();
-        formData.append(
-          'payload_json',
-          JSON.stringify({
-            embeds: [embed],
-            components,
-          })
-        );
-        formData.append('files[0]', new Blob([Uint8Array.from(imageBuffer)], { type: 'image/png' }), 'weekly_boss_arena.png');
+  for (const chId of channelIds) {
+    let res: Response | null = null;
+    if (imageBuffer) {
+      const formData = new FormData();
+      formData.append(
+        'payload_json',
+        JSON.stringify({
+          embeds: [embed],
+          components,
+        })
+      );
+      formData.append('files[0]', new Blob([Uint8Array.from(imageBuffer)], { type: 'image/png' }), 'weekly_boss_arena.png');
 
-        res = await fetch(`https://discord.com/api/v10/channels/${chId}/messages`, {
-          method: 'POST',
-          headers: { Authorization: `Bot ${token}` },
-          body: formData,
-        }).catch((e) => {
-          console.error(`[BOSS POST] Error posting boss card to Discord channel ${chId}:`, e);
-          return null;
-        });
-      } else {
-        res = await fetch(`https://discord.com/api/v10/channels/${chId}/messages`, {
-          method: 'POST',
-          headers: {
-            Authorization: `Bot ${token}`,
-            'Content-Type': 'application/json',
+      res = await fetch(`https://discord.com/api/v10/channels/${chId}/messages`, {
+        method: 'POST',
+        headers: { Authorization: `Bot ${token}` },
+        body: formData,
+      }).catch((e) => {
+        console.error(`[BOSS POST] Error posting boss card to Discord channel ${chId}:`, e);
+        return null;
+      });
+    } else {
+      res = await fetch(`https://discord.com/api/v10/channels/${chId}/messages`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bot ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ embeds: [embed], components }),
+      }).catch((e) => {
+        console.error(`[BOSS POST] Error posting boss card to Discord channel ${chId}:`, e);
+        return null;
+      });
+    }
+
+    if (res && res.ok) {
+      const postedMsg = await res.json().catch(() => null);
+      if (postedMsg?.id) {
+        const { data: existingCfg } = await supabaseAdmin
+          .from('guild_config')
+          .select('config')
+          .eq('guild_id', guildId)
+          .eq('feature_key', 'weekly_boss')
+          .maybeSingle();
+
+        await supabaseAdmin.from('guild_config').upsert({
+          guild_id: guildId,
+          feature_key: 'weekly_boss',
+          config: {
+            ...(existingCfg?.config || {}),
+            channel_id: chId,
+            last_channel_id: chId,
+            last_message_id: postedMsg.id,
           },
-          body: JSON.stringify({ embeds: [embed], components }),
-        }).catch((e) => {
-          console.error(`[BOSS POST] Error posting boss card to Discord channel ${chId}:`, e);
-          return null;
+          updated_at: new Date().toISOString(),
         });
-      }
-
-      if (res && res.ok) {
-        const postedMsg = await res.json().catch(() => null);
-        if (postedMsg?.id) {
-          const { data: existingCfg } = await supabaseAdmin
-            .from('guild_config')
-            .select('config')
-            .eq('guild_id', guildId)
-            .eq('feature_key', 'weekly_boss')
-            .maybeSingle();
-
-          await supabaseAdmin.from('guild_config').upsert({
-            guild_id: guildId,
-            feature_key: 'weekly_boss',
-            config: {
-              ...(existingCfg?.config || {}),
-              channel_id: chId,
-              last_channel_id: chId,
-              last_message_id: postedMsg.id,
-            },
-            updated_at: new Date().toISOString(),
-          });
-        }
       }
     }
   }
+}
 
 async function resolveDirectImageUrl(url: string | null | undefined): Promise<string | null> {
   if (!url || typeof url !== 'string' || !url.startsWith('http')) return null;
