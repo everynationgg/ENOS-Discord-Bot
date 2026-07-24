@@ -746,6 +746,17 @@ async function checkAndProcessTrivia(client) {
       const today = local.dateStr;
       const currentTimeStr = local.timeStr;
 
+      // Query actual drops from database created today
+      const todayStartIso = `${today}T00:00:00.000Z`;
+      const { data: dropsToday } = await supabase
+        .from('trivia_drops')
+        .select('id, status')
+        .eq('guild_id', guildId)
+        .gte('created_at', todayStartIso);
+
+      const actualDropsToday = dropsToday?.length || 0;
+      const hasActiveDrop = dropsToday?.some((d) => d.status === 'active');
+
       // Ensure scheduling exists for today
       let isConfigDirty = false;
       if (
@@ -756,9 +767,7 @@ async function checkAndProcessTrivia(client) {
       ) {
         config.scheduled_drop_times = generateDropTimesForDay(dropsPerDay);
         config.scheduled_drop_time = config.scheduled_drop_times[0];
-        if (config.scheduled_drop_date !== today) {
-          config.completed_drops_today = 0;
-        }
+        config.completed_drops_today = actualDropsToday;
         config.scheduled_drop_date = today;
         isConfigDirty = true;
 
@@ -771,25 +780,33 @@ async function checkAndProcessTrivia(client) {
         const dropSuccess = await triggerTriviaDrop(client, guildId);
         if (dropSuccess) {
           config.last_drop_date = today;
+          config.completed_drops_today = actualDropsToday + 1;
         }
         config.manual_trigger_requested = false;
         isConfigDirty = true;
       }
       // Check if it's time to drop today (scheduled)
       else {
-        const completedCount = config.completed_drops_today || 0;
-        if (completedCount < config.scheduled_drop_times.length) {
-          const targetTime = config.scheduled_drop_times[completedCount];
-          const [currH, currM] = currentTimeStr.split(':').map(Number);
-          const [schedH, schedM] = targetTime.split(':').map(Number);
+        // Strict Guards: DO NOT spawn if an active drop is already running or max drops reached today
+        if (hasActiveDrop) {
+          // Active drop in progress, skip scheduling another drop
+        } else if (actualDropsToday >= dropsPerDay) {
+          // Max daily drops reached for today, skip
+        } else {
+          const completedCount = actualDropsToday;
+          if (completedCount < config.scheduled_drop_times.length) {
+            const targetTime = config.scheduled_drop_times[completedCount];
+            const [currH, currM] = currentTimeStr.split(':').map(Number);
+            const [schedH, schedM] = targetTime.split(':').map(Number);
 
-          if (currH > schedH || (currH === schedH && currM >= schedM)) {
-            logger.info(`[TRIVIA CRON] Triggering scheduled drop ${completedCount + 1}/${config.scheduled_drop_times.length} for guild ${guildId}. Time reached: ${currentTimeStr} >= ${targetTime}`);
-            const dropSuccess = await triggerTriviaDrop(client, guildId);
-            if (dropSuccess) {
-              config.completed_drops_today = completedCount + 1;
-              config.last_drop_date = today;
-              isConfigDirty = true;
+            if (currH > schedH || (currH === schedH && currM >= schedM)) {
+              logger.info(`[TRIVIA CRON] Triggering scheduled drop ${completedCount + 1}/${config.scheduled_drop_times.length} for guild ${guildId}. Time reached: ${currentTimeStr} >= ${targetTime}`);
+              const dropSuccess = await triggerTriviaDrop(client, guildId);
+              if (dropSuccess) {
+                config.completed_drops_today = completedCount + 1;
+                config.last_drop_date = today;
+                isConfigDirty = true;
+              }
             }
           }
         }
