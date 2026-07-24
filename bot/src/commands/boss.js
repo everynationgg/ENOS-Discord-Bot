@@ -6,6 +6,7 @@ const {
   ButtonBuilder,
   ButtonStyle,
   AttachmentBuilder,
+  MessageFlags,
 } = require('discord.js');
 const {
   getOrCreateActiveBoss,
@@ -18,6 +19,34 @@ const {
 } = require('../modules/gaming/boss');
 const { renderBossImage } = require('../modules/gaming/bossCanvas');
 const { supabase } = require('../lib/supabase');
+
+/**
+ * Resolves an ibb.co share page link to a direct i.ibb.co image URL.
+ * Direct links (i.ibb.co) are returned as-is.
+ */
+async function resolveImageUrl(url) {
+  if (!url || typeof url !== 'string') return null;
+  if (!url.startsWith('http')) return null;
+  // Already a direct image link
+  if (url.includes('i.ibb.co/') || /\.(png|jpg|jpeg|gif|webp)(\?.*)?$/i.test(url)) return url;
+  // Resolve ibb.co share pages to og:image direct link
+  try {
+    const controller = new AbortController();
+    const t = setTimeout(() => controller.abort(), 5000);
+    const res = await fetch(url, {
+      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/122.0.0.0 Safari/537.36' },
+      signal: controller.signal,
+    });
+    clearTimeout(t);
+    if (res.ok) {
+      const html = await res.text();
+      const m = html.match(/<meta\s+property=["']og:image["']\s+content=["']([^"']+)["']/i) ||
+                html.match(/(https:\/\/i\.ibb\.co\/[a-zA-Z0-9_\-\.\/]+)/i);
+      if (m && m[1]) return m[1];
+    }
+  } catch (e) {}
+  return url;
+}
 
 /**
  * Builds the Public Channel Server Overview Card.
@@ -49,11 +78,12 @@ async function buildPublicBossEmbedPayload(guildId) {
     .eq('feature_key', 'weekly_boss')
     .maybeSingle();
 
-  const classImageUrls = {
-    mom: featureRow?.config?.mom_image_url || null,
-    dad: featureRow?.config?.dad_image_url || null,
-    kid: featureRow?.config?.kid_image_url || null,
-  };
+  const [momUrl, dadUrl, kidUrl] = await Promise.all([
+    resolveImageUrl(featureRow?.config?.mom_image_url || null),
+    resolveImageUrl(featureRow?.config?.dad_image_url || null),
+    resolveImageUrl(featureRow?.config?.kid_image_url || null),
+  ]);
+  const classImageUrls = { mom: momUrl, dad: dadUrl, kid: kidUrl };
 
   const buffer = await renderBossImage({
     bossName: boss.boss_name,
@@ -120,11 +150,12 @@ async function buildPersonalCombatPayload(guildId, userId) {
     .eq('feature_key', 'weekly_boss')
     .maybeSingle();
 
-  const classImageUrls = {
-    mom: featureRow?.config?.mom_image_url || null,
-    dad: featureRow?.config?.dad_image_url || null,
-    kid: featureRow?.config?.kid_image_url || null,
-  };
+  const [momUrl2, dadUrl2, kidUrl2] = await Promise.all([
+    resolveImageUrl(featureRow?.config?.mom_image_url || null),
+    resolveImageUrl(featureRow?.config?.dad_image_url || null),
+    resolveImageUrl(featureRow?.config?.kid_image_url || null),
+  ]);
+  const classImageUrls = { mom: momUrl2, dad: dadUrl2, kid: kidUrl2 };
 
   const activeClass = playerState?.class_key || 'mom';
 
@@ -224,7 +255,7 @@ module.exports = {
 
     if (sub === 'status' || sub === 'spawn') {
       if (sub === 'spawn' && !interaction.member.permissions.has(PermissionFlagsBits.ManageGuild)) {
-        return interaction.reply({ content: '❌ You need the **Manage Server** permission to force spawn a boss.', ephemeral: true });
+        return interaction.reply({ content: '❌ You need the **Manage Server** permission to force spawn a boss.', flags: MessageFlags.Ephemeral });
       }
 
       await interaction.deferReply();
@@ -233,7 +264,7 @@ module.exports = {
     }
 
     if (sub === 'stats') {
-      await interaction.deferReply({ ephemeral: true });
+      await interaction.deferReply({ flags: MessageFlags.Ephemeral });
       const profile = await getUserProfile(interaction.guild.id, interaction.user.id);
       const playerState = await getPlayerState(interaction.guild.id, interaction.user.id);
 
@@ -328,12 +359,12 @@ module.exports = {
           `• ⚡ **Full Triad Meltdown (3 AP + Both States)**: 60,000 DMG!\n\n` +
           `*Note: Defeating the main boss unlocks Overkill Mode with 1.5x bonus points & XP!*`
         );
-      return interaction.reply({ embeds: [embed], ephemeral: true });
+      return interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
     }
 
     // ─── 1. JOIN CLASS / ENGAGE BOSS (Launches Personal Ephemeral Combat View) ───
     if (customId.startsWith('boss_join:') || customId === 'boss_engage') {
-      await interaction.deferReply({ ephemeral: true });
+      await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
       if (customId.startsWith('boss_join:')) {
         const targetClass = customId.split(':')[1];
@@ -385,7 +416,7 @@ module.exports = {
 
       const res = await executeCombatAction(guildId, userId, actionType);
       if (!res.success) {
-        await interaction.followUp({ content: res.message, ephemeral: true });
+        await interaction.followUp({ content: res.message, flags: MessageFlags.Ephemeral });
         return;
       }
 
@@ -409,7 +440,7 @@ module.exports = {
       const statType = customId.split(':')[1];
       await interaction.deferUpdate();
       const res = await allocateStatPoint(guildId, userId, statType);
-      await interaction.followUp({ content: res.message, ephemeral: true });
+      await interaction.followUp({ content: res.message, flags: MessageFlags.Ephemeral });
       return;
     }
 
@@ -438,10 +469,10 @@ module.exports = {
           new ButtonBuilder().setCustomId('boss_stat_add:ap_save').setLabel('+5% AP Save').setStyle(ButtonStyle.Success).setEmoji('⚡'),
           new ButtonBuilder().setCustomId('boss_stat_add:xp_boost').setLabel('+5% XP Rate').setStyle(ButtonStyle.Secondary).setEmoji('📈')
         );
-        return interaction.reply({ embeds: [embed], components: [row], ephemeral: true });
+        return interaction.reply({ embeds: [embed], components: [row], flags: MessageFlags.Ephemeral });
       }
 
-      return interaction.reply({ embeds: [embed], ephemeral: true });
+      return interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
     }
 
     // ─── 6. LEADERBOARD ─────────────────────────────────────────────────────
@@ -471,7 +502,7 @@ module.exports = {
         .setDescription(lines.join('\n'))
         .setFooter({ text: 'ENOS RPG Ranking System' });
 
-      return interaction.reply({ embeds: [embed], ephemeral: true });
+      return interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
     }
   },
 };
