@@ -190,12 +190,16 @@ async function buildPersonalCombatPayload(guildId, userId) {
   const classTitles = { mom: '🛡️ M.O.M. (Buff Support)', dad: '🔨 D.A.D. (Debuff Setup)', kid: '⚡ K.I.D. (Nuke Combo)' };
 
   const hpPct = Math.max(0, Math.round((Number(boss.current_hp) / Number(boss.max_hp)) * 100));
+  const filledBlocks = Math.round(hpPct / 10);
+  const hpBar = '🟩'.repeat(filledBlocks) + '⬛'.repeat(10 - filledBlocks);
 
   const embed = new EmbedBuilder()
     .setColor(boss.is_overkill ? 0xef4444 : 0x38bdf8)
     .setTitle(`🗡️ Personal Arena — ${classTitles[activeClass]}`)
     .setDescription(
-      `**Target**: ${boss.boss_name} (**${hpPct}% HP remaining**)\n` +
+      `🎯 **Target**: **${boss.boss_name}**\n` +
+      `❤️ **HP Status**: ${hpBar} **${hpPct}%** (\`${Number(boss.current_hp).toLocaleString()} / ${Number(boss.max_hp).toLocaleString()} HP\`)\n` +
+      `🛡️ **M.O.M. Buff**: ${boss.mom_buff ? '✅ **ACTIVE** (Ready for Nuke)' : '❌ Inactive'} | 🔨 **D.A.D. Debuff**: ${boss.dad_debuff ? '✅ **ACTIVE**' : '❌ Inactive'}\n` +
       `⚔️ **Last Action**: ${boss.last_action || 'None'}\n\n` +
       `⚡ **Your AP Remaining**: \`${playerState.ap_remaining}/5 AP\` ${playerState.is_locked ? '*(Class locked for week)*' : '*(Can swap class)*'}\n` +
       `⏱️ *Note: This private combat view will auto-expire in 5 minutes.*`
@@ -261,7 +265,34 @@ module.exports = {
 
       await interaction.deferReply();
       const payload = await buildPublicBossEmbedPayload(interaction.guild.id);
-      return interaction.editReply(payload);
+      const replyMsg = await interaction.editReply(payload);
+
+      // Save public card message location for real-time live updates
+      try {
+        const { data: featureRow } = await supabase
+          .from('guild_config')
+          .select('config')
+          .eq('guild_id', interaction.guild.id)
+          .eq('feature_key', 'weekly_boss')
+          .maybeSingle();
+
+        const updatedConfig = {
+          ...(featureRow?.config || {}),
+          last_channel_id: interaction.channelId,
+          last_message_id: replyMsg.id,
+        };
+
+        await supabase
+          .from('guild_config')
+          .upsert({
+            guild_id: interaction.guild.id,
+            feature_key: 'weekly_boss',
+            config: updatedConfig,
+            updated_at: new Date().toISOString(),
+          });
+      } catch (e) {}
+
+      return;
     }
 
     if (sub === 'stats') {
@@ -446,13 +477,33 @@ module.exports = {
         setTimeout(() => lvlMsg.delete().catch(() => {}), 10000);
       }
 
-      // Update Public Channel Card asynchronously if present
+      // Update Public Channel Card asynchronously in real-time
       try {
-        const publicPayload = await buildPublicBossEmbedPayload(guildId);
-        if (interaction.message && !interaction.message.flags.has('Ephemeral')) {
-          await interaction.message.edit(publicPayload).catch(() => {});
+        const { data: featureRow } = await supabase
+          .from('guild_config')
+          .select('config')
+          .eq('guild_id', guildId)
+          .eq('feature_key', 'weekly_boss')
+          .maybeSingle();
+
+        const channelId = featureRow?.config?.last_channel_id || featureRow?.config?.channel_id;
+        const messageId = featureRow?.config?.last_message_id;
+
+        if (channelId && interaction.client) {
+          const channel = await interaction.client.channels.fetch(channelId).catch(() => null);
+          if (channel) {
+            const publicPayload = await buildPublicBossEmbedPayload(guildId);
+            if (messageId) {
+              const publicMsg = await channel.messages.fetch(messageId).catch(() => null);
+              if (publicMsg) {
+                await publicMsg.edit(publicPayload).catch(() => {});
+              }
+            }
+          }
         }
-      } catch (e) {}
+      } catch (e) {
+        logger.error('[BOSS UPDATE] Error updating public card:', e);
+      }
 
       return;
     }
