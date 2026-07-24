@@ -163,7 +163,13 @@ async function getUserProfile(guildId, userId) {
     .eq('user_id', userId)
     .maybeSingle();
 
-  if (existing) return existing;
+  if (existing) {
+    return {
+      stat_crit: 0,
+      stat_loot_boost: 0,
+      ...existing,
+    };
+  }
 
   const { data: newProfile, error } = await supabase
     .from('boss_user_profiles')
@@ -174,8 +180,10 @@ async function getUserProfile(guildId, userId) {
       xp: 0,
       unallocated_stats: 0,
       stat_dmg: 0,
+      stat_crit: 0,
       stat_ap_save: 0,
       stat_xp_boost: 0,
+      stat_loot_boost: 0,
     })
     .select()
     .single();
@@ -235,14 +243,30 @@ async function allocateStatPoint(guildId, userId, statType) {
   const updates = { unallocated_stats: profile.unallocated_stats - 1, updated_at: new Date().toISOString() };
 
   if (statType === 'dmg') {
-    updates.stat_dmg = profile.stat_dmg + 1;
-  } else if (statType === 'ap_save') {
-    if (profile.stat_ap_save >= 4) {
-      return { success: false, message: '❌ AP Conservation is capped at 4 points (20% maximum chance).' };
+    if ((profile.stat_dmg || 0) >= 35) {
+      return { success: false, message: '❌ Damage Bonus is capped at 35 points (+35% max).' };
     }
-    updates.stat_ap_save = profile.stat_ap_save + 1;
+    updates.stat_dmg = (profile.stat_dmg || 0) + 1;
+  } else if (statType === 'crit') {
+    if ((profile.stat_crit || 0) >= 35) {
+      return { success: false, message: '❌ Critical Strike is capped at 35 points (+35% max chance).' };
+    }
+    updates.stat_crit = (profile.stat_crit || 0) + 1;
+  } else if (statType === 'ap_save') {
+    if ((profile.stat_ap_save || 0) >= 15) {
+      return { success: false, message: '❌ AP Conservation is capped at 15 points (+15% max chance).' };
+    }
+    updates.stat_ap_save = (profile.stat_ap_save || 0) + 1;
   } else if (statType === 'xp_boost') {
-    updates.stat_xp_boost = profile.stat_xp_boost + 1;
+    if ((profile.stat_xp_boost || 0) >= 10) {
+      return { success: false, message: '❌ XP Rate Boost is capped at 10 points (+10% max boost).' };
+    }
+    updates.stat_xp_boost = (profile.stat_xp_boost || 0) + 1;
+  } else if (statType === 'loot_boost') {
+    if ((profile.stat_loot_boost || 0) >= 10) {
+      return { success: false, message: '❌ Loot Multiplier is capped at 10 points (+10% max bonus).' };
+    }
+    updates.stat_loot_boost = (profile.stat_loot_boost || 0) + 1;
   } else {
     return { success: false, message: 'Invalid stat type.' };
   }
@@ -261,7 +285,7 @@ async function allocateStatPoint(guildId, userId, statType) {
 }
 
 /**
- * Executes a player combat move (Basic Attack 1 AP or Skill 3 AP).
+ * Executes a player combat action (basic attack or 3 AP skill).
  */
 async function executeCombatAction(guildId, userId, actionType) {
   const boss = await getOrCreateActiveBoss(guildId);
@@ -285,8 +309,8 @@ async function executeCombatAction(guildId, userId, actionType) {
     };
   }
 
-  // Option B: AP Conservation Roll (+5% chance per stat_ap_save point, max 20%)
-  const apSaveChance = Math.min(0.20, profile.stat_ap_save * 0.05);
+  // AP Conservation Roll (+1% chance per stat_ap_save point, max 15%)
+  const apSaveChance = Math.min(0.15, (profile.stat_ap_save || 0) * 0.01);
   const apConserved = Math.random() < apSaveChance;
   const actualApDeducted = apConserved ? 0 : apCost;
 
@@ -338,33 +362,51 @@ async function executeCombatAction(guildId, userId, actionType) {
     }
   }
 
-  // Stat Dmg Bonus (+2% per stat_dmg point)
-  const dmgMultiplier = 1 + (profile.stat_dmg * 0.02);
+  // Stat Dmg Bonus (+1% per stat_dmg point, max 35%)
+  const dmgMultiplier = 1 + (Math.min(35, profile.stat_dmg || 0) * 0.01);
   let totalDmg = Math.round(baseDmg * dmgMultiplier);
+
+  // Critical Strike Roll (+1% per stat_crit point, max 35% chance for 2x DMG)
+  const critChance = Math.min(0.35, (profile.stat_crit || 0) * 0.01);
+  const isCrit = Math.random() < critChance;
+  if (isCrit) {
+    totalDmg *= 2;
+  }
 
   // Overkill Mode 1.5x Bonus Multiplier
   const pointsMultiplier = boss.is_overkill ? 1.5 : 1.0;
   let pointsEarned = Math.round(totalDmg * pointsMultiplier);
 
-  // XP Math: 100 XP per AP spent + stat_xp_boost (+5% per point)
-  const xpMultiplier = 1 + (profile.stat_xp_boost * 0.05);
+  // XP Math: 100 XP per AP spent + stat_xp_boost (+1% per point, max 10%)
+  const xpMultiplier = 1 + (Math.min(10, profile.stat_xp_boost || 0) * 0.01);
   const baseXp = apCost * 100;
   const xpEarned = Math.round(baseXp * xpMultiplier * pointsMultiplier);
 
-  // User Account XP & Level Up Math
-  const newXp = profile.xp + xpEarned;
-  const xpPerLevel = profile.level * 500;
-  let newLevel = profile.level;
-  let newUnallocated = profile.unallocated_stats;
+  // User Account XP & Level Up Math (Lv 1-100 Curve: 150 + 25L + 7L^1.35)
+  const getXpRequiredForLevel = (l) => Math.round(150 + 25 * l + 7 * Math.pow(l, 1.35));
 
-  if (newXp >= xpPerLevel) {
-    newLevel += 1;
-    newUnallocated += 1; // 1 Stat Point per level
+  let currentLevel = profile.level || 1;
+  let currentXp = (profile.xp || 0) + xpEarned;
+  let newUnallocated = profile.unallocated_stats || 0;
+
+  while (currentLevel < 100) {
+    const xpNeeded = getXpRequiredForLevel(currentLevel);
+    if (currentXp >= xpNeeded) {
+      currentXp -= xpNeeded;
+      currentLevel += 1;
+      newUnallocated += 1;
+    } else {
+      break;
+    }
   }
+
+  const newLevel = currentLevel;
+  const newXp = currentXp;
 
   // Atomic Update Boss HP & Synergy State in Supabase
   const newHp = Math.max(0, boss.current_hp - totalDmg);
   let actionText = `${classKey.toUpperCase()} used ${skillName} dealt ${totalDmg.toLocaleString()} DMG`;
+  if (isCrit) actionText += ' 💥 (CRITICAL STRIKE! 2x DMG)';
   if (apConserved) actionText += ' ⚡ (0 AP SPENT!)';
   if (isSynergy) actionText += ` 🔥 (${synergyType.toUpperCase()} COMBO!)`;
   if (newLevel > profile.level) actionText += ` 🎉 (LEVEL UP to Lv.${newLevel}!)`;

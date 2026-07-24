@@ -305,17 +305,20 @@ module.exports = {
       await interaction.deferReply({ flags: MessageFlags.Ephemeral });
       const profile = await getUserProfile(interaction.guild.id, interaction.user.id);
       const playerState = await getPlayerState(interaction.guild.id, interaction.user.id);
+      const xpNeeded = Math.round(150 + 25 * profile.level + 7 * Math.pow(profile.level, 1.35));
 
       const embed = new EmbedBuilder()
         .setColor(0x38bdf8)
         .setTitle(`👤 ${interaction.user.username}'s RPG Profile`)
         .setDescription(
-          `**Level**: \`${profile.level}\` | **XP**: \`${profile.xp}/${profile.level * 500}\`\n` +
+          `**Level**: \`${profile.level}/100\` | **XP**: \`${profile.xp}/${xpNeeded}\`\n` +
           `**Unallocated Stat Points**: \`${profile.unallocated_stats}\`\n\n` +
           `**Attributes & Perks**:\n` +
-          `• ⚔️ **Damage Bonus**: \`+${profile.stat_dmg * 2}%\` (${profile.stat_dmg} pts)\n` +
-          `• ⚡ **AP Conservation**: \`+${profile.stat_ap_save * 5}%\` (${profile.stat_ap_save}/4 pts max - 0 AP chance)\n` +
-          `• 📈 **XP Rate Boost**: \`+${profile.stat_xp_boost * 5}%\` (${profile.stat_xp_boost} pts)\n\n` +
+          `• ⚔️ **Damage Bonus**: \`+${profile.stat_dmg || 0}%\` (${profile.stat_dmg || 0}/35 pts)\n` +
+          `• 💥 **Critical Strike**: \`+${profile.stat_crit || 0}%\` (${profile.stat_crit || 0}/35 pts max - 2x DMG chance)\n` +
+          `• ⚡ **AP Conservation**: \`+${profile.stat_ap_save || 0}%\` (${profile.stat_ap_save || 0}/15 pts max - 0 AP chance)\n` +
+          `• 📈 **XP Rate Boost**: \`+${profile.stat_xp_boost || 0}%\` (${profile.stat_xp_boost || 0}/10 pts)\n` +
+          `• 💰 **Loot Multiplier**: \`+${profile.stat_loot_boost || 0}%\` (${profile.stat_loot_boost || 0}/10 pts)\n\n` +
           `**Active Week Status**: AP \`${playerState.ap_remaining}/5\` | Damage: \`${playerState.total_damage.toLocaleString()} DMG\``
         )
         .setFooter({ text: 'ENOS RPG Progression System' });
@@ -323,13 +326,6 @@ module.exports = {
       const row = new ActionRowBuilder();
       if (profile.unallocated_stats > 0) {
         row.addComponents(
-          new ButtonBuilder().setCustomId('boss_stat_add:dmg').setLabel('+2% DMG').setStyle(ButtonStyle.Primary).setEmoji('⚔️'),
-          new ButtonBuilder().setCustomId('boss_stat_add:ap_save').setLabel('+5% AP Save').setStyle(ButtonStyle.Success).setEmoji('⚡'),
-          new ButtonBuilder().setCustomId('boss_stat_add:xp_boost').setLabel('+5% XP Rate').setStyle(ButtonStyle.Secondary).setEmoji('📈')
-        );
-        const reply = await interaction.editReply({ embeds: [embed], components: [row] });
-        scheduleEphemeralExpiry(interaction);
-        return reply;
       }
 
       const reply = await interaction.editReply({ embeds: [embed] });
@@ -540,26 +536,31 @@ module.exports = {
       // Re-fetch profile and player state to edit the profile embed directly in-place
       const profile = await getUserProfile(guildId, userId);
       const playerState = await getPlayerState(guildId, userId);
+      const xpNeeded = Math.round(150 + 25 * profile.level + 7 * Math.pow(profile.level, 1.35));
 
       const embed = new EmbedBuilder()
         .setColor(0x38bdf8)
         .setTitle(`👤 ${interaction.user.username}'s RPG Profile`)
         .setDescription(
-          `**Level**: \`${profile.level}\` | **XP**: \`${profile.xp}/${profile.level * 500}\`\n` +
+          `**Level**: \`${profile.level}/100\` | **XP**: \`${profile.xp}/${xpNeeded}\`\n` +
           `**Unallocated Stat Points**: \`${profile.unallocated_stats}\`\n\n` +
           `**Attributes & Perks**:\n` +
-          `• ⚔️ **Damage Bonus**: \`+${profile.stat_dmg * 2}%\` (${profile.stat_dmg} pts)\n` +
-          `• ⚡ **AP Conservation**: \`+${profile.stat_ap_save * 5}%\` (${profile.stat_ap_save}/4 pts max - 0 AP chance)\n` +
-          `• 📈 **XP Rate Boost**: \`+${profile.stat_xp_boost * 5}%\` (${profile.stat_xp_boost} pts)\n\n` +
+          `• ⚔️ **Damage Bonus**: \`+${profile.stat_dmg || 0}%\` (${profile.stat_dmg || 0}/35 pts)\n` +
+          `• 💥 **Critical Strike**: \`+${profile.stat_crit || 0}%\` (${profile.stat_crit || 0}/35 pts max - 2x DMG chance)\n` +
+          `• ⚡ **AP Conservation**: \`+${profile.stat_ap_save || 0}%\` (${profile.stat_ap_save || 0}/15 pts max - 0 AP chance)\n` +
+          `• 📈 **XP Rate Boost**: \`+${profile.stat_xp_boost || 0}%\` (${profile.stat_xp_boost || 0}/10 pts)\n` +
+          `• 💰 **Loot Multiplier**: \`+${profile.stat_loot_boost || 0}%\` (${profile.stat_loot_boost || 0}/10 pts)\n\n` +
           `**Active Week Status**: AP \`${playerState.ap_remaining}/5\` | Damage: \`${playerState.total_damage.toLocaleString()} DMG\``
         );
 
       const row = new ActionRowBuilder();
       if (profile.unallocated_stats > 0) {
         row.addComponents(
-          new ButtonBuilder().setCustomId('boss_stat_add:dmg').setLabel('+2% DMG').setStyle(ButtonStyle.Primary).setEmoji('⚔️'),
-          new ButtonBuilder().setCustomId('boss_stat_add:ap_save').setLabel('+5% AP Save').setStyle(ButtonStyle.Success).setEmoji('⚡'),
-          new ButtonBuilder().setCustomId('boss_stat_add:xp_boost').setLabel('+5% XP Rate').setStyle(ButtonStyle.Secondary).setEmoji('📈')
+          new ButtonBuilder().setCustomId('boss_stat_add:dmg').setLabel('+1% DMG').setStyle(ButtonStyle.Primary).setEmoji('⚔️'),
+          new ButtonBuilder().setCustomId('boss_stat_add:crit').setLabel('+1% Crit').setStyle(ButtonStyle.Danger).setEmoji('💥'),
+          new ButtonBuilder().setCustomId('boss_stat_add:ap_save').setLabel('+1% AP Save').setStyle(ButtonStyle.Success).setEmoji('⚡'),
+          new ButtonBuilder().setCustomId('boss_stat_add:xp_boost').setLabel('+1% XP').setStyle(ButtonStyle.Secondary).setEmoji('📈'),
+          new ButtonBuilder().setCustomId('boss_stat_add:loot_boost').setLabel('+1% Loot').setStyle(ButtonStyle.Secondary).setEmoji('💰')
         );
         await interaction.editReply({ embeds: [embed], components: [row] });
       } else {
@@ -574,17 +575,20 @@ module.exports = {
     if (customId === 'boss_profile') {
       const profile = await getUserProfile(guildId, userId);
       const playerState = await getPlayerState(guildId, userId);
+      const xpNeeded = Math.round(150 + 25 * profile.level + 7 * Math.pow(profile.level, 1.35));
 
       const embed = new EmbedBuilder()
         .setColor(0x38bdf8)
         .setTitle(`👤 ${interaction.user.username}'s RPG Profile`)
         .setDescription(
-          `**Level**: \`${profile.level}\` | **XP**: \`${profile.xp}/${profile.level * 500}\`\n` +
+          `**Level**: \`${profile.level}/100\` | **XP**: \`${profile.xp}/${xpNeeded}\`\n` +
           `**Unallocated Stat Points**: \`${profile.unallocated_stats}\`\n\n` +
           `**Attributes & Perks**:\n` +
-          `• ⚔️ **Damage Bonus**: \`+${profile.stat_dmg * 2}%\` (${profile.stat_dmg} pts)\n` +
-          `• ⚡ **AP Conservation**: \`+${profile.stat_ap_save * 5}%\` (${profile.stat_ap_save}/4 pts max - 0 AP chance)\n` +
-          `• 📈 **XP Rate Boost**: \`+${profile.stat_xp_boost * 5}%\` (${profile.stat_xp_boost} pts)\n\n` +
+          `• ⚔️ **Damage Bonus**: \`+${profile.stat_dmg || 0}%\` (${profile.stat_dmg || 0}/35 pts)\n` +
+          `• 💥 **Critical Strike**: \`+${profile.stat_crit || 0}%\` (${profile.stat_crit || 0}/35 pts max - 2x DMG chance)\n` +
+          `• ⚡ **AP Conservation**: \`+${profile.stat_ap_save || 0}%\` (${profile.stat_ap_save || 0}/15 pts max - 0 AP chance)\n` +
+          `• 📈 **XP Rate Boost**: \`+${profile.stat_xp_boost || 0}%\` (${profile.stat_xp_boost || 0}/10 pts)\n` +
+          `• 💰 **Loot Multiplier**: \`+${profile.stat_loot_boost || 0}%\` (${profile.stat_loot_boost || 0}/10 pts)\n\n` +
           `**Active Week Status**: AP \`${playerState.ap_remaining}/5\` | Damage: \`${playerState.total_damage.toLocaleString()} DMG\``
         );
 
@@ -594,9 +598,11 @@ module.exports = {
 
       if (profile.unallocated_stats > 0) {
         row.addComponents(
-          new ButtonBuilder().setCustomId('boss_stat_add:dmg').setLabel('+2% DMG').setStyle(ButtonStyle.Primary).setEmoji('⚔️'),
-          new ButtonBuilder().setCustomId('boss_stat_add:ap_save').setLabel('+5% AP Save').setStyle(ButtonStyle.Success).setEmoji('⚡'),
-          new ButtonBuilder().setCustomId('boss_stat_add:xp_boost').setLabel('+5% XP Rate').setStyle(ButtonStyle.Secondary).setEmoji('📈')
+          new ButtonBuilder().setCustomId('boss_stat_add:dmg').setLabel('+1% DMG').setStyle(ButtonStyle.Primary).setEmoji('⚔️'),
+          new ButtonBuilder().setCustomId('boss_stat_add:crit').setLabel('+1% Crit').setStyle(ButtonStyle.Danger).setEmoji('💥'),
+          new ButtonBuilder().setCustomId('boss_stat_add:ap_save').setLabel('+1% AP Save').setStyle(ButtonStyle.Success).setEmoji('⚡'),
+          new ButtonBuilder().setCustomId('boss_stat_add:xp_boost').setLabel('+1% XP').setStyle(ButtonStyle.Secondary).setEmoji('📈'),
+          new ButtonBuilder().setCustomId('boss_stat_add:loot_boost').setLabel('+1% Loot').setStyle(ButtonStyle.Secondary).setEmoji('💰')
         );
         replyMsg = await interaction.reply({ embeds: [embed], components: [row], flags: MessageFlags.Ephemeral, fetchReply: true });
       } else {
