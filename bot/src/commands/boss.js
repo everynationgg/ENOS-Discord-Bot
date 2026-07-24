@@ -335,9 +335,17 @@ module.exports = {
    * Button Interaction Handler for Weekly Boss Buttons
    */
   async handleBossButton(interaction) {
-    const customId = interaction.customId;
+    let customId = interaction.customId;
     const guildId = interaction.guild.id;
     const userId = interaction.user.id;
+
+    logger.info(`[BOSS BUTTON] Received: customId="${customId}" user=${userId} guild=${guildId}`);
+
+    // ─── Backward compat: remap old boss_pick: → boss_join: ─────────────────
+    if (customId.startsWith('boss_pick:')) {
+      customId = customId.replace('boss_pick:', 'boss_join:');
+      logger.info(`[BOSS BUTTON] Remapped old boss_pick to: ${customId}`);
+    }
 
     if (customId === 'boss_close_ephemeral') {
       return interaction.deleteReply().catch(() => {});

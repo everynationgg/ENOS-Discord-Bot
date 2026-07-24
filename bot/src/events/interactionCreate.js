@@ -44,6 +44,7 @@ module.exports = {
 
       // ─── Button Interactions ──────────────────────────────────────────────────
       if (interaction.isButton()) {
+        logger.info(`[INTERACTION] Button click: customId="${interaction.customId}" user=${interaction.user.id}`);
         if (interaction.customId === 'verify_here') {
           return handleVerifyButton(interaction);
         }
