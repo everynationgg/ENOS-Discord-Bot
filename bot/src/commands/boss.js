@@ -139,7 +139,7 @@ async function buildPublicBossEmbedPayload(guildId) {
 /**
  * Builds a Player's Personal Ephemeral Combat View Payload.
  */
-async function buildPersonalCombatPayload(guildId, userId) {
+async function buildPersonalCombatPayload(guildId, userId, combatResult = null) {
   const boss = await getOrCreateActiveBoss(guildId);
   const playerState = await getPlayerState(guildId, userId);
   const currentWeek = getWeekIdentifier();
@@ -193,10 +193,16 @@ async function buildPersonalCombatPayload(guildId, userId) {
   const filledBlocks = Math.round(hpPct / 10);
   const hpBar = '🟩'.repeat(filledBlocks) + '⬛'.repeat(10 - filledBlocks);
 
+  let levelUpBanner = '';
+  if (combatResult?.leveledUp) {
+    levelUpBanner = `🎉 **LEVEL UP! You reached Level ${combatResult.newLevel}!** (+1 Stat Point earned! Click **My Stats** to allocate it)\n\n`;
+  }
+
   const embed = new EmbedBuilder()
-    .setColor(boss.is_overkill ? 0xef4444 : 0x38bdf8)
+    .setColor(combatResult?.leveledUp ? 0xfacc15 : (boss.is_overkill ? 0xef4444 : 0x38bdf8))
     .setTitle(`🗡️ Personal Arena — ${classTitles[activeClass]}`)
     .setDescription(
+      levelUpBanner +
       `🎯 **Target**: **${boss.boss_name}**\n` +
       `❤️ **HP Status**: ${hpBar} **${hpPct}%** (\`${Number(boss.current_hp).toLocaleString()} / ${Number(boss.max_hp).toLocaleString()} HP\`)\n` +
       `🛡️ **M.O.M. Buff**: ${boss.mom_buff ? '✅ **ACTIVE** (Ready for Nuke)' : '❌ Inactive'} | 🔨 **D.A.D. Debuff**: ${boss.dad_debuff ? '✅ **ACTIVE**' : '❌ Inactive'}\n` +
@@ -463,19 +469,9 @@ module.exports = {
         return;
       }
 
-      // Re-render ephemeral combat view
-      const payload = await buildPersonalCombatPayload(guildId, userId);
+      // Re-render ephemeral combat view (with levelUp state merged inside embed)
+      const payload = await buildPersonalCombatPayload(guildId, userId, res);
       await interaction.editReply(payload);
-
-      // Level up ephemeral notification (10s expiry)
-      if (res.leveledUp) {
-        const lvlMsg = await interaction.followUp({
-          content: `🎉 **LEVEL UP!** You reached **Level ${res.newLevel}**! You earned **+1 Stat Point**! Click **My Stats** to allocate it.`,
-          flags: MessageFlags.Ephemeral,
-          fetchReply: true,
-        });
-        setTimeout(() => lvlMsg.delete().catch(() => {}), 10000);
-      }
 
       // Update Public Channel Card asynchronously in real-time
       try {
