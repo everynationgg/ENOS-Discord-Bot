@@ -73,7 +73,7 @@ async function postBossCardToDiscord(guildId: string, boss: any) {
       bossName: boss.boss_name,
       bossTitle: boss.boss_title,
       customImageUrl: boss.custom_image_url,
-      customBgUrl: boss.custom_bg_url,
+      customBgUrl: featureRows?.[0]?.config?.custom_bg_url || null,
       classImageUrls,
       currentHp: Number(boss.current_hp),
       maxHp: Number(boss.max_hp),
@@ -221,7 +221,6 @@ export async function POST(req: NextRequest) {
             mom_buff: false,
             dad_debuff: false,
             custom_image_url: resolvedImageUrl || null,
-            custom_bg_url: resolvedBgUrl || null,
             last_action: '⚡ Admin force spawned a new Weekly Boss!',
           })
           .eq('id', existingBoss.id)
@@ -249,7 +248,6 @@ export async function POST(req: NextRequest) {
             mom_buff: false,
             dad_debuff: false,
             custom_image_url: resolvedImageUrl || null,
-            custom_bg_url: resolvedBgUrl || null,
             last_action: '⚡ Admin force spawned a new Weekly Boss!',
           })
           .select()
