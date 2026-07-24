@@ -223,12 +223,12 @@ async function buildPersonalCombatPayload(guildId, userId) {
 }
 
 /**
- * Schedules a 5-minute auto-expiry for an ephemeral reply.
+ * Schedules auto-expiry for an ephemeral reply.
  */
-function scheduleEphemeralExpiry(interaction) {
+function scheduleEphemeralExpiry(interaction, ms = 5 * 60 * 1000) {
   setTimeout(() => {
     interaction.deleteReply().catch(() => {});
-  }, 5 * 60 * 1000); // 5 minutes (300,000 ms)
+  }, ms);
 }
 
 module.exports = {
@@ -368,7 +368,9 @@ module.exports = {
           `• ⚡ **Full Triad Meltdown (3 AP + Both States)**: 60,000 DMG!\n\n` +
           `*Note: Defeating the main boss unlocks Overkill Mode with 1.5x bonus points & XP!*`
         );
-      return interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
+      const replyMsg = await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral, fetchReply: true });
+      setTimeout(() => replyMsg.delete().catch(() => {}), 10000);
+      return;
     }
 
     // ─── 1. JOIN CLASS / ENGAGE BOSS (Launches Personal Ephemeral Combat View) ───
@@ -425,13 +427,24 @@ module.exports = {
 
       const res = await executeCombatAction(guildId, userId, actionType);
       if (!res.success) {
-        await interaction.followUp({ content: res.message, flags: MessageFlags.Ephemeral });
+        const followMsg = await interaction.followUp({ content: res.message, flags: MessageFlags.Ephemeral, fetchReply: true });
+        setTimeout(() => followMsg.delete().catch(() => {}), 5000);
         return;
       }
 
       // Re-render ephemeral combat view
       const payload = await buildPersonalCombatPayload(guildId, userId);
       await interaction.editReply(payload);
+
+      // Level up ephemeral notification (10s expiry)
+      if (res.leveledUp) {
+        const lvlMsg = await interaction.followUp({
+          content: `🎉 **LEVEL UP!** You reached **Level ${res.newLevel}**! You earned **+1 Stat Point**! Click **My Stats** to allocate it.`,
+          flags: MessageFlags.Ephemeral,
+          fetchReply: true,
+        });
+        setTimeout(() => lvlMsg.delete().catch(() => {}), 10000);
+      }
 
       // Update Public Channel Card asynchronously if present
       try {
@@ -449,7 +462,10 @@ module.exports = {
       const statType = customId.split(':')[1];
       await interaction.deferUpdate();
       const res = await allocateStatPoint(guildId, userId, statType);
-      await interaction.followUp({ content: res.message, flags: MessageFlags.Ephemeral });
+      const isLevelUp = res.message?.includes('LEVEL UP');
+      const delayMs = isLevelUp ? 10000 : 5000;
+      const followMsg = await interaction.followUp({ content: res.message, flags: MessageFlags.Ephemeral, fetchReply: true });
+      setTimeout(() => followMsg.delete().catch(() => {}), delayMs);
       return;
     }
 
@@ -472,16 +488,19 @@ module.exports = {
         );
 
       const row = new ActionRowBuilder();
+      let replyMsg;
       if (profile.unallocated_stats > 0) {
         row.addComponents(
           new ButtonBuilder().setCustomId('boss_stat_add:dmg').setLabel('+2% DMG').setStyle(ButtonStyle.Primary).setEmoji('⚔️'),
           new ButtonBuilder().setCustomId('boss_stat_add:ap_save').setLabel('+5% AP Save').setStyle(ButtonStyle.Success).setEmoji('⚡'),
           new ButtonBuilder().setCustomId('boss_stat_add:xp_boost').setLabel('+5% XP Rate').setStyle(ButtonStyle.Secondary).setEmoji('📈')
         );
-        return interaction.reply({ embeds: [embed], components: [row], flags: MessageFlags.Ephemeral });
+        replyMsg = await interaction.reply({ embeds: [embed], components: [row], flags: MessageFlags.Ephemeral, fetchReply: true });
+      } else {
+        replyMsg = await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral, fetchReply: true });
       }
-
-      return interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
+      setTimeout(() => replyMsg.delete().catch(() => {}), 15000);
+      return;
     }
 
     // ─── 6. LEADERBOARD ─────────────────────────────────────────────────────
@@ -511,7 +530,9 @@ module.exports = {
         .setDescription(lines.join('\n'))
         .setFooter({ text: 'ENOS RPG Ranking System' });
 
-      return interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
+      const replyMsg = await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral, fetchReply: true });
+      setTimeout(() => replyMsg.delete().catch(() => {}), 10000);
+      return;
     }
   },
 };
