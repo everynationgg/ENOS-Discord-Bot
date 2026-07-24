@@ -1,4 +1,4 @@
-const { Events } = require('discord.js');
+const { Events, MessageFlags } = require('discord.js');
 const logger = require('../lib/logger');
 const {
   handleVerifyButton,
@@ -137,9 +137,9 @@ module.exports = {
       logger.error('[INTERACTION] Handler error:', err);
       const content = '❌ An error occurred while processing this interaction.';
       if (interaction.replied || interaction.deferred) {
-        await interaction.followUp({ content, ephemeral: true }).catch(() => {});
+        await interaction.followUp({ content, flags: MessageFlags.Ephemeral }).catch(() => {});
       } else {
-        await interaction.reply({ content, ephemeral: true }).catch(() => {});
+        await interaction.reply({ content, flags: MessageFlags.Ephemeral }).catch(() => {});
       }
     }
   },
