@@ -2,6 +2,10 @@ require('dotenv').config();
 const { Client, GatewayIntentBits, Partials, Collection } = require('discord.js');
 const { loadEvents } = require('./lib/loader');
 const { loadCommands } = require('./lib/loader');
+/**
+ * ENOS Discord Bot Main Entrypoint
+ * RPG 5-Stat Tree System v1.1.0
+ */
 const { initCrons } = require('./lib/cron');
 const logger = require('./lib/logger');
 
