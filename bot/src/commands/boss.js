@@ -326,10 +326,19 @@ module.exports = {
       const row = new ActionRowBuilder();
       if (profile.unallocated_stats > 0) {
         row.addComponents(
+          new ButtonBuilder().setCustomId('boss_stat_add:dmg').setLabel('+1% DMG').setStyle(ButtonStyle.Primary).setEmoji('⚔️'),
+          new ButtonBuilder().setCustomId('boss_stat_add:crit').setLabel('+1% Crit').setStyle(ButtonStyle.Danger).setEmoji('💥'),
+          new ButtonBuilder().setCustomId('boss_stat_add:ap_save').setLabel('+1% AP Save').setStyle(ButtonStyle.Success).setEmoji('⚡'),
+          new ButtonBuilder().setCustomId('boss_stat_add:xp_boost').setLabel('+1% XP').setStyle(ButtonStyle.Secondary).setEmoji('📈'),
+          new ButtonBuilder().setCustomId('boss_stat_add:loot_boost').setLabel('+1% Loot').setStyle(ButtonStyle.Secondary).setEmoji('💰')
+        );
+        const reply = await interaction.editReply({ embeds: [embed], components: [row] });
+        scheduleEphemeralExpiry(interaction, 15000);
+        return reply;
       }
 
-      const reply = await interaction.editReply({ embeds: [embed] });
-      scheduleEphemeralExpiry(interaction);
+      const reply = await interaction.editReply({ embeds: [embed], components: [] });
+      scheduleEphemeralExpiry(interaction, 5000);
       return reply;
     }
 
@@ -382,6 +391,7 @@ module.exports = {
     }
 
     if (customId === 'boss_close_ephemeral') {
+      await interaction.deferUpdate().catch(() => {});
       return interaction.deleteReply().catch(() => {});
     }
 
