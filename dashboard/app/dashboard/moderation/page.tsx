@@ -1,6 +1,8 @@
 'use client';
 
 import FeatureCard from '@/components/FeatureCard';
+import DiscordEmbedPreview from '@/components/DiscordEmbedPreview';
+import ImageUploader from '@/components/ImageUploader';
 import { useEffect, useState } from 'react';
 
 export default function ModerationPage() {
@@ -133,6 +135,92 @@ export default function ModerationPage() {
       }
     } catch (err) {
       console.error(err);
+    }
+  };
+
+  // Showcase states
+  const [showcasePreset, setShowcasePreset] = useState<'major' | 'patch' | 'showcase'>('major');
+  const [showcaseTitle, setShowcaseTitle] = useState('');
+  const [showcaseSummary, setShowcaseSummary] = useState('');
+  const [showcaseBody, setShowcaseBody] = useState('');
+  const [showcaseBannerUrl, setShowcaseBannerUrl] = useState('');
+  const [showcaseVideoUrl, setShowcaseVideoUrl] = useState('');
+  const [showcaseRewardCoins, setShowcaseRewardCoins] = useState(50);
+  const [showcaseTryChannel, setShowcaseTryChannel] = useState('');
+  const [showcaseChannelId, setShowcaseChannelId] = useState('');
+  const [showcaseDispatchState, setShowcaseDispatchState] = useState<'idle' | 'dispatching' | 'error'>('idle');
+  const [showcaseStatusMsg, setShowcaseStatusMsg] = useState<string | null>(null);
+  const [showcaseHistory, setShowcaseHistory] = useState<any[]>([]);
+
+  const fetchShowcaseHistory = async () => {
+    try {
+      const res = await fetch('/api/moderation/showcase/history');
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data)) setShowcaseHistory(data);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'showcase') {
+      fetchShowcaseHistory();
+      if (channels.length === 0) fetchAnnouncebotData();
+    }
+  }, [activeTab]);
+
+  const handleApplyPreset = (preset: 'major' | 'patch' | 'showcase') => {
+    setShowcasePreset(preset);
+    if (preset === 'major') {
+      setShowcaseTitle('ENOS 2.0 Master System Released!');
+      setShowcaseSummary('World Boss RPG 2.0, Daily AI Trivia, Vault Economy, and AI Support are now live!');
+      setShowcaseBody('### What\'s New in ENOS 2.0:\n- ⚔️ **Weekly Boss RPG**: Fight raid bosses with 3 classes & 5-Attribute Skill Trees!\n- 🧠 **Daily AI Trivia Drops**: Test your knowledge with anti-cheat speed scoring!\n- 💰 **Vault Economy**: Earn coins automatically in voice channels & complete daily quests!\n- 🔑 **Keyform Whitelists**: One-click whitelist applications for Palworld & game servers!');
+      setShowcaseRewardCoins(100);
+    } else if (preset === 'patch') {
+      setShowcaseTitle('Weekly System Maintenance & Fixes');
+      setShowcaseSummary('Patch notes for v1.4.2 performance and bug fixes.');
+      setShowcaseBody('⚡ **Improvements**:\n- Reduced canvas render latency by 40%.\n- Improved daily trivia drop anti-cheat shuffling.\n\n🐛 **Fixes**:\n- Fixed edge case where voice streak rewards doubled on server restart.');
+      setShowcaseRewardCoins(0);
+    } else if (preset === 'showcase') {
+      setShowcaseTitle('Video Tutorial: How to Play Trivia & Earn Vault Coins');
+      setShowcaseSummary('Watch our 1-minute video guide on daily trivia drops and economy rewards.');
+      setShowcaseBody('Learn how microsecond speed scoring works, how anti-cheat shuffling protects answers, and how to cash in your points in the Vault!');
+      setShowcaseRewardCoins(25);
+    }
+  };
+
+  const handleDispatchShowcase = async () => {
+    if (!showcaseTitle.trim() || !showcaseBody.trim() || !showcaseChannelId.trim()) return;
+    setShowcaseDispatchState('dispatching');
+    setShowcaseStatusMsg(null);
+    try {
+      const res = await fetch('/api/moderation/showcase/dispatch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          channel_id: showcaseChannelId.trim(),
+          preset_type: showcasePreset,
+          title: showcaseTitle.trim(),
+          summary: showcaseSummary.trim(),
+          body_markdown: showcaseBody.trim(),
+          banner_url: showcaseBannerUrl.trim(),
+          video_url: showcaseVideoUrl.trim(),
+          reward_coins: showcaseRewardCoins,
+          try_feature_channel: showcaseTryChannel.trim(),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Failed to dispatch showcase.');
+      }
+      setShowcaseStatusMsg('✓ Server update and feature showcase successfully published to Discord!');
+      setShowcaseDispatchState('idle');
+      fetchShowcaseHistory();
+    } catch (err: any) {
+      setShowcaseDispatchState('error');
+      setShowcaseStatusMsg(`⚠️ ${err?.message || 'Failed to publish showcase.'}`);
     }
   };
 
@@ -301,6 +389,13 @@ export default function ModerationPage() {
           >
             📢 Announcebot
           </button>
+          <button
+            className={`sidebar-item ${activeTab === 'showcase' ? 'active' : ''}`}
+            onClick={() => setActiveTab('showcase')}
+            id="sidebar-mod-showcase"
+          >
+            🚀 Feature Showcase Publisher
+          </button>
         </aside>
 
         {/* Detail Content Area */}
@@ -311,6 +406,13 @@ export default function ModerationPage() {
               <p style={{ marginTop: '0.5rem', marginBottom: '1.5rem' }}>
                 Keep your server secure and streamline the process of welcoming new members.
               </p>
+
+              <div className="overview-item">
+                <h3>🚀 Feature Showcase Publisher</h3>
+                <p>
+                  Design and publish high-engagement update cards with hero banners, embedded video tutorials, interactive feedback modals, and Vault Coin rewards.
+                </p>
+              </div>
 
               <div className="overview-item">
                 <h3>📢 Announcebot</h3>
@@ -1185,6 +1287,233 @@ export default function ModerationPage() {
                       {statusMessage}
                     </div>
                   )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'showcase' && (
+            <div className="split-layout-detail">
+              {/* Form & Controls (Left Column) */}
+              <div className="feature-form-card" style={{ flex: '1 1 500px' }}>
+                <div style={{ backgroundColor: 'var(--bg-secondary)', borderRadius: '12px', padding: '1.5rem', border: '1px solid var(--border-color)' }}>
+                  <h3 style={{ marginTop: 0, marginBottom: '1rem', fontSize: '1.15rem' }}>🚀 Feature Showcase Publisher</h3>
+
+                  {/* Preset Selector */}
+                  <div style={{ marginBottom: '1.25rem' }}>
+                    <label className="form-label" style={{ fontWeight: 600, display: 'block', marginBottom: '0.4rem' }}>
+                      ⚡ Preset Template Selector
+                    </label>
+                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                      <button
+                        type="button"
+                        className={`btn ${showcasePreset === 'major' ? 'btn-primary' : 'btn-secondary'}`}
+                        onClick={() => handleApplyPreset('major')}
+                        style={{ flex: 1, fontSize: '0.8125rem' }}
+                      >
+                        🚀 Major Feature Drop
+                      </button>
+                      <button
+                        type="button"
+                        className={`btn ${showcasePreset === 'patch' ? 'btn-primary' : 'btn-secondary'}`}
+                        onClick={() => handleApplyPreset('patch')}
+                        style={{ flex: 1, fontSize: '0.8125rem' }}
+                      >
+                        🛠️ Micro-Patch Notes
+                      </button>
+                      <button
+                        type="button"
+                        className={`btn ${showcasePreset === 'showcase' ? 'btn-primary' : 'btn-secondary'}`}
+                        onClick={() => handleApplyPreset('showcase')}
+                        style={{ flex: 1, fontSize: '0.8125rem' }}
+                      >
+                        🎬 Video Showcase
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Target Channel */}
+                  <div style={{ marginBottom: '1.25rem' }}>
+                    <label className="form-label" style={{ fontWeight: 600, display: 'block', marginBottom: '0.4rem' }}>
+                      🎯 Target Channel
+                    </label>
+                    <select
+                      className="form-input"
+                      value={showcaseChannelId}
+                      onChange={(e) => setShowcaseChannelId(e.target.value)}
+                      style={{ width: '100%', marginBottom: '0.4rem' }}
+                    >
+                      <option value="">-- Select Channel from List --</option>
+                      {channels.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.name} ({c.id})
+                        </option>
+                      ))}
+                    </select>
+                    <input
+                      type="text"
+                      className="form-input"
+                      placeholder="Or manually enter / paste Channel ID"
+                      value={showcaseChannelId}
+                      onChange={(e) => setShowcaseChannelId(e.target.value.trim())}
+                      style={{ width: '100%' }}
+                    />
+                  </div>
+
+                  {/* Title & Summary */}
+                  <div style={{ marginBottom: '1.25rem' }}>
+                    <label className="form-label" style={{ fontWeight: 600, display: 'block', marginBottom: '0.4rem' }}>
+                      📌 Title & Value Tagline
+                    </label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      placeholder="Title (e.g. Weekly Boss RPG 2.0 Released!)"
+                      value={showcaseTitle}
+                      onChange={(e) => setShowcaseTitle(e.target.value)}
+                      style={{ width: '100%', marginBottom: '0.5rem' }}
+                    />
+                    <input
+                      type="text"
+                      className="form-input"
+                      placeholder="Summary / Tagline (Italicized text below title)"
+                      value={showcaseSummary}
+                      onChange={(e) => setShowcaseSummary(e.target.value)}
+                      style={{ width: '100%' }}
+                    />
+                  </div>
+
+                  {/* Body Content */}
+                  <div style={{ marginBottom: '1.25rem' }}>
+                    <label className="form-label" style={{ fontWeight: 600, display: 'block', marginBottom: '0.4rem' }}>
+                      ✍️ Main Feature Highlights (Markdown Supported)
+                    </label>
+                    <textarea
+                      className="form-input"
+                      rows={6}
+                      placeholder="Detail features, patch notes, or instructions..."
+                      value={showcaseBody}
+                      onChange={(e) => setShowcaseBody(e.target.value)}
+                      style={{ width: '100%', fontFamily: 'inherit', resize: 'vertical' }}
+                    />
+                  </div>
+
+                  {/* Banner Upload */}
+                  <ImageUploader
+                    id="showcase-banner-uploader"
+                    label="🖼️ Hero Banner / Artwork Image (Optional)"
+                    value={showcaseBannerUrl}
+                    onChange={(url) => setShowcaseBannerUrl(url)}
+                    placeholder="https://.../banner.png or upload image"
+                    helpText="Appears as high-res 16:9 artwork inside the Discord embed card"
+                  />
+
+                  {/* Video URL & Deep-Link */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '1.25rem' }}>
+                    <div>
+                      <label className="form-label" style={{ fontWeight: 600, display: 'block', marginBottom: '0.4rem' }}>
+                        🎥 Video Tutorial URL
+                      </label>
+                      <input
+                        type="text"
+                        className="form-input"
+                        placeholder="https://youtube.com/watch?v=..."
+                        value={showcaseVideoUrl}
+                        onChange={(e) => setShowcaseVideoUrl(e.target.value.trim())}
+                        style={{ width: '100%' }}
+                      />
+                    </div>
+                    <div>
+                      <label className="form-label" style={{ fontWeight: 600, display: 'block', marginBottom: '0.4rem' }}>
+                        🚀 "Try Feature" Channel ID
+                      </label>
+                      <input
+                        type="text"
+                        className="form-input"
+                        placeholder="Channel ID to deep-link users"
+                        value={showcaseTryChannel}
+                        onChange={(e) => setShowcaseTryChannel(e.target.value.trim())}
+                        style={{ width: '100%' }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Reward Setting */}
+                  <div style={{ marginBottom: '1.25rem', backgroundColor: 'var(--bg-primary)', padding: '0.85rem 1rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                    <label className="form-label" style={{ fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <span>🎁 Vault Coins Reward Amount:</span>
+                      <input
+                        type="number"
+                        className="form-input"
+                        min={0}
+                        max={1000}
+                        value={showcaseRewardCoins}
+                        onChange={(e) => setShowcaseRewardCoins(Number(e.target.value))}
+                        style={{ width: '100px', textAlign: 'center' }}
+                      />
+                    </label>
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                      Set 0 to disable reward button. When set &gt; 0, members can click `[🎁 Claim Vault Coins]` once to earn coins!
+                    </span>
+                  </div>
+
+                  {/* Dispatch Button */}
+                  <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                    <button
+                      type="button"
+                      className="btn btn-primary"
+                      disabled={showcaseDispatchState !== 'idle' || !showcaseTitle.trim() || !showcaseBody.trim() || !showcaseChannelId.trim()}
+                      onClick={handleDispatchShowcase}
+                      style={{ backgroundColor: '#6366f1', border: 'none', fontWeight: 600, padding: '0.75rem 1.5rem', fontSize: '1rem' }}
+                    >
+                      {showcaseDispatchState === 'dispatching' ? 'Publishing Showcase...' : '🚀 Publish Showcase Update'}
+                    </button>
+                  </div>
+
+                  {showcaseStatusMsg && (
+                    <div style={{ marginTop: '1rem', padding: '0.75rem', borderRadius: '6px', backgroundColor: showcaseDispatchState === 'error' ? 'rgba(239, 68, 68, 0.15)' : 'rgba(16, 185, 129, 0.15)', color: showcaseDispatchState === 'error' ? '#f87171' : '#34d399', fontSize: '0.85rem' }}>
+                      {showcaseStatusMsg}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Real-time Discord Preview Simulator (Right Column) */}
+              <div style={{ flex: '1 1 420px', minWidth: '320px' }}>
+                <div style={{ position: 'sticky', top: '1rem' }}>
+                  <h3 style={{ marginTop: 0, marginBottom: '0.75rem', fontSize: '1.05rem', color: 'var(--text-muted)' }}>
+                    👁️ Real-Time Discord Embed Preview
+                  </h3>
+                  <DiscordEmbedPreview
+                    presetType={showcasePreset}
+                    title={showcaseTitle}
+                    summary={showcaseSummary}
+                    bodyMarkdown={showcaseBody}
+                    bannerUrl={showcaseBannerUrl}
+                    videoUrl={showcaseVideoUrl}
+                    rewardCoins={showcaseRewardCoins}
+                    tryFeatureChannel={showcaseTryChannel}
+                  />
+
+                  {/* Past Showcase History */}
+                  <div style={{ marginTop: '1.5rem', backgroundColor: 'var(--bg-secondary)', borderRadius: '12px', padding: '1.25rem', border: '1px solid var(--border-color)' }}>
+                    <h4 style={{ marginTop: 0, marginBottom: '0.75rem', fontSize: '0.95rem' }}>📜 Published Updates Log</h4>
+                    {showcaseHistory.length === 0 ? (
+                      <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)' }}>No updates published yet.</p>
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: '250px', overflowY: 'auto' }}>
+                        {showcaseHistory.slice(0, 10).map((item) => (
+                          <div key={item.id} style={{ padding: '0.5rem', backgroundColor: 'var(--bg-primary)', borderRadius: '6px', fontSize: '0.8125rem', border: '1px solid var(--border-color)' }}>
+                            <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{item.title}</div>
+                            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'flex', justifyContent: 'space-between', marginTop: '0.2rem' }}>
+                              <span>Channel: #{item.channel_id}</span>
+                              <span>{new Date(item.created_at).toLocaleDateString()}</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
