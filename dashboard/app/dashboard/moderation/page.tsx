@@ -140,7 +140,9 @@ export default function ModerationPage() {
 
   // Showcase states
   const [showcasePreset, setShowcasePreset] = useState<'major' | 'patch' | 'showcase'>('major');
+  const [showcaseTitleSize, setShowcaseTitleSize] = useState<'h1' | 'h2' | 'h3'>('h1');
   const [showcaseTitle, setShowcaseTitle] = useState('');
+  const [showcaseBodySize, setShowcaseBodySize] = useState<'h2' | 'h3' | 'normal'>('normal');
   const [showcaseSummary, setShowcaseSummary] = useState('');
   const [showcaseBody, setShowcaseBody] = useState('');
   const [showcaseBannerUrl, setShowcaseBannerUrl] = useState('');
@@ -148,9 +150,55 @@ export default function ModerationPage() {
   const [showcaseRewardCoins, setShowcaseRewardCoins] = useState(50);
   const [showcaseTryChannel, setShowcaseTryChannel] = useState('');
   const [showcaseChannelId, setShowcaseChannelId] = useState('');
+  const [showcaseFeedbackChannelId, setShowcaseFeedbackChannelId] = useState('');
   const [showcaseDispatchState, setShowcaseDispatchState] = useState<'idle' | 'dispatching' | 'error'>('idle');
   const [showcaseStatusMsg, setShowcaseStatusMsg] = useState<string | null>(null);
   const [showcaseHistory, setShowcaseHistory] = useState<any[]>([]);
+
+  // Dynamic Dropdown Items
+  const [dropdownItems, setDropdownItems] = useState<
+    Array<{
+      id: string;
+      label: string;
+      description: string;
+      hero_image_url: string;
+      content_markdown: string;
+    }>
+  >([
+    {
+      id: 'item_1',
+      label: '1. Weekly World Boss RPG 2.0',
+      description: '3 Playable RPG Classes & 5-Attribute Skill Tree',
+      hero_image_url: '',
+      content_markdown: '### ⚔️ Weekly World Boss RPG System\n• **3 Classes**: M.O.M (Tank), D.A.D (Brawler), K.I.D (Speed)\n• **Skill Tree**: Allocate stat points into DMG, Crit, AP Save, XP, and Loot!\n• **Commands**: `/boss attack`, `/boss stats`',
+    },
+  ]);
+
+  const handleAddDropdownItem = () => {
+    const newId = `item_${Date.now()}`;
+    setDropdownItems((prev) => [
+      ...prev,
+      {
+        id: newId,
+        label: `${prev.length + 1}. New Feature Highlight`,
+        description: 'Brief description for select menu',
+        hero_image_url: '',
+        content_markdown: 'Type details for this feature update...',
+      },
+    ]);
+  };
+
+  const handleUpdateDropdownItem = (index: number, key: string, value: string) => {
+    setDropdownItems((prev) => {
+      const next = [...prev];
+      next[index] = { ...next[index], [key]: value };
+      return next;
+    });
+  };
+
+  const handleRemoveDropdownItem = (index: number) => {
+    setDropdownItems((prev) => prev.filter((_, idx) => idx !== index));
+  };
 
   const fetchShowcaseHistory = async () => {
     try {
@@ -174,16 +222,19 @@ export default function ModerationPage() {
   const handleApplyPreset = (preset: 'major' | 'patch' | 'showcase') => {
     setShowcasePreset(preset);
     if (preset === 'major') {
+      setShowcaseTitleSize('h1');
       setShowcaseTitle('ENOS 2.0 Master System Released!');
       setShowcaseSummary('World Boss RPG 2.0, Daily AI Trivia, Vault Economy, and AI Support are now live!');
       setShowcaseBody('### What\'s New in ENOS 2.0:\n- ⚔️ **Weekly Boss RPG**: Fight raid bosses with 3 classes & 5-Attribute Skill Trees!\n- 🧠 **Daily AI Trivia Drops**: Test your knowledge with anti-cheat speed scoring!\n- 💰 **Vault Economy**: Earn coins automatically in voice channels & complete daily quests!\n- 🔑 **Keyform Whitelists**: One-click whitelist applications for Palworld & game servers!');
       setShowcaseRewardCoins(100);
     } else if (preset === 'patch') {
+      setShowcaseTitleSize('h2');
       setShowcaseTitle('Weekly System Maintenance & Fixes');
       setShowcaseSummary('Patch notes for v1.4.2 performance and bug fixes.');
       setShowcaseBody('⚡ **Improvements**:\n- Reduced canvas render latency by 40%.\n- Improved daily trivia drop anti-cheat shuffling.\n\n🐛 **Fixes**:\n- Fixed edge case where voice streak rewards doubled on server restart.');
       setShowcaseRewardCoins(0);
     } else if (preset === 'showcase') {
+      setShowcaseTitleSize('h1');
       setShowcaseTitle('Video Tutorial: How to Play Trivia & Earn Vault Coins');
       setShowcaseSummary('Watch our 1-minute video guide on daily trivia drops and economy rewards.');
       setShowcaseBody('Learn how microsecond speed scoring works, how anti-cheat shuffling protects answers, and how to cash in your points in the Vault!');
@@ -201,14 +252,18 @@ export default function ModerationPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           channel_id: showcaseChannelId.trim(),
+          feedback_channel_id: showcaseFeedbackChannelId.trim(),
           preset_type: showcasePreset,
+          title_size: showcaseTitleSize,
           title: showcaseTitle.trim(),
+          body_size: showcaseBodySize,
           summary: showcaseSummary.trim(),
           body_markdown: showcaseBody.trim(),
           banner_url: showcaseBannerUrl.trim(),
           video_url: showcaseVideoUrl.trim(),
           reward_coins: showcaseRewardCoins,
           try_feature_channel: showcaseTryChannel.trim(),
+          dropdown_items: dropdownItems,
         }),
       });
       const data = await res.json();
@@ -1360,66 +1415,159 @@ export default function ModerationPage() {
                     />
                   </div>
 
-                  {/* Title & Summary */}
+                  {/* Title & Font Size Selector */}
                   <div style={{ marginBottom: '1.25rem' }}>
-                    <label className="form-label" style={{ fontWeight: 600, display: 'block', marginBottom: '0.4rem' }}>
-                      📌 Title & Value Tagline
+                    <label className="form-label" style={{ fontWeight: 600, display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
+                      <span>📌 Announcement Main Title</span>
+                      <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Header Font Size:</span>
                     </label>
+                    <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                      <input
+                        type="text"
+                        className="form-input"
+                        placeholder="Title (e.g. PATCH 1.0 or ENOS 2.0 Released!)"
+                        value={showcaseTitle}
+                        onChange={(e) => setShowcaseTitle(e.target.value)}
+                        style={{ flex: 1 }}
+                      />
+                      <select
+                        className="form-input"
+                        value={showcaseTitleSize}
+                        onChange={(e) => setShowcaseTitleSize(e.target.value as any)}
+                        style={{ width: '130px' }}
+                      >
+                        <option value="h1"># H1 Extra Large</option>
+                        <option value="h2">## H2 Large</option>
+                        <option value="h3">### H3 Medium</option>
+                      </select>
+                    </div>
                     <input
                       type="text"
                       className="form-input"
-                      placeholder="Title (e.g. Weekly Boss RPG 2.0 Released!)"
-                      value={showcaseTitle}
-                      onChange={(e) => setShowcaseTitle(e.target.value)}
-                      style={{ width: '100%', marginBottom: '0.5rem' }}
-                    />
-                    <input
-                      type="text"
-                      className="form-input"
-                      placeholder="Summary / Tagline (Italicized text below title)"
+                      placeholder="Summary / Tagline (Optional italicized tagline below title)"
                       value={showcaseSummary}
                       onChange={(e) => setShowcaseSummary(e.target.value)}
                       style={{ width: '100%' }}
                     />
                   </div>
 
-                  {/* Body Content */}
+                  {/* Body Content & Formatting Selector */}
                   <div style={{ marginBottom: '1.25rem' }}>
-                    <label className="form-label" style={{ fontWeight: 600, display: 'block', marginBottom: '0.4rem' }}>
-                      ✍️ Main Feature Highlights (Markdown Supported)
+                    <label className="form-label" style={{ fontWeight: 600, display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
+                      <span>✍️ Main Patch Notes Body</span>
+                      <select
+                        className="form-input"
+                        value={showcaseBodySize}
+                        onChange={(e) => setShowcaseBodySize(e.target.value as any)}
+                        style={{ width: '150px', fontSize: '0.75rem', padding: '0.2rem 0.4rem' }}
+                      >
+                        <option value="normal">Normal Body Text</option>
+                        <option value="h2">## Subheader Size</option>
+                        <option value="h3">### Sub-section Size</option>
+                      </select>
                     </label>
                     <textarea
                       className="form-input"
-                      rows={6}
-                      placeholder="Detail features, patch notes, or instructions..."
+                      rows={5}
+                      placeholder="Type main release notes or patch overview text here..."
                       value={showcaseBody}
                       onChange={(e) => setShowcaseBody(e.target.value)}
                       style={{ width: '100%', fontFamily: 'inherit', resize: 'vertical' }}
                     />
                   </div>
 
-                  {/* Banner Upload */}
+                  {/* Dynamic Dropdown Items Builder */}
+                  <div style={{ marginBottom: '1.5rem', backgroundColor: 'var(--bg-primary)', padding: '1rem', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                      <label className="form-label" style={{ fontWeight: 700, margin: 0, fontSize: '0.95rem' }}>
+                        📋 Dynamic Dropdown Options Builder ({dropdownItems.length})
+                      </label>
+                      <button
+                        type="button"
+                        className="btn btn-secondary"
+                        onClick={handleAddDropdownItem}
+                        style={{ fontSize: '0.78rem', padding: '0.35rem 0.75rem' }}
+                      >
+                        ➕ Add Dropdown Option
+                      </button>
+                    </div>
+
+                    {dropdownItems.map((item, idx) => (
+                      <div key={item.id || idx} style={{ marginBottom: '1rem', backgroundColor: 'var(--bg-secondary)', padding: '0.85rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                          <span style={{ fontWeight: 600, fontSize: '0.85rem' }}>Option #{idx + 1}</span>
+                          {dropdownItems.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveDropdownItem(idx)}
+                              style={{ backgroundColor: 'transparent', border: 'none', color: '#f87171', cursor: 'pointer', fontSize: '0.8rem' }}
+                            >
+                              🗑️ Remove
+                            </button>
+                          )}
+                        </div>
+
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                          <input
+                            type="text"
+                            className="form-input"
+                            placeholder="Dropdown Label (e.g. 1. Hero RPG Class)"
+                            value={item.label}
+                            onChange={(e) => handleUpdateDropdownItem(idx, 'label', e.target.value)}
+                          />
+                          <input
+                            type="text"
+                            className="form-input"
+                            placeholder="Subtitle (e.g. Multi-phase raids)"
+                            value={item.description}
+                            onChange={(e) => handleUpdateDropdownItem(idx, 'description', e.target.value)}
+                          />
+                        </div>
+
+                        {/* Hero Photo Upload for this specific update item */}
+                        <ImageUploader
+                          id={`dropdown-hero-uploader-${idx}`}
+                          label="🖼️ Hero Artwork / Feature Photo for this selected update"
+                          value={item.hero_image_url}
+                          onChange={(url) => handleUpdateDropdownItem(idx, 'hero_image_url', url)}
+                          placeholder="Upload or paste image URL..."
+                          helpText="This photo pops up when member selects this option from the dropdown menu"
+                        />
+
+                        <textarea
+                          className="form-input"
+                          rows={3}
+                          placeholder="Detailed content shown in ephemeral popup when selected..."
+                          value={item.content_markdown}
+                          onChange={(e) => handleUpdateDropdownItem(idx, 'content_markdown', e.target.value)}
+                          style={{ width: '100%', fontFamily: 'inherit', resize: 'vertical', marginTop: '0.5rem' }}
+                        />
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Main Embed Banner Upload (Optional) */}
                   <ImageUploader
                     id="showcase-banner-uploader"
-                    label="🖼️ Hero Banner / Artwork Image (Optional)"
+                    label="🖼️ Main Announcement Banner (Optional)"
                     value={showcaseBannerUrl}
                     onChange={(url) => setShowcaseBannerUrl(url)}
                     placeholder="https://.../banner.png or upload image"
-                    helpText="Appears as high-res 16:9 artwork inside the Discord embed card"
+                    helpText="Appears at the bottom of the main announcement card"
                   />
 
-                  {/* Video URL & Deep-Link */}
+                  {/* Private Admin Feedback Channel & Try Feature Deep-Link */}
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '1.25rem' }}>
                     <div>
                       <label className="form-label" style={{ fontWeight: 600, display: 'block', marginBottom: '0.4rem' }}>
-                        🎥 Video Tutorial URL
+                        🔒 Private Admin Feedback Channel ID
                       </label>
                       <input
                         type="text"
                         className="form-input"
-                        placeholder="https://youtube.com/watch?v=..."
-                        value={showcaseVideoUrl}
-                        onChange={(e) => setShowcaseVideoUrl(e.target.value.trim())}
+                        placeholder="Admin channel ID to receive feedback"
+                        value={showcaseFeedbackChannelId}
+                        onChange={(e) => setShowcaseFeedbackChannelId(e.target.value.trim())}
                         style={{ width: '100%' }}
                       />
                     </div>
@@ -1438,10 +1586,25 @@ export default function ModerationPage() {
                     </div>
                   </div>
 
-                  {/* Reward Setting */}
-                  <div style={{ marginBottom: '1.25rem', backgroundColor: 'var(--bg-primary)', padding: '0.85rem 1rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
-                    <label className="form-label" style={{ fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <span>🎁 Vault Coins Reward Amount:</span>
+                  {/* Video URL & Reward Setting */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '1.25rem' }}>
+                    <div>
+                      <label className="form-label" style={{ fontWeight: 600, display: 'block', marginBottom: '0.4rem' }}>
+                        🎥 Video Tutorial URL
+                      </label>
+                      <input
+                        type="text"
+                        className="form-input"
+                        placeholder="https://youtube.com/watch?v=..."
+                        value={showcaseVideoUrl}
+                        onChange={(e) => setShowcaseVideoUrl(e.target.value.trim())}
+                        style={{ width: '100%' }}
+                      />
+                    </div>
+                    <div>
+                      <label className="form-label" style={{ fontWeight: 600, display: 'block', marginBottom: '0.4rem' }}>
+                        🎁 Vault Coins Reward Amount
+                      </label>
                       <input
                         type="number"
                         className="form-input"
@@ -1449,12 +1612,9 @@ export default function ModerationPage() {
                         max={1000}
                         value={showcaseRewardCoins}
                         onChange={(e) => setShowcaseRewardCoins(Number(e.target.value))}
-                        style={{ width: '100px', textAlign: 'center' }}
+                        style={{ width: '100%', textAlign: 'center' }}
                       />
-                    </label>
-                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                      Set 0 to disable reward button. When set &gt; 0, members can click `[🎁 Claim Vault Coins]` once to earn coins!
-                    </span>
+                    </div>
                   </div>
 
                   {/* Dispatch Button */}
@@ -1482,17 +1642,20 @@ export default function ModerationPage() {
               <div style={{ flex: '1 1 420px', minWidth: '320px' }}>
                 <div style={{ position: 'sticky', top: '1rem' }}>
                   <h3 style={{ marginTop: 0, marginBottom: '0.75rem', fontSize: '1.05rem', color: 'var(--text-muted)' }}>
-                    👁️ Real-Time Discord Embed Preview
+                    👁️ Real-Time Discord Embed & Ephemeral Simulator
                   </h3>
                   <DiscordEmbedPreview
                     presetType={showcasePreset}
+                    titleSize={showcaseTitleSize}
                     title={showcaseTitle}
+                    bodySize={showcaseBodySize}
                     summary={showcaseSummary}
                     bodyMarkdown={showcaseBody}
                     bannerUrl={showcaseBannerUrl}
                     videoUrl={showcaseVideoUrl}
                     rewardCoins={showcaseRewardCoins}
                     tryFeatureChannel={showcaseTryChannel}
+                    dropdownItems={dropdownItems}
                   />
 
                   {/* Past Showcase History */}

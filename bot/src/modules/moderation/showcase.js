@@ -3,7 +3,7 @@ const logger = require('../../lib/logger');
 const { supabase } = require('../../lib/supabase');
 
 /**
- * Handles the reward claim button click for a showcase update.
+ * Handles reward claim button click for a showcase update.
  * @param {import('discord.js').ButtonInteraction} interaction
  */
 async function handleShowcaseClaim(interaction) {
@@ -126,7 +126,7 @@ async function handleShowcaseFeedbackButton(interaction) {
 }
 
 /**
- * Handles feedback modal submission.
+ * Handles feedback modal submission and dispatches embed to private admin feedback channel.
  * @param {import('discord.js').ModalSubmitInteraction} interaction
  */
 async function handleShowcaseFeedbackSubmit(interaction) {
@@ -134,14 +134,53 @@ async function handleShowcaseFeedbackSubmit(interaction) {
     const showcaseId = interaction.customId.replace('showcase_feedback_modal:', '');
     const feedbackText = interaction.fields.getTextInputValue('feedback_text');
     const guildId = interaction.guildId || process.env.DISCORD_GUILD_ID;
+    const userTag = interaction.user.tag || interaction.user.username;
 
+    // 1. Save feedback to database
     await supabase.from('showcase_feedback').insert({
       showcase_id: showcaseId,
       guild_id: guildId,
       user_id: interaction.user.id,
-      user_tag: interaction.user.tag || interaction.user.username,
+      user_tag: userTag,
       feedback_text: feedbackText.trim(),
     });
+
+    // 2. Fetch showcase details to find feedback_channel_id
+    const { data: showcase } = await supabase
+      .from('showcase_updates')
+      .select('title, feedback_channel_id')
+      .eq('id', showcaseId)
+      .maybeSingle();
+
+    // 3. Post to private admin feedback channel if configured
+    if (showcase && showcase.feedback_channel_id) {
+      const DISCORD_TOKEN = process.env.DISCORD_TOKEN || process.env.DISCORD_BOT_TOKEN;
+      if (DISCORD_TOKEN) {
+        const feedbackEmbed = {
+          title: '💬 New Member Feedback Received',
+          color: 0x10b981, // Emerald Green
+          fields: [
+            { name: '👤 Member', value: `<@${interaction.user.id}> (${userTag})`, inline: true },
+            { name: '📌 Showcase Update', value: showcase.title || 'Server Update', inline: true },
+            { name: '✍️ Feedback Message', value: feedbackText.trim() },
+          ],
+          timestamp: new Date().toISOString(),
+          footer: { text: 'ENOS Moderation • Private Admin Feedback Log' },
+        };
+
+        await fetch(
+          `https://discord.com/api/v10/channels/${showcase.feedback_channel_id.trim()}/messages`,
+          {
+            method: 'POST',
+            headers: {
+              Authorization: `Bot ${DISCORD_TOKEN}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ embeds: [feedbackEmbed] }),
+          }
+        ).catch((err) => logger.error('[SEND ADMIN FEEDBACK DISCORD ERROR]:', err));
+      }
+    }
 
     return interaction.reply({
       content: '💬 **Thank you for your feedback!** Your message has been sent to our moderation team.',
@@ -157,93 +196,114 @@ async function handleShowcaseFeedbackSubmit(interaction) {
 }
 
 /**
- * Handles dropdown select menu selections from feature showcase updates.
+ * Handles dynamic select menu clicks and rerolls ephemeral feature guide cards with hero photos.
  * @param {import('discord.js').StringSelectMenuInteraction} interaction
  */
 async function handleShowcaseSelectMenu(interaction) {
   try {
-    const selected = interaction.values[0];
+    const showcaseId = interaction.customId.replace('showcase_select_', '');
+    const selectedItemId = interaction.values[0];
+    const guildId = interaction.guildId || process.env.DISCORD_GUILD_ID;
 
-    let embedData = {
-      title: '📖 ENOS Feature Guide',
-      description: 'Select an option from the dropdown menu to view feature details.',
-      color: 0x6366f1,
+    // Fetch showcase update details from database
+    const { data: showcase, error: scErr } = await supabase
+      .from('showcase_updates')
+      .select('*')
+      .eq('id', showcaseId)
+      .maybeSingle();
+
+    if (scErr || !showcase) {
+      return interaction.reply({
+        content: '⚠️ Unable to locate this update record in the database.',
+        flags: MessageFlags.Ephemeral,
+      });
+    }
+
+    const items = Array.isArray(showcase.dropdown_items) ? showcase.dropdown_items : [];
+    const targetItem = items.find(
+      (it) => it.id === selectedItemId || it.label === selectedItemId
+    );
+
+    if (!targetItem) {
+      return interaction.reply({
+        content: '⚠️ Selected update details could not be found.',
+        flags: MessageFlags.Ephemeral,
+      });
+    }
+
+    // Build Ephemeral Embed with Hero Photo
+    const embed = {
+      title: targetItem.label,
+      description: targetItem.content_markdown || 'No additional details specified.',
+      color: 0x6366f1, // Indigo
+      footer: { text: 'ENOS Bot Feature Showcase • Interactive Update Guide' },
+      timestamp: new Date().toISOString(),
     };
 
-    if (selected === 'rpg_boss') {
-      embedData = {
-        title: '⚔️ Weekly World Boss RPG System & 5-Stat Skill Tree',
-        color: 0xef4444,
-        description:
-          '**How to Play**:\n' +
-          '• Use `/boss attack` in `#weekly-boss` to attack the server raid boss.\n' +
-          '• **3 Playable Classes**:\n' +
-          '  - 🛡️ **M.O.M.** (Tank / Shielding Barrier)\n' +
-          '  - 🔨 **D.A.D.** (Heavy Brawler DPS)\n' +
-          '  - ⚡ **K.I.D.** (Speed / AP Synergy)\n' +
-          '• **5-Attribute Skill Tree**: Level up to gain points and allocate into **DMG**, **Crit Chance**, **AP Save**, **XP Boost**, and **Loot Boost**!\n' +
-          '• **Commands**: `/boss attack`, `/boss stats`, `/boss leaderboard`.',
-      };
-    } else if (selected === 'trivia') {
-      embedData = {
-        title: '🧠 Daily AI Trivia Drops & Speed Scoring',
-        color: 0xf59e0b,
-        description:
-          '**How it Works**:\n' +
-          '• ENOS drops a daily AI-generated question in weighted server channels.\n' +
-          '• **Anti-Cheat Shuffling**: Every player gets a private, shuffled answer order so choices cannot be shared in voice chat!\n' +
-          '• **Microsecond Speed Scoring**: Quick answers score top podium points.\n' +
-          '• **Commands**: `/trivia status`, `/trivia leaderboard`.',
-      };
-    } else if (selected === 'vault') {
-      embedData = {
-        title: '💰 Vault Economy & Voice Activity Leveling',
-        color: 0x10b981,
-        description:
-          '**How it Works**:\n' +
-          '• **Voice Coins**: Earn Vault Coins automatically for every minute spent hanging out in server voice channels.\n' +
-          '• **Tier Ranks**: Advance through Bronze → Silver → Gold → Diamond → Mythic.\n' +
-          '• **Daily Quests**: Complete daily tasks using `/vault daily` to claim bonus coin crates.\n' +
-          '• **Commands**: `/vault balance`, `/vault daily`, `/vault leaderboard`.',
-      };
-    } else if (selected === 'gatekeeper') {
-      embedData = {
-        title: '🔐 Gatekeeper Onboarding & Keyform Whitelists',
-        color: 0x6366f1,
-        description:
-          '**How it Works**:\n' +
-          '• **Gatekeeper**: New joiners complete a fast sign-up modal logging their In-Game Name (IGN), Discovery Source, and Game Branch roles.\n' +
-          '• **Keyform Whitelists**: One-click whitelist application for community game servers (*Palworld, Where Winds Meet, BG3, etc.*).\n' +
-          '• **Commands**: `/register-keyform`.',
-      };
-    } else if (selected === 'ai_digest') {
-      embedData = {
-        title: '🤖 Taglish AI Daily Digest & Support Help Desk',
-        color: 0xec4899,
-        description:
-          '**How it Works**:\n' +
-          '• **Daily Digest**: Every 24 hours, Gemini AI scrapes server channels to generate a Taglish summary digest of top conversations.\n' +
-          '• **AI Help Desk**: Click `[🤖 Get AI Help]` in support channels to spawn a private AI thread that answers FAQs and server rules instantly.',
-      };
-    } else if (selected === 'social') {
-      embedData = {
-        title: '🎂 Social Systems (Birthdays & TikTok Live Alerts)',
-        color: 0x8b5cf6,
-        description:
-          '**How it Works**:\n' +
-          '• **Birthdays**: Log your birthday during onboarding or via `/birthday` to get automated daily birthday announcements & custom card graphics.\n' +
-          '• **TikTok Live Alerts**: Automatic alerts dropped when community creators go live.',
-      };
+    if (targetItem.hero_image_url && targetItem.hero_image_url.trim()) {
+      embed.image = { url: targetItem.hero_image_url.trim() };
+    }
+
+    // Build Ephemeral Action Buttons
+    const buttons = [];
+
+    if (showcase.try_feature_channel && showcase.try_feature_channel.trim()) {
+      buttons.push({
+        type: 2,
+        style: 5, // LINK
+        label: '🚀 Try Feature Now',
+        url: `https://discord.com/channels/${guildId}/${showcase.try_feature_channel.trim()}`,
+      });
+    }
+
+    if (showcase.video_url && showcase.video_url.trim()) {
+      buttons.push({
+        type: 2,
+        style: 5, // LINK
+        label: '🎥 Watch Video Guide',
+        url: showcase.video_url.trim(),
+      });
+    }
+
+    if (Number(showcase.reward_coins) > 0) {
+      buttons.push({
+        type: 2,
+        style: 3, // SUCCESS
+        custom_id: `showcase_claim_${showcaseId}`,
+        label: `🎁 Claim +${showcase.reward_coins} Vault Coins`,
+      });
+    }
+
+    buttons.push({
+      type: 2,
+      style: 2, // SECONDARY
+      custom_id: `showcase_feedback_${showcaseId}`,
+      label: '💬 Send Feedback',
+    });
+
+    const components = [];
+    if (buttons.length > 0) {
+      components.push({ type: 1, components: buttons });
+    }
+
+    // Seamless Reroll: If interaction has already replied/deferred or is component, update or reply ephemeral
+    if (interaction.replied || interaction.deferred) {
+      return interaction.followUp({
+        embeds: [embed],
+        components,
+        flags: MessageFlags.Ephemeral,
+      });
     }
 
     return interaction.reply({
-      embeds: [embedData],
+      embeds: [embed],
+      components,
       flags: MessageFlags.Ephemeral,
     });
   } catch (err) {
     logger.error('[SHOWCASE SELECT MENU ERROR]:', err);
     return interaction.reply({
-      content: '❌ Failed to load feature guide.',
+      content: '❌ Failed to load update details.',
       flags: MessageFlags.Ephemeral,
     });
   }

@@ -4,7 +4,7 @@ import { supabaseAdmin } from '@/lib/supabase';
 
 const DISCORD_TOKEN = process.env.DISCORD_TOKEN || process.env.DISCORD_BOT_TOKEN;
 
-// POST /api/moderation/showcase/dispatch — Dispatch a rich showcase update to Discord
+// POST /api/moderation/showcase/dispatch — Dispatch a dynamic showcase update to Discord
 export async function POST(req: NextRequest) {
   try {
     const session = await auth();
@@ -16,14 +16,18 @@ export async function POST(req: NextRequest) {
     const {
       guild_id,
       channel_id,
+      feedback_channel_id,
       preset_type = 'major',
+      title_size = 'h1',
       title,
+      body_size = 'normal',
       summary,
       body_markdown,
       banner_url,
       video_url,
       reward_coins = 0,
       try_feature_channel,
+      dropdown_items = [],
     } = body;
 
     const guildId = guild_id || process.env.DISCORD_GUILD_ID || '';
@@ -53,19 +57,24 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 1. Insert placeholder record into Supabase first to get UUID
+    // 1. Insert record into Supabase to generate UUID
     const { data: showcaseRecord, error: dbErr } = await supabaseAdmin
       .from('showcase_updates')
       .insert({
         guild_id: guildId,
         channel_id: channel_id.trim(),
+        feedback_channel_id: feedback_channel_id ? feedback_channel_id.trim() : null,
         preset_type,
+        title_size,
         title: title.trim(),
+        body_size,
         summary: summary ? summary.trim() : null,
         body_markdown: body_markdown.trim(),
         banner_url: banner_url ? banner_url.trim() : null,
         video_url: video_url ? video_url.trim() : null,
         reward_coins: Number(reward_coins) || 0,
+        try_feature_channel: try_feature_channel ? try_feature_channel.trim() : null,
+        dropdown_items: Array.isArray(dropdown_items) ? dropdown_items : [],
         created_by: session.user?.name || session.user?.email || 'Admin',
       })
       .select()
@@ -81,14 +90,24 @@ export async function POST(req: NextRequest) {
 
     const showcaseId = showcaseRecord.id;
 
-    // 2. Build Discord Embed Color
-    let colorHex = 0x6366f1; // Indigo (default)
+    // 2. Format Embed Title with Header Markdown
+    let formattedTitle = title.trim();
+    if (title_size === 'h1') formattedTitle = `# 🚀 ${title.trim()}`;
+    else if (title_size === 'h2') formattedTitle = `## 🚀 ${title.trim()}`;
+    else if (title_size === 'h3') formattedTitle = `### 🚀 ${title.trim()}`;
+
+    // Format Embed Body Text
+    let formattedBody = body_markdown.trim();
+    if (body_size === 'h2') formattedBody = `## ${body_markdown.trim()}`;
+    else if (body_size === 'h3') formattedBody = `### ${body_markdown.trim()}`;
+
+    let colorHex = 0x6366f1; // Indigo
     if (preset_type === 'patch') colorHex = 0x3b82f6; // Blue
     if (preset_type === 'showcase') colorHex = 0x10b981; // Emerald
 
     const embed: any = {
-      title: `${preset_type === 'major' ? '🚀' : preset_type === 'patch' ? '🛠️' : '🎬'} ${title.trim()}`,
-      description: summary ? `*${summary.trim()}*\n\n${body_markdown.trim()}` : body_markdown.trim(),
+      title: formattedTitle,
+      description: summary ? `*${summary.trim()}*\n\n${formattedBody}` : formattedBody,
       color: colorHex,
       timestamp: new Date().toISOString(),
       footer: {
@@ -100,97 +119,29 @@ export async function POST(req: NextRequest) {
       embed.image = { url: banner_url.trim() };
     }
 
-    // 3. Build ActionRow Component Buttons
-    const buttons: any[] = [];
-
-    // Optional: Try Feature Deep-link
-    if (try_feature_channel && try_feature_channel.trim()) {
-      buttons.push({
-        type: 2, // BUTTON
-        style: 5, // LINK
-        label: '🚀 Try Feature Now',
-        url: `https://discord.com/channels/${guildId}/${try_feature_channel.trim()}`,
-      });
-    }
-
-    // Optional: Video Link Button
-    if (video_url && video_url.trim()) {
-      buttons.push({
-        type: 2, // BUTTON
-        style: 5, // LINK
-        label: '🎥 Watch Video Guide',
-        url: video_url.trim(),
-      });
-    }
-
-    // Reward Claim Button
-    if (Number(reward_coins) > 0) {
-      buttons.push({
-        type: 2, // BUTTON
-        style: 3, // SUCCESS (Green)
-        custom_id: `showcase_claim_${showcaseId}`,
-        label: `🎁 Claim +${reward_coins} Vault Coins`,
-      });
-    }
-
-    // Quick Feedback Button
-    buttons.push({
-      type: 2, // BUTTON
-      style: 2, // SECONDARY (Gray)
-      custom_id: `showcase_feedback_${showcaseId}`,
-      label: '💬 Send Feedback',
-    });
-
-    // 4. Build Select Menu Dropdown
-    const selectMenu = {
-      type: 3, // STRING SELECT MENU
-      custom_id: `showcase_select_${showcaseId}`,
-      placeholder: '📌 Select a feature to view guide, stats & commands...',
-      options: [
-        {
-          label: '1. Weekly World Boss RPG & 5-Stat Tree',
-          value: 'rpg_boss',
-          description: 'Class roles (M.O.M/D.A.D/K.I.D), AP energy & stat trees',
-          emoji: { name: '⚔️' },
-        },
-        {
-          label: '2. Daily AI Trivia Drops & Speed Scoring',
-          value: 'trivia',
-          description: 'Weighted channel drops, anti-cheat & podium rewards',
-          emoji: { name: '🧠' },
-        },
-        {
-          label: '3. Vault Economy, Voice Activity & Quests',
-          value: 'vault',
-          description: 'Earn coins in voice channels, daily quests & tier ranks',
-          emoji: { name: '💰' },
-        },
-        {
-          label: '4. Gatekeeper Onboarding & Keyform Whitelists',
-          value: 'gatekeeper',
-          description: 'IGN logging, game branch roles & server whitelists',
-          emoji: { name: '🔐' },
-        },
-        {
-          label: '5. Taglish AI Daily Digest & Help Desk',
-          value: 'ai_digest',
-          description: '24-hr channel summaries & automated AI support threads',
-          emoji: { name: '🤖' },
-        },
-        {
-          label: '6. Social Systems (Birthdays & TikTok Alerts)',
-          value: 'social',
-          description: 'Birthday celebrations & automated TikTok stream alerts',
-          emoji: { name: '🎂' },
-        },
-      ],
-    };
+    // 3. Build Dynamic Select Menu Dropdown Options
+    const selectOptions = (Array.isArray(dropdown_items) ? dropdown_items : []).map(
+      (item: any, idx: number) => ({
+        label: (item.label || `Update ${idx + 1}`).substring(0, 100),
+        value: (item.id || `item_${idx}`).substring(0, 100),
+        description: item.description ? item.description.substring(0, 100) : undefined,
+        emoji: { name: '📌' },
+      })
+    );
 
     const components: any[] = [];
-    if (buttons.length > 0) components.push({ type: 1, components: buttons });
-    components.push({ type: 1, components: [selectMenu] });
 
-    // 5. Send Message via Discord REST API
+    if (selectOptions.length > 0) {
+      const selectMenu = {
+        type: 3, // STRING SELECT MENU
+        custom_id: `showcase_select_${showcaseId}`,
+        placeholder: '📌 Select a feature update to view hero artwork & details...',
+        options: selectOptions,
+      };
+      components.push({ type: 1, components: [selectMenu] });
+    }
+
+    // 4. Send Message via Discord REST API
     const discordRes = await fetch(
       `https://discord.com/api/v10/channels/${channel_id.trim()}/messages`,
       {
@@ -217,27 +168,11 @@ export async function POST(req: NextRequest) {
 
     const sentMessage = await discordRes.json();
 
-    // 6. Update message_id in DB
+    // 5. Update message_id in DB
     await supabaseAdmin
       .from('showcase_updates')
       .update({ message_id: sentMessage.id })
       .eq('id', showcaseId);
-
-    // 7. Log bot event
-    await supabaseAdmin
-      .from('bot_event_logs')
-      .insert({
-        guild_id: guildId,
-        event_type: 'showcase_dispatched',
-        details: {
-          showcase_id: showcaseId,
-          channel_id,
-          message_id: sentMessage.id,
-          title: title.trim(),
-          reward_coins,
-        },
-      })
-      .catch((e) => console.warn('[LOG SHOWCASE ERROR]:', e?.message));
 
     return NextResponse.json({
       success: true,

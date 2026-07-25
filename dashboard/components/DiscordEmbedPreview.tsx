@@ -1,28 +1,46 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
+
+interface DropdownItem {
+  id: string;
+  label: string;
+  description?: string;
+  hero_image_url?: string;
+  content_markdown?: string;
+}
 
 interface DiscordEmbedPreviewProps {
   presetType: string;
+  titleSize?: string;
   title: string;
+  bodySize?: string;
   summary?: string;
   bodyMarkdown: string;
   bannerUrl?: string;
   videoUrl?: string;
   rewardCoins?: number;
   tryFeatureChannel?: string;
+  dropdownItems?: DropdownItem[];
 }
 
 export default function DiscordEmbedPreview({
   presetType,
+  titleSize = 'h1',
   title,
+  bodySize = 'normal',
   summary,
   bodyMarkdown,
   bannerUrl,
   videoUrl,
   rewardCoins = 0,
   tryFeatureChannel,
+  dropdownItems = [],
 }: DiscordEmbedPreviewProps) {
+  const [selectedItemIndex, setSelectedItemIndex] = useState<number | null>(
+    dropdownItems.length > 0 ? 0 : null
+  );
+
   let borderColor = '#6366f1'; // Indigo
   let iconEmoji = '🚀';
   if (presetType === 'patch') {
@@ -33,7 +51,21 @@ export default function DiscordEmbedPreview({
     iconEmoji = '🎬';
   }
 
-  const displayTitle = title ? `${iconEmoji} ${title}` : `${iconEmoji} Feature Update Title`;
+  let titleFontSize = '1.25rem';
+  if (titleSize === 'h2') titleFontSize = '1.1rem';
+  if (titleSize === 'h3') titleFontSize = '0.95rem';
+
+  let bodyFontSize = '0.875rem';
+  let bodyFontWeight = 400;
+  if (bodySize === 'h2') {
+    bodyFontSize = '1.05rem';
+    bodyFontWeight = 700;
+  } else if (bodySize === 'h3') {
+    bodyFontSize = '0.95rem';
+    bodyFontWeight = 600;
+  }
+
+  const selectedItem = selectedItemIndex !== null ? dropdownItems[selectedItemIndex] : null;
 
   return (
     <div
@@ -82,11 +114,13 @@ export default function DiscordEmbedPreview({
               ✓ BOT
             </span>
           </div>
-          <span style={{ fontSize: '0.72rem', color: '#949ba4' }}>Today at {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+          <span style={{ fontSize: '0.72rem', color: '#949ba4' }}>
+            Today at {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+          </span>
         </div>
       </div>
 
-      {/* Embed Container */}
+      {/* Main Announcement Embed Container */}
       <div
         style={{
           borderLeft: `4px solid ${borderColor}`,
@@ -96,8 +130,15 @@ export default function DiscordEmbedPreview({
           maxWidth: '520px',
         }}
       >
-        <div style={{ fontWeight: 700, fontSize: '1rem', color: '#f2f3f5', marginBottom: '0.4rem' }}>
-          {displayTitle}
+        <div
+          style={{
+            fontWeight: 700,
+            fontSize: titleFontSize,
+            color: '#f2f3f5',
+            marginBottom: '0.4rem',
+          }}
+        >
+          {title ? `${iconEmoji} ${title}` : `${iconEmoji} Feature Update Title`}
         </div>
 
         {summary && (
@@ -106,8 +147,16 @@ export default function DiscordEmbedPreview({
           </div>
         )}
 
-        <div style={{ whiteSpace: 'pre-wrap', color: '#dbdee1', fontSize: '0.875rem', lineHeight: '1.4' }}>
-          {bodyMarkdown || 'Type body markdown to preview layout...'}
+        <div
+          style={{
+            whiteSpace: 'pre-wrap',
+            color: '#dbdee1',
+            fontSize: bodyFontSize,
+            fontWeight: bodyFontWeight,
+            lineHeight: '1.4',
+          }}
+        >
+          {bodyMarkdown || 'Type main patch notes to preview layout...'}
         </div>
 
         {bannerUrl && (
@@ -127,33 +176,92 @@ export default function DiscordEmbedPreview({
         </div>
       </div>
 
-      {/* Simulated Discord Button Row */}
-      <div style={{ display: 'flex', gap: '0.4rem', marginTop: '0.6rem', flexWrap: 'wrap' }}>
-        {tryFeatureChannel && (
-          <div style={{ backgroundColor: '#2b2d31', color: '#5865f2', padding: '0.4rem 0.75rem', borderRadius: '4px', fontSize: '0.8rem', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
-            🚀 Try Feature Now
-          </div>
-        )}
-        {videoUrl && (
-          <div style={{ backgroundColor: '#2b2d31', color: '#5865f2', padding: '0.4rem 0.75rem', borderRadius: '4px', fontSize: '0.8rem', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
-            🎥 Watch Video Guide
-          </div>
-        )}
-        {rewardCoins > 0 && (
-          <div style={{ backgroundColor: '#248046', color: '#ffffff', padding: '0.4rem 0.75rem', borderRadius: '4px', fontSize: '0.8rem', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
-            🎁 Claim +{rewardCoins} Vault Coins
-          </div>
-        )}
-        <div style={{ backgroundColor: '#4e5058', color: '#ffffff', padding: '0.4rem 0.75rem', borderRadius: '4px', fontSize: '0.8rem', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
-          💬 Send Feedback
+      {/* Interactive Dropdown Select Menu Simulator */}
+      {dropdownItems.length > 0 && (
+        <div style={{ marginTop: '0.5rem', maxWidth: '520px' }}>
+          <label style={{ fontSize: '0.72rem', color: '#949ba4', display: 'block', marginBottom: '0.2rem' }}>
+            📌 Select an item below to simulate Ephemeral Hero Photo popup:
+          </label>
+          <select
+            style={{
+              width: '100%',
+              backgroundColor: '#2b2d31',
+              color: '#dbdee1',
+              border: '1px solid #4e5058',
+              borderRadius: '4px',
+              padding: '0.4rem 0.6rem',
+              fontSize: '0.8rem',
+            }}
+            value={selectedItemIndex ?? 0}
+            onChange={(e) => setSelectedItemIndex(Number(e.target.value))}
+          >
+            {dropdownItems.map((item, idx) => (
+              <option key={idx} value={idx}>
+                {item.label || `Option ${idx + 1}`}
+              </option>
+            ))}
+          </select>
         </div>
-      </div>
+      )}
 
-      {/* Simulated Select Menu Dropdown */}
-      <div style={{ marginTop: '0.5rem', backgroundColor: '#2b2d31', borderRadius: '4px', padding: '0.5rem 0.75rem', border: '1px solid #4e5058', color: '#949ba4', fontSize: '0.8rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <span>📌 Select a feature to view guide, stats & commands...</span>
-        <span>▼</span>
-      </div>
+      {/* Simulated Ephemeral Hero Photo Card Popup */}
+      {selectedItem && (
+        <div
+          style={{
+            marginTop: '0.75rem',
+            borderLeft: '4px solid #6366f1',
+            backgroundColor: '#2b2d31',
+            borderRadius: '4px',
+            padding: '0.75rem 1rem',
+            maxWidth: '520px',
+            position: 'relative',
+          }}
+        >
+          <div style={{ fontSize: '0.68rem', color: '#949ba4', fontStyle: 'italic', marginBottom: '0.4rem' }}>
+            🔒 Ephemeral Response (Only you can see this)
+          </div>
+          <div style={{ fontWeight: 700, fontSize: '0.95rem', color: '#f2f3f5', marginBottom: '0.3rem' }}>
+            {selectedItem.label}
+          </div>
+          <div style={{ whiteSpace: 'pre-wrap', fontSize: '0.8125rem', color: '#dbdee1' }}>
+            {selectedItem.content_markdown || 'Dynamic item details will appear here...'}
+          </div>
+
+          {selectedItem.hero_image_url && (
+            <div style={{ marginTop: '0.6rem', borderRadius: '4px', overflow: 'hidden' }}>
+              {/* eslint-disable-next-img-element */}
+              <img
+                src={selectedItem.hero_image_url}
+                alt="Hero Photo"
+                style={{ width: '100%', maxHeight: '200px', objectFit: 'cover', display: 'block' }}
+                onError={(e) => ((e.target as HTMLElement).style.display = 'none')}
+              />
+            </div>
+          )}
+
+          {/* Action Buttons inside Ephemeral Card */}
+          <div style={{ display: 'flex', gap: '0.4rem', marginTop: '0.6rem', flexWrap: 'wrap' }}>
+            {tryFeatureChannel && (
+              <div style={{ backgroundColor: '#2b2d31', color: '#5865f2', padding: '0.35rem 0.65rem', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 600 }}>
+                🚀 Try Feature
+              </div>
+            )}
+            {videoUrl && (
+              <div style={{ backgroundColor: '#2b2d31', color: '#5865f2', padding: '0.35rem 0.65rem', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 600 }}>
+                🎥 Watch Video
+              </div>
+            )}
+            {rewardCoins > 0 && (
+              <div style={{ backgroundColor: '#248046', color: '#ffffff', padding: '0.35rem 0.65rem', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 600 }}>
+                🎁 Claim +{rewardCoins} Coins
+              </div>
+            )}
+            <div style={{ backgroundColor: '#4e5058', color: '#ffffff', padding: '0.35rem 0.65rem', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 600 }}>
+              💬 Send Feedback
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
