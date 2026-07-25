@@ -32,6 +32,110 @@ export default function ModerationPage() {
   const [rules, setRules] = useState<string[]>([]);
   const [newRuleText, setNewRuleText] = useState('');
 
+  // Announcebot states
+  const [announcementText, setAnnouncementText] = useState('');
+  const [announcementChannelId, setAnnouncementChannelId] = useState('');
+  const [scheduledDateTime, setScheduledDateTime] = useState('');
+  const [channels, setChannels] = useState<{ id: string; name: string }[]>([]);
+  const [scheduledQueue, setScheduledQueue] = useState<any[]>([]);
+  const [postingState, setPostingState] = useState<'idle' | 'posting' | 'scheduling' | 'error'>('idle');
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
+
+  const fetchAnnouncebotData = async () => {
+    try {
+      const [chRes, qRes] = await Promise.all([
+        fetch('/api/social/birthday/channels'),
+        fetch('/api/moderation/announcement/queue'),
+      ]);
+      if (chRes.ok) {
+        const chData = await chRes.json();
+        if (Array.isArray(chData)) setChannels(chData);
+      }
+      if (qRes.ok) {
+        const qData = await qRes.json();
+        if (Array.isArray(qData)) setScheduledQueue(qData);
+      }
+    } catch (err) {
+      console.error('[ANNOUNCEBOT FETCH ERROR]:', err);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'announcebot') {
+      fetchAnnouncebotData();
+    }
+  }, [activeTab]);
+
+  const handlePostNow = async () => {
+    if (!announcementText.trim() || !announcementChannelId.trim()) return;
+    setPostingState('posting');
+    setStatusMessage(null);
+    try {
+      const res = await fetch('/api/moderation/announcement/post', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          channel_id: announcementChannelId.trim(),
+          message: announcementText.trim(),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Failed to post announcement.');
+      }
+      setStatusMessage('✓ Announcement posted successfully to Discord!');
+      setAnnouncementText('');
+      setPostingState('idle');
+    } catch (err: any) {
+      setPostingState('error');
+      setStatusMessage(`⚠️ ${err?.message || 'Failed to post announcement.'}`);
+    }
+  };
+
+  const handleSchedulePost = async () => {
+    if (!announcementText.trim() || !announcementChannelId.trim() || !scheduledDateTime) return;
+    setPostingState('scheduling');
+    setStatusMessage(null);
+    try {
+      const scheduledUtc = new Date(scheduledDateTime).toISOString();
+      const res = await fetch('/api/moderation/announcement/schedule', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          channel_id: announcementChannelId.trim(),
+          message: announcementText.trim(),
+          scheduled_at: scheduledUtc,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Failed to schedule announcement.');
+      }
+      setStatusMessage('✓ Announcement scheduled successfully!');
+      setAnnouncementText('');
+      setScheduledDateTime('');
+      setPostingState('idle');
+      fetchAnnouncebotData();
+    } catch (err: any) {
+      setPostingState('error');
+      setStatusMessage(`⚠️ ${err?.message || 'Failed to schedule announcement.'}`);
+    }
+  };
+
+  const handleDeleteScheduled = async (id: string) => {
+    if (!confirm('Are you sure you want to cancel this scheduled announcement?')) return;
+    try {
+      const res = await fetch(`/api/moderation/announcement/queue?id=${id}`, {
+        method: 'DELETE',
+      });
+      if (res.ok) {
+        fetchAnnouncebotData();
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   const fetchKeyformData = async () => {
     setLoadingKeyform(true);
     try {
@@ -190,6 +294,13 @@ export default function ModerationPage() {
           >
             🔑 Keyform Access
           </button>
+          <button
+            className={`sidebar-item ${activeTab === 'announcebot' ? 'active' : ''}`}
+            onClick={() => setActiveTab('announcebot')}
+            id="sidebar-mod-announcebot"
+          >
+            📢 Announcebot
+          </button>
         </aside>
 
         {/* Detail Content Area */}
@@ -200,6 +311,13 @@ export default function ModerationPage() {
               <p style={{ marginTop: '0.5rem', marginBottom: '1.5rem' }}>
                 Keep your server secure and streamline the process of welcoming new members.
               </p>
+
+              <div className="overview-item">
+                <h3>📢 Announcebot</h3>
+                <p>
+                  Broadcast announcements immediately as the bot to any channel or schedule posts using local time for automated future dispatching.
+                </p>
+              </div>
 
               <div className="overview-item">
                 <h3>🔐 Gatekeeper Onboarding</h3>
@@ -973,6 +1091,100 @@ export default function ModerationPage() {
                       </div>
                     )}
                   </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'announcebot' && (
+            <div className="split-layout-detail">
+              <div className="feature-instructions">
+                <h3>📢 Announcebot Guide</h3>
+                <p>
+                  Announcebot allows server administrators to post announcements directly as the ENOS Bot to any channel instantly on demand.
+                </p>
+                <ul style={{ paddingLeft: '1.2rem', marginTop: '0.5rem', fontSize: '0.85rem' }}>
+                  <li style={{ marginBottom: '0.4rem' }}><strong>⚡ Pure Manual Control</strong>: No automated cron jobs or background polling overhead.</li>
+                  <li style={{ marginBottom: '0.4rem' }}><strong>🎯 Direct Targeting</strong>: Pick any text channel or announcement channel from the list.</li>
+                  <li style={{ marginBottom: '0.4rem' }}><strong>✨ Discord Formatting</strong>: Supports standard Markdown (bold <code>**</code>, italics <code>*</code>, links, codeblocks, emojis).</li>
+                </ul>
+                <div className="tip-box" style={{ marginTop: '1rem' }}>
+                  <strong>💡 Pro Tip:</strong><br />
+                  Make sure the ENOS Bot has permission to send messages and view the target channel in Discord.
+                </div>
+              </div>
+
+              <div className="feature-form-card">
+                <div style={{ backgroundColor: 'var(--bg-secondary)', borderRadius: '12px', padding: '1.5rem', border: '1px solid var(--border-color)' }}>
+                  <h3 style={{ marginTop: 0, marginBottom: '1rem', fontSize: '1.15rem' }}>📢 Compose & Post Announcement</h3>
+
+                  {/* Target Channel */}
+                  <div style={{ marginBottom: '1.25rem' }}>
+                    <label className="form-label" style={{ fontWeight: 600, display: 'block', marginBottom: '0.4rem' }}>
+                      🎯 Target Channel
+                    </label>
+                    <select
+                      className="form-input"
+                      value={announcementChannelId}
+                      onChange={(e) => setAnnouncementChannelId(e.target.value)}
+                      style={{ width: '100%', marginBottom: '0.5rem' }}
+                    >
+                      <option value="">-- Select Channel from List --</option>
+                      {channels.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.name} ({c.id})
+                        </option>
+                      ))}
+                    </select>
+                    <span className="form-hint" style={{ display: 'block', marginBottom: '0.25rem' }}>Or manually enter / paste Channel ID:</span>
+                    <input
+                      type="text"
+                      className="form-input"
+                      placeholder="e.g. 1111851611099254815"
+                      value={announcementChannelId}
+                      onChange={(e) => setAnnouncementChannelId(e.target.value.trim())}
+                      style={{ width: '100%' }}
+                    />
+                  </div>
+
+                  {/* Announcement Message Textarea */}
+                  <div style={{ marginBottom: '1.25rem' }}>
+                    <label className="form-label" style={{ fontWeight: 600, display: 'block', marginBottom: '0.4rem' }}>
+                      ✍️ Announcement Message Text
+                    </label>
+                    <textarea
+                      className="form-input"
+                      rows={6}
+                      placeholder="Type your message here... Supports **bold**, *italics*, @mentions, and emojis!"
+                      value={announcementText}
+                      onChange={(e) => setAnnouncementText(e.target.value)}
+                      style={{ width: '100%', fontFamily: 'inherit', resize: 'vertical' }}
+                    />
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '0.25rem', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                      <span>Discord character limit: 2000</span>
+                      <span>{announcementText.length} / 2000</span>
+                    </div>
+                  </div>
+
+                  {/* Broadcast Button */}
+                  <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                    <button
+                      type="button"
+                      className="btn btn-primary"
+                      disabled={postingState !== 'idle' || !announcementText.trim() || !announcementChannelId.trim()}
+                      onClick={handlePostNow}
+                      style={{ backgroundColor: '#10b981', border: 'none', fontWeight: 600, padding: '0.65rem 1.25rem', fontSize: '0.95rem' }}
+                    >
+                      {postingState === 'posting' ? 'Posting to Discord...' : '🚀 Broadcast Announcement Now'}
+                    </button>
+                  </div>
+
+                  {/* Status Message Feedback */}
+                  {statusMessage && (
+                    <div style={{ marginTop: '1rem', padding: '0.75rem', borderRadius: '6px', backgroundColor: postingState === 'error' ? 'rgba(239, 68, 68, 0.15)' : 'rgba(16, 185, 129, 0.15)', color: postingState === 'error' ? '#f87171' : '#34d399', fontSize: '0.85rem' }}>
+                      {statusMessage}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
