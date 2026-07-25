@@ -244,24 +244,28 @@ async function handleShowcaseSelectMenu(interaction) {
       embed.image = { url: targetItem.hero_image_url.trim() };
     }
 
-    // Build Ephemeral Action Buttons
+    // Build Ephemeral Action Buttons (Per-item overrides global)
     const buttons = [];
 
-    if (showcase.try_feature_channel && showcase.try_feature_channel.trim()) {
+    const targetChannel = (targetItem.try_channel_id || showcase.try_feature_channel || '').trim();
+    const targetButtonLabel = (targetItem.try_button_label || '🚀 Try Feature Now').trim();
+    const targetVideoUrl = (targetItem.video_url || showcase.video_url || '').trim();
+
+    if (targetChannel) {
       buttons.push({
         type: 2,
         style: 5, // LINK
-        label: '🚀 Try Feature Now',
-        url: `https://discord.com/channels/${guildId}/${showcase.try_feature_channel.trim()}`,
+        label: targetButtonLabel,
+        url: `https://discord.com/channels/${guildId}/${targetChannel}`,
       });
     }
 
-    if (showcase.video_url && showcase.video_url.trim()) {
+    if (targetVideoUrl) {
       buttons.push({
         type: 2,
         style: 5, // LINK
         label: '🎥 Watch Video Guide',
-        url: showcase.video_url.trim(),
+        url: targetVideoUrl,
       });
     }
 

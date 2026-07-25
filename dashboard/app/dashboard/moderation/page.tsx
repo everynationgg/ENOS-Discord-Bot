@@ -1534,13 +1534,41 @@ export default function ModerationPage() {
                           helpText="This photo pops up when member selects this option from the dropdown menu"
                         />
 
+                        {/* Per-Item Custom Action Button & Link Overrides */}
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.5rem', marginTop: '0.5rem', marginBottom: '0.5rem' }}>
+                          <input
+                            type="text"
+                            className="form-input"
+                            placeholder="Button Label (e.g. ⚔️ Join Raid Arena)"
+                            value={item.try_button_label || ''}
+                            onChange={(e) => handleUpdateDropdownItem(idx, 'try_button_label', e.target.value)}
+                            style={{ fontSize: '0.8rem' }}
+                          />
+                          <input
+                            type="text"
+                            className="form-input"
+                            placeholder="Target Channel ID (Deep-link)"
+                            value={item.try_channel_id || ''}
+                            onChange={(e) => handleUpdateDropdownItem(idx, 'try_channel_id', e.target.value)}
+                            style={{ fontSize: '0.8rem' }}
+                          />
+                          <input
+                            type="text"
+                            className="form-input"
+                            placeholder="Video Tutorial URL (Optional)"
+                            value={item.video_url || ''}
+                            onChange={(e) => handleUpdateDropdownItem(idx, 'video_url', e.target.value)}
+                            style={{ fontSize: '0.8rem' }}
+                          />
+                        </div>
+
                         <textarea
                           className="form-input"
                           rows={3}
                           placeholder="Detailed content shown in ephemeral popup when selected..."
                           value={item.content_markdown}
                           onChange={(e) => handleUpdateDropdownItem(idx, 'content_markdown', e.target.value)}
-                          style={{ width: '100%', fontFamily: 'inherit', resize: 'vertical', marginTop: '0.5rem' }}
+                          style={{ width: '100%', fontFamily: 'inherit', resize: 'vertical' }}
                         />
                       </div>
                     ))}

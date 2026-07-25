@@ -8,6 +8,9 @@ interface DropdownItem {
   description?: string;
   hero_image_url?: string;
   content_markdown?: string;
+  try_channel_id?: string;
+  try_button_label?: string;
+  video_url?: string;
 }
 
 interface DiscordEmbedPreviewProps {
@@ -241,14 +244,14 @@ export default function DiscordEmbedPreview({
 
           {/* Action Buttons inside Ephemeral Card */}
           <div style={{ display: 'flex', gap: '0.4rem', marginTop: '0.6rem', flexWrap: 'wrap' }}>
-            {tryFeatureChannel && (
+            {(selectedItem.try_channel_id || tryFeatureChannel) && (
               <div style={{ backgroundColor: '#2b2d31', color: '#5865f2', padding: '0.35rem 0.65rem', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 600 }}>
-                🚀 Try Feature
+                {selectedItem.try_button_label || '🚀 Try Feature Now'}
               </div>
             )}
-            {videoUrl && (
+            {(selectedItem.video_url || videoUrl) && (
               <div style={{ backgroundColor: '#2b2d31', color: '#5865f2', padding: '0.35rem 0.65rem', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 600 }}>
-                🎥 Watch Video
+                🎥 Watch Video Guide
               </div>
             )}
             {rewardCoins > 0 && (
