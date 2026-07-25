@@ -88,6 +88,14 @@ module.exports = {
           const { handleBossButton } = require('../commands/boss');
           return handleBossButton(interaction);
         }
+        if (interaction.customId.startsWith('showcase_claim_')) {
+          const { handleShowcaseClaim } = require('../modules/moderation/showcase');
+          return handleShowcaseClaim(interaction);
+        }
+        if (interaction.customId.startsWith('showcase_feedback_')) {
+          const { handleShowcaseFeedbackButton } = require('../modules/moderation/showcase');
+          return handleShowcaseFeedbackButton(interaction);
+        }
         return;
       }
 
@@ -99,6 +107,10 @@ module.exports = {
         }
         if (interaction.customId === 'verify_ign_modal') {
           return handleIGNModalSubmit(interaction);
+        }
+        if (interaction.customId.startsWith('showcase_feedback_modal:')) {
+          const { handleShowcaseFeedbackSubmit } = require('../modules/moderation/showcase');
+          return handleShowcaseFeedbackSubmit(interaction);
         }
         if (interaction.customId.startsWith('lfg_modal:')) {
           const { handleLFGModalSubmit } = require('../modules/gaming/lfg');
@@ -113,6 +125,10 @@ module.exports = {
 
       // ─── String Select Menus ──────────────────────────────────────────────────
       if (interaction.isStringSelectMenu()) {
+        if (interaction.customId.startsWith('showcase_select_')) {
+          const { handleShowcaseSelectMenu } = require('../modules/moderation/showcase');
+          return handleShowcaseSelectMenu(interaction);
+        }
         if (interaction.customId.startsWith('translate_select_')) {
           const { handleTranslationSelection } = require('../modules/utility/translator');
           return handleTranslationSelection(interaction);
