@@ -481,7 +481,7 @@ export default function ModerationPage() {
             onClick={() => setActiveTab('showcase')}
             id="sidebar-mod-showcase"
           >
-            🚀 Feature Showcase Publisher
+            🚀 Server Update Publisher
           </button>
         </aside>
 
@@ -495,7 +495,7 @@ export default function ModerationPage() {
               </p>
 
               <div className="overview-item">
-                <h3>🚀 Feature Showcase Publisher</h3>
+                <h3>🚀 Server Update Publisher</h3>
                 <p>
                   Design and publish high-engagement update cards with hero banners, embedded video tutorials, interactive feedback modals, and Vault Coin rewards.
                 </p>
@@ -1384,7 +1384,7 @@ export default function ModerationPage() {
               {/* Form & Controls (Left Column) */}
               <div className="feature-form-card" style={{ flex: '1 1 500px' }}>
                 <div style={{ backgroundColor: 'var(--bg-secondary)', borderRadius: '12px', padding: '1.5rem', border: '1px solid var(--border-color)' }}>
-                  <h3 style={{ marginTop: 0, marginBottom: '1rem', fontSize: '1.15rem' }}>🚀 Feature Showcase Publisher</h3>
+                  <h3 style={{ marginTop: 0, marginBottom: '1rem', fontSize: '1.15rem' }}>🚀 Server Update Publisher</h3>
 
                   {/* Load Previous Post Selector */}
                   <div style={{ marginBottom: '1.25rem', backgroundColor: 'var(--bg-primary)', padding: '0.85rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
