@@ -4,7 +4,7 @@ import { supabaseAdmin } from '@/lib/supabase';
 
 const DISCORD_TOKEN = process.env.DISCORD_TOKEN || process.env.DISCORD_BOT_TOKEN;
 
-// POST /api/moderation/showcase/dispatch — Dispatch a dynamic showcase update to Discord
+// POST /api/moderation/showcase/dispatch — Dispatch or Edit a dynamic showcase update on Discord
 export async function POST(req: NextRequest) {
   try {
     const session = await auth();
@@ -14,6 +14,7 @@ export async function POST(req: NextRequest) {
 
     const body = await req.json();
     const {
+      showcase_id, // If provided, updates existing showcase post
       guild_id,
       channel_id,
       feedback_channel_id,
@@ -57,46 +58,83 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 1. Insert record into Supabase to generate UUID
-    const { data: showcaseRecord, error: dbErr } = await supabaseAdmin
-      .from('showcase_updates')
-      .insert({
-        guild_id: guildId,
-        channel_id: channel_id.trim(),
-        feedback_channel_id: feedback_channel_id ? feedback_channel_id.trim() : null,
-        preset_type,
-        title_size,
-        title: title.trim(),
-        body_size,
-        summary: summary ? summary.trim() : null,
-        body_markdown: body_markdown.trim(),
-        banner_url: banner_url ? banner_url.trim() : null,
-        video_url: video_url ? video_url.trim() : null,
-        reward_coins: Number(reward_coins) || 0,
-        try_feature_channel: try_feature_channel ? try_feature_channel.trim() : null,
-        dropdown_items: Array.isArray(dropdown_items) ? dropdown_items : [],
-        created_by: session.user?.name || session.user?.email || 'Admin',
-      })
-      .select()
-      .single();
+    let activeShowcaseId = showcase_id;
+    let existingMessageId: string | null = null;
 
-    if (dbErr) {
-      console.error('[SHOWCASE DISPATCH DB ERROR]:', dbErr);
-      return NextResponse.json(
-        { success: false, error: `Failed to create showcase record: ${dbErr.message}` },
-        { status: 500 }
-      );
+    if (activeShowcaseId) {
+      // 1A. Update existing record in Supabase
+      const { data: updatedRecord, error: updateErr } = await supabaseAdmin
+        .from('showcase_updates')
+        .update({
+          guild_id: guildId,
+          channel_id: channel_id.trim(),
+          feedback_channel_id: feedback_channel_id ? feedback_channel_id.trim() : null,
+          preset_type,
+          title_size,
+          title: title.trim(),
+          body_size,
+          summary: summary ? summary.trim() : null,
+          body_markdown: body_markdown.trim(),
+          banner_url: banner_url ? banner_url.trim() : null,
+          video_url: video_url ? video_url.trim() : null,
+          reward_coins: Number(reward_coins) || 0,
+          try_feature_channel: try_feature_channel ? try_feature_channel.trim() : null,
+          dropdown_items: Array.isArray(dropdown_items) ? dropdown_items : [],
+        })
+        .eq('id', activeShowcaseId)
+        .select()
+        .single();
+
+      if (updateErr) {
+        console.error('[SHOWCASE UPDATE DB ERROR]:', updateErr);
+        return NextResponse.json(
+          { success: false, error: `Failed to update showcase record: ${updateErr.message}` },
+          { status: 500 }
+        );
+      }
+
+      existingMessageId = updatedRecord.message_id;
+    } else {
+      // 1B. Insert new record into Supabase to generate UUID
+      const { data: showcaseRecord, error: dbErr } = await supabaseAdmin
+        .from('showcase_updates')
+        .insert({
+          guild_id: guildId,
+          channel_id: channel_id.trim(),
+          feedback_channel_id: feedback_channel_id ? feedback_channel_id.trim() : null,
+          preset_type,
+          title_size,
+          title: title.trim(),
+          body_size,
+          summary: summary ? summary.trim() : null,
+          body_markdown: body_markdown.trim(),
+          banner_url: banner_url ? banner_url.trim() : null,
+          video_url: video_url ? video_url.trim() : null,
+          reward_coins: Number(reward_coins) || 0,
+          try_feature_channel: try_feature_channel ? try_feature_channel.trim() : null,
+          dropdown_items: Array.isArray(dropdown_items) ? dropdown_items : [],
+          created_by: session.user?.name || session.user?.email || 'Admin',
+        })
+        .select()
+        .single();
+
+      if (dbErr) {
+        console.error('[SHOWCASE DISPATCH DB ERROR]:', dbErr);
+        return NextResponse.json(
+          { success: false, error: `Failed to create showcase record: ${dbErr.message}` },
+          { status: 500 }
+        );
+      }
+
+      activeShowcaseId = showcaseRecord.id;
     }
 
-    const showcaseId = showcaseRecord.id;
-
-    // 2. Format Embed Title with Header Markdown
+    // 2. Format Embed Title & Body Markdown
     let formattedTitle = title.trim();
     if (title_size === 'h1') formattedTitle = `# 🚀 ${title.trim()}`;
     else if (title_size === 'h2') formattedTitle = `## 🚀 ${title.trim()}`;
     else if (title_size === 'h3') formattedTitle = `### 🚀 ${title.trim()}`;
 
-    // Format Embed Body Text
     let formattedBody = body_markdown.trim();
     if (body_size === 'h2') formattedBody = `## ${body_markdown.trim()}`;
     else if (body_size === 'h3') formattedBody = `### ${body_markdown.trim()}`;
@@ -119,7 +157,7 @@ export async function POST(req: NextRequest) {
       embed.image = { url: banner_url.trim() };
     }
 
-    // 3. Build Dynamic Select Menu Dropdown Options
+    // 3. Build Dynamic Select Menu Options
     const selectOptions = (Array.isArray(dropdown_items) ? dropdown_items : []).map(
       (item: any, idx: number) => ({
         label: (item.label || `Update ${idx + 1}`).substring(0, 100),
@@ -130,32 +168,51 @@ export async function POST(req: NextRequest) {
     );
 
     const components: any[] = [];
-
     if (selectOptions.length > 0) {
       const selectMenu = {
         type: 3, // STRING SELECT MENU
-        custom_id: `showcase_select_${showcaseId}`,
+        custom_id: `showcase_select_${activeShowcaseId}`,
         placeholder: '📌 Select a feature update to view hero artwork & details...',
         options: selectOptions,
       };
       components.push({ type: 1, components: [selectMenu] });
     }
 
-    // 4. Send Message via Discord REST API
-    const discordRes = await fetch(
-      `https://discord.com/api/v10/channels/${channel_id.trim()}/messages`,
-      {
-        method: 'POST',
-        headers: {
-          Authorization: `Bot ${DISCORD_TOKEN}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          embeds: [embed],
-          components,
-        }),
-      }
-    );
+    // 4. Send or Edit Message via Discord REST API
+    let discordRes: Response;
+    if (existingMessageId) {
+      // EDIT existing message using PATCH
+      discordRes = await fetch(
+        `https://discord.com/api/v10/channels/${channel_id.trim()}/messages/${existingMessageId}`,
+        {
+          method: 'PATCH',
+          headers: {
+            Authorization: `Bot ${DISCORD_TOKEN}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            embeds: [embed],
+            components,
+          }),
+        }
+      );
+    } else {
+      // CREATE new message using POST
+      discordRes = await fetch(
+        `https://discord.com/api/v10/channels/${channel_id.trim()}/messages`,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bot ${DISCORD_TOKEN}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            embeds: [embed],
+            components,
+          }),
+        }
+      );
+    }
 
     if (!discordRes.ok) {
       const errJson = await discordRes.json().catch(() => ({}));
@@ -168,15 +225,18 @@ export async function POST(req: NextRequest) {
 
     const sentMessage = await discordRes.json();
 
-    // 5. Update message_id in DB
-    await supabaseAdmin
-      .from('showcase_updates')
-      .update({ message_id: sentMessage.id })
-      .eq('id', showcaseId);
+    // 5. Update message_id in DB if new
+    if (!existingMessageId && sentMessage.id) {
+      await supabaseAdmin
+        .from('showcase_updates')
+        .update({ message_id: sentMessage.id })
+        .eq('id', activeShowcaseId);
+    }
 
     return NextResponse.json({
       success: true,
-      showcase_id: showcaseId,
+      updated: !!existingMessageId,
+      showcase_id: activeShowcaseId,
       message_id: sentMessage.id,
     });
   } catch (err: any) {

@@ -242,6 +242,33 @@ export default function ModerationPage() {
     }
   };
 
+  const [editingShowcaseId, setEditingShowcaseId] = useState<string | null>(null);
+
+  const handleLoadShowcaseForEdit = (item: any) => {
+    setEditingShowcaseId(item.id);
+    setShowcasePreset(item.preset_type || 'major');
+    setShowcaseTitleSize(item.title_size || 'h1');
+    setShowcaseTitle(item.title || '');
+    setShowcaseBodySize(item.body_size || 'normal');
+    setShowcaseSummary(item.summary || '');
+    setShowcaseBody(item.body_markdown || '');
+    setShowcaseBannerUrl(item.banner_url || '');
+    setShowcaseVideoUrl(item.video_url || '');
+    setShowcaseRewardCoins(item.reward_coins || 0);
+    setShowcaseTryChannel(item.try_feature_channel || '');
+    setShowcaseChannelId(item.channel_id || '');
+    setShowcaseFeedbackChannelId(item.feedback_channel_id || '');
+    if (Array.isArray(item.dropdown_items) && item.dropdown_items.length > 0) {
+      setDropdownItems(item.dropdown_items);
+    }
+    setShowcaseStatusMsg(`📌 Loaded post "${item.title}" into Dashboard editor.`);
+  };
+
+  const handleCancelEdit = () => {
+    setEditingShowcaseId(null);
+    setShowcaseStatusMsg(null);
+  };
+
   const handleDispatchShowcase = async () => {
     if (!showcaseTitle.trim() || !showcaseBody.trim() || !showcaseChannelId.trim()) return;
     setShowcaseDispatchState('dispatching');
@@ -251,6 +278,7 @@ export default function ModerationPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          showcase_id: editingShowcaseId,
           channel_id: showcaseChannelId.trim(),
           feedback_channel_id: showcaseFeedbackChannelId.trim(),
           preset_type: showcasePreset,
@@ -270,7 +298,11 @@ export default function ModerationPage() {
       if (!res.ok || !data.success) {
         throw new Error(data.error || 'Failed to dispatch showcase.');
       }
-      setShowcaseStatusMsg('✓ Server update and feature showcase successfully published to Discord!');
+      setShowcaseStatusMsg(
+        editingShowcaseId
+          ? '✓ Live Discord update and database record successfully updated!'
+          : '✓ Server update and feature showcase successfully published to Discord!'
+      );
       setShowcaseDispatchState('idle');
       fetchShowcaseHistory();
     } catch (err: any) {
@@ -1354,6 +1386,41 @@ export default function ModerationPage() {
                 <div style={{ backgroundColor: 'var(--bg-secondary)', borderRadius: '12px', padding: '1.5rem', border: '1px solid var(--border-color)' }}>
                   <h3 style={{ marginTop: 0, marginBottom: '1rem', fontSize: '1.15rem' }}>🚀 Feature Showcase Publisher</h3>
 
+                  {/* Load Previous Post Selector */}
+                  <div style={{ marginBottom: '1.25rem', backgroundColor: 'var(--bg-primary)', padding: '0.85rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
+                      <label className="form-label" style={{ fontWeight: 600, margin: 0 }}>
+                        📜 Load Previous Published Post into Editor
+                      </label>
+                      {editingShowcaseId && (
+                        <button
+                          type="button"
+                          onClick={handleCancelEdit}
+                          style={{ backgroundColor: 'transparent', border: 'none', color: '#f87171', cursor: 'pointer', fontSize: '0.78rem', fontWeight: 600 }}
+                        >
+                          ✕ Cancel Edit Mode
+                        </button>
+                      )}
+                    </div>
+                    <select
+                      className="form-input"
+                      value={editingShowcaseId || ''}
+                      onChange={(e) => {
+                        const item = showcaseHistory.find((h) => h.id === e.target.value);
+                        if (item) handleLoadShowcaseForEdit(item);
+                        else handleCancelEdit();
+                      }}
+                      style={{ width: '100%' }}
+                    >
+                      <option value="">-- Select a past published post to load into form --</option>
+                      {showcaseHistory.map((item) => (
+                        <option key={item.id} value={item.id}>
+                          {item.title} (Channel: #{item.channel_id}) — {new Date(item.created_at).toLocaleDateString()}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
                   {/* Preset Selector */}
                   <div style={{ marginBottom: '1.25rem' }}>
                     <label className="form-label" style={{ fontWeight: 600, display: 'block', marginBottom: '0.4rem' }}>
@@ -1645,16 +1712,36 @@ export default function ModerationPage() {
                     </div>
                   </div>
 
-                  {/* Dispatch Button */}
-                  <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                  {/* Dispatch / Update Button */}
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
+                    {editingShowcaseId && (
+                      <button
+                        type="button"
+                        className="btn btn-secondary"
+                        onClick={handleCancelEdit}
+                        style={{ fontSize: '0.9rem', padding: '0.65rem 1.1rem' }}
+                      >
+                        Cancel Edit
+                      </button>
+                    )}
                     <button
                       type="button"
                       className="btn btn-primary"
                       disabled={showcaseDispatchState !== 'idle' || !showcaseTitle.trim() || !showcaseBody.trim() || !showcaseChannelId.trim()}
                       onClick={handleDispatchShowcase}
-                      style={{ backgroundColor: '#6366f1', border: 'none', fontWeight: 600, padding: '0.75rem 1.5rem', fontSize: '1rem' }}
+                      style={{
+                        backgroundColor: editingShowcaseId ? '#3b82f6' : '#6366f1',
+                        border: 'none',
+                        fontWeight: 600,
+                        padding: '0.75rem 1.5rem',
+                        fontSize: '1rem',
+                      }}
                     >
-                      {showcaseDispatchState === 'dispatching' ? 'Publishing Showcase...' : '🚀 Publish Showcase Update'}
+                      {showcaseDispatchState === 'dispatching'
+                        ? 'Saving Changes...'
+                        : editingShowcaseId
+                        ? '✏️ Update Live Discord Post'
+                        : '🚀 Publish Showcase Update'}
                     </button>
                   </div>
 
@@ -1694,9 +1781,19 @@ export default function ModerationPage() {
                     ) : (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: '250px', overflowY: 'auto' }}>
                         {showcaseHistory.slice(0, 10).map((item) => (
-                          <div key={item.id} style={{ padding: '0.5rem', backgroundColor: 'var(--bg-primary)', borderRadius: '6px', fontSize: '0.8125rem', border: '1px solid var(--border-color)' }}>
-                            <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{item.title}</div>
-                            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'flex', justifyContent: 'space-between', marginTop: '0.2rem' }}>
+                          <div key={item.id} style={{ padding: '0.6rem', backgroundColor: 'var(--bg-primary)', borderRadius: '6px', fontSize: '0.8125rem', border: '1px solid var(--border-color)' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{item.title}</span>
+                              <button
+                                type="button"
+                                className="btn btn-secondary"
+                                onClick={() => handleLoadShowcaseForEdit(item)}
+                                style={{ fontSize: '0.72rem', padding: '0.2rem 0.5rem' }}
+                              >
+                                ✏️ Load & Edit
+                              </button>
+                            </div>
+                            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'flex', justifyContent: 'space-between', marginTop: '0.25rem' }}>
                               <span>Channel: #{item.channel_id}</span>
                               <span>{new Date(item.created_at).toLocaleDateString()}</span>
                             </div>
