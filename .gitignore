@@ -38,3 +38,5 @@ Thumbs.db
 *.tsbuildinfo
 dashboard/.next/
 node_modules
+scratch/
+

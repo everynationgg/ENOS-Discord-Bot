@@ -1,6 +1,7 @@
 'use client';
 
 import FeatureCard from '@/components/FeatureCard';
+import ImageUploader from '@/components/ImageUploader';
 import { useEffect, useState } from 'react';
 
 const GAME_BRANCHES = [
@@ -1252,34 +1253,24 @@ export default function GamingPage() {
                           <div className="section-divider-line" />
                         </div>
 
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-                          <div className="form-group">
-                            <label className="form-label">🧌 Boss Artwork Image URL (Displayed on Spawn & Combat)</label>
-                            <input
-                              id="boss-image-url"
-                              className="form-input"
-                              placeholder="https://.../boss_environment_art.png"
-                              value={imageUrl}
-                              onChange={(e) => setConfig('custom_image_url', e.target.value.trim())}
-                            />
-                            <span className="form-hint">
-                              Full boss artwork image. Displayed ONLY on initial spawn, and on the right side during combat.
-                            </span>
-                          </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                          <ImageUploader
+                            id="boss-image-url"
+                            label="🧌 Boss Artwork Image (Displayed on Spawn & Combat)"
+                            placeholder="https://.../boss_environment_art.png"
+                            value={imageUrl}
+                            onChange={(url) => setConfig('custom_image_url', url)}
+                            helpText="Full boss artwork image. Displayed ONLY on initial spawn, and on the right side during combat."
+                          />
 
-                          <div className="form-group">
-                            <label className="form-label">🌄 Arena Background Image (Optional 16:9)</label>
-                            <input
-                              id="boss-bg-url"
-                              className="form-input"
-                              placeholder="https://.../arena_background.png"
-                              value={bgUrl}
-                              onChange={(e) => setConfig('custom_bg_url', e.target.value.trim())}
-                            />
-                            <span className="form-hint">
-                              Optional custom background landscape/arena image
-                            </span>
-                          </div>
+                          <ImageUploader
+                            id="boss-bg-url"
+                            label="🌄 Arena Background Image (Optional 16:9)"
+                            placeholder="https://.../arena_background.png"
+                            value={bgUrl}
+                            onChange={(url) => setConfig('custom_bg_url', url)}
+                            helpText="Optional custom background landscape/arena image"
+                          />
                         </div>
 
                         {/* Player Class Custom Images */}
@@ -1289,42 +1280,33 @@ export default function GamingPage() {
                           <div className="section-divider-line" />
                         </div>
 
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.75rem' }}>
-                          <div className="form-group">
-                            <label className="form-label">🛡️ M.O.M. Class Image</label>
-                            <input
-                              id="boss-mom-image-url"
-                              className="form-input"
-                              placeholder="https://.../mom_character.png"
-                              value={momImageUrl}
-                              onChange={(e) => setConfig('mom_image_url', e.target.value.trim())}
-                            />
-                            <span className="form-hint">Placed on left side when M.O.M. class is selected</span>
-                          </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
+                          <ImageUploader
+                            id="boss-mom-image-url"
+                            label="🛡️ M.O.M. Class Image"
+                            placeholder="https://.../mom_character.png"
+                            value={momImageUrl}
+                            onChange={(url) => setConfig('mom_image_url', url)}
+                            helpText="Placed on left side when M.O.M. class is selected"
+                          />
 
-                          <div className="form-group">
-                            <label className="form-label">🔨 D.A.D. Class Image</label>
-                            <input
-                              id="boss-dad-image-url"
-                              className="form-input"
-                              placeholder="https://.../dad_character.png"
-                              value={dadImageUrl}
-                              onChange={(e) => setConfig('dad_image_url', e.target.value.trim())}
-                            />
-                            <span className="form-hint">Placed on left side when D.A.D. class is selected</span>
-                          </div>
+                          <ImageUploader
+                            id="boss-dad-image-url"
+                            label="🔨 D.A.D. Class Image"
+                            placeholder="https://.../dad_character.png"
+                            value={dadImageUrl}
+                            onChange={(url) => setConfig('dad_image_url', url)}
+                            helpText="Placed on left side when D.A.D. class is selected"
+                          />
 
-                          <div className="form-group">
-                            <label className="form-label">⚡ K.I.D. Class Image</label>
-                            <input
-                              id="boss-kid-image-url"
-                              className="form-input"
-                              placeholder="https://.../kid_character.png"
-                              value={kidImageUrl}
-                              onChange={(e) => setConfig('kid_image_url', e.target.value.trim())}
-                            />
-                            <span className="form-hint">Placed on left side when K.I.D. class is selected</span>
-                          </div>
+                          <ImageUploader
+                            id="boss-kid-image-url"
+                            label="⚡ K.I.D. Class Image"
+                            placeholder="https://.../kid_character.png"
+                            value={kidImageUrl}
+                            onChange={(url) => setConfig('kid_image_url', url)}
+                            helpText="Placed on left side when K.I.D. class is selected"
+                          />
                         </div>
 
                         {/* Live Canvas Composite Preview Card */}
