@@ -9,20 +9,20 @@ interface ImageUploaderProps {
   onChange: (url: string) => void;
   placeholder?: string;
   helpText?: string;
-  maxDimension?: number; // Optional max width/height to auto-resize (default 1920)
+  maxDimension?: number; // Optional max width/height to auto-resize (default 1200)
 }
 
 /**
- * Resizes an image client-side on a Canvas if it exceeds maxDimension.
+ * Resizes an image client-side on a Canvas to compress payload < 500KB.
  * Returns a Blob ready for upload.
  */
-async function optimizeImage(file: File, maxDim = 1920): Promise<Blob> {
-  // If file is GIF or SVG, do not scale canvas (preserve animation/vector)
-  if (file.type === 'image/gif' || file.type === 'image/svg+xml') {
+async function optimizeImage(file: File, maxDim = 1200): Promise<Blob> {
+  // SVG doesn't need scaling
+  if (file.type === 'image/svg+xml') {
     return file;
   }
 
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve) => {
     const img = new Image();
     const url = URL.createObjectURL(file);
 
@@ -30,7 +30,7 @@ async function optimizeImage(file: File, maxDim = 1920): Promise<Blob> {
       URL.revokeObjectURL(url);
 
       let { width, height } = img;
-      if (width <= maxDim && height <= maxDim) {
+      if (width <= maxDim && height <= maxDim && file.size < 1048576) {
         resolve(file);
         return;
       }
@@ -59,7 +59,7 @@ async function optimizeImage(file: File, maxDim = 1920): Promise<Blob> {
 
       ctx.drawImage(img, 0, 0, width, height);
 
-      const mimeType = file.type === 'image/png' ? 'image/png' : 'image/jpeg';
+      // Compress as JPEG to ensure payload stays under Vercel 4.5MB limit
       canvas.toBlob(
         (blob) => {
           if (blob) {
@@ -68,8 +68,8 @@ async function optimizeImage(file: File, maxDim = 1920): Promise<Blob> {
             resolve(file);
           }
         },
-        mimeType,
-        0.92
+        'image/jpeg',
+        0.82
       );
     };
 
@@ -89,7 +89,7 @@ export default function ImageUploader({
   onChange,
   placeholder = 'https://... or upload image below',
   helpText,
-  maxDimension = 1920,
+  maxDimension = 1200,
 }: ImageUploaderProps) {
   const [isUploading, setIsUploading] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
@@ -109,7 +109,8 @@ export default function ImageUploader({
       // 1. Client-side optimization/resizing
       const optimizedBlob = await optimizeImage(file, maxDimension);
       const formData = new FormData();
-      formData.append('file', optimizedBlob, file.name);
+      const fileName = file.name.replace(/\.[^/.]+$/, '') + '.jpg';
+      formData.append('file', optimizedBlob, fileName);
 
       // 2. Upload to /api/upload
       const res = await fetch('/api/upload', {
@@ -117,7 +118,16 @@ export default function ImageUploader({
         body: formData,
       });
 
-      const data = await res.json();
+      const responseText = await res.text();
+      let data: any = {};
+      try {
+        data = JSON.parse(responseText);
+      } catch {
+        if (res.status === 413 || responseText.includes('Request Entity Too Large')) {
+          throw new Error('Image file is too large (exceeds 4.5MB upload limit). Please select a smaller file.');
+        }
+        throw new Error(`Upload server error (${res.status}): ${responseText.substring(0, 100)}`);
+      }
 
       if (!res.ok || !data.success) {
         throw new Error(data.error || 'Failed to upload image.');
