@@ -167,10 +167,10 @@ export default function ModerationPage() {
   >([
     {
       id: 'item_1',
-      label: '1. Weekly World Boss RPG 2.0',
-      description: '3 Playable RPG Classes & 5-Attribute Skill Tree',
+      label: '1. ⚔️ Weekly World Boss RPG 2.0',
+      description: 'Master of Magic, Damage Absorbing Defender & King of Instant Damage',
       hero_image_url: '',
-      content_markdown: '### ⚔️ Weekly World Boss RPG System\n• **3 Classes**: M.O.M (Tank), D.A.D (Brawler), K.I.D (Speed)\n• **Skill Tree**: Allocate stat points into DMG, Crit, AP Save, XP, and Loot!\n• **Commands**: `/boss attack`, `/boss stats`',
+      content_markdown: '### ⚔️ Weekly World Boss RPG System\n• **M.O.M.** (Master of Magic): Support Class with healing & party buffs.\n• **D.A.D.** (Damage Absorbing Defender): Tank & Debuff Class with taunt & barrier shields.\n• **K.I.D.** (King of Instant Damage): Critical Hit & Burst DPS Class.\n• **Skill Tree**: Allocate stat points into DMG, Crit, AP Save, XP, and Loot!\n• **Commands**: `/boss attack`, `/boss stats`',
     },
   ]);
 
