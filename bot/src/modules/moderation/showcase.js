@@ -2,8 +2,12 @@ const { ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder, Messag
 const logger = require('../../lib/logger');
 const { supabase } = require('../../lib/supabase');
 
+// In-memory Map to track when users open an update feature card (for 10-second anti-farm reading timer)
+const showcaseOpenedTimestamps = new Map();
+
 /**
- * Handles reward claim button click for a showcase update.
+ * Handles the reward claim button click for a showcase update.
+ * Enforces a 10-second reading timer before awarding Vault coins.
  * @param {import('discord.js').ButtonInteraction} interaction
  */
 async function handleShowcaseClaim(interaction) {
@@ -11,6 +15,28 @@ async function handleShowcaseClaim(interaction) {
     const showcaseId = interaction.customId.replace('showcase_claim_', '');
     const userId = interaction.user.id;
     const guildId = interaction.guildId || process.env.DISCORD_GUILD_ID;
+
+    // 1. Check 10-second reading timer
+    const openedKey = `${userId}:${showcaseId}`;
+    const openedAt = showcaseOpenedTimestamps.get(openedKey);
+
+    if (!openedAt) {
+      // Mark current time if not set, and prompt user to read for 10s
+      showcaseOpenedTimestamps.set(openedKey, Date.now());
+      return interaction.reply({
+        content: '⏳ Please read through the feature update notes for at least **10 seconds** before claiming your Vault Coins!',
+        flags: MessageFlags.Ephemeral,
+      });
+    }
+
+    const elapsedSeconds = Math.floor((Date.now() - openedAt) / 1000);
+    if (elapsedSeconds < 10) {
+      const remaining = 10 - elapsedSeconds;
+      return interaction.reply({
+        content: `⏳ Please read through the feature update notes for at least **10 seconds** before claiming your Vault Coins! (Please wait **${remaining}s** more)`,
+        flags: MessageFlags.Ephemeral,
+      });
+    }
 
     // Fetch showcase update details
     const { data: showcase, error: scErr } = await supabase
@@ -196,14 +222,18 @@ async function handleShowcaseFeedbackSubmit(interaction) {
 }
 
 /**
- * Handles dynamic select menu clicks and rerolls ephemeral feature guide cards with hero photos.
+ * Handles dynamic select menu clicks, records 10s timer timestamp, and rerolls active ephemeral message in-place.
  * @param {import('discord.js').StringSelectMenuInteraction} interaction
  */
 async function handleShowcaseSelectMenu(interaction) {
   try {
     const showcaseId = interaction.customId.replace('showcase_select_', '');
     const selectedItemId = interaction.values[0];
+    const userId = interaction.user.id;
     const guildId = interaction.guildId || process.env.DISCORD_GUILD_ID;
+
+    // Record time when member opened/rerolled this update for 10s anti-farm timer
+    showcaseOpenedTimestamps.set(`${userId}:${showcaseId}`, Date.now());
 
     // Fetch showcase update details from database
     const { data: showcase, error: scErr } = await supabase
@@ -285,20 +315,49 @@ async function handleShowcaseSelectMenu(interaction) {
       label: '💬 Send Feedback',
     });
 
+    // Build Select Menu Component Row for active ephemeral rerolling
+    const selectOptions = items.map((item, idx) => ({
+      label: (item.label || `Update ${idx + 1}`).substring(0, 100),
+      value: (item.id || `item_${idx}`).substring(0, 100),
+      description: item.description ? item.description.substring(0, 100) : undefined,
+      default: item.id === selectedItemId || item.label === selectedItemId,
+      emoji: { name: '📌' },
+    }));
+
+    const selectMenuRow = {
+      type: 1,
+      components: [
+        {
+          type: 3, // STRING SELECT MENU
+          custom_id: `showcase_select_${showcaseId}`,
+          placeholder: '📌 Select a feature update to view hero artwork & details...',
+          options: selectOptions,
+        },
+      ],
+    };
+
     const components = [];
     if (buttons.length > 0) {
       components.push({ type: 1, components: buttons });
     }
+    components.push(selectMenuRow);
 
-    // Seamless Reroll: If interaction has already replied/deferred or is component, update or reply ephemeral
-    if (interaction.replied || interaction.deferred) {
-      return interaction.followUp({
+    // Active Ephemeral Rerolling Logic:
+    // Check if interaction was triggered on an ephemeral message component (or select menu inside ephemeral response)
+    const isEphemeralComponent =
+      interaction.message &&
+      interaction.message.flags &&
+      interaction.message.flags.has(MessageFlags.Ephemeral);
+
+    if (isEphemeralComponent) {
+      // Edit the active ephemeral message in-place ("reroll")
+      return interaction.update({
         embeds: [embed],
         components,
-        flags: MessageFlags.Ephemeral,
       });
     }
 
+    // Initial select menu click from main announcement post: reply ephemeral with select menu included
     return interaction.reply({
       embeds: [embed],
       components,
