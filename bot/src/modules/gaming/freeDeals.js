@@ -131,17 +131,19 @@ async function checkAndDispatchDeals(client, guildId) {
   const deals = await fetchAllDeals(minDiscount);
   if (!deals.length) return { count: 0 };
 
-  // Fetch previously posted deal IDs for this guild
+  // Fetch previously posted deal IDs and titles for this guild
   const { data: postedRows } = await supabase
     .from('free_game_deals')
-    .select('deal_id')
+    .select('deal_id, title')
     .eq('guild_id', guildId);
 
   const postedSet = new Set((postedRows || []).map((r) => r.deal_id));
+  const postedTitleSet = new Set((postedRows || []).map((r) => (r.title || '').toLowerCase().trim()));
   let newlyPosted = 0;
 
   for (const deal of deals) {
-    if (postedSet.has(deal.dealId)) continue;
+    const cleanTitle = (deal.title || '').toLowerCase().trim();
+    if (postedSet.has(deal.dealId) || postedTitleSet.has(cleanTitle)) continue;
     if (newlyPosted >= 5) break; // Cap at 5 new deal alerts per batch run to avoid spam
 
     const is100Free = deal.isFree || deal.savingsPercent >= 100;

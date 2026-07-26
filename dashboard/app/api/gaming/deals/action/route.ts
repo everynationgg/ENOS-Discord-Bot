@@ -138,14 +138,16 @@ export async function POST(req: NextRequest) {
 
       const { data: postedRows } = await supabaseAdmin
         .from('free_game_deals')
-        .select('deal_id')
+        .select('deal_id, title')
         .eq('guild_id', guildId);
 
       const postedSet = new Set((postedRows || []).map((r: any) => r.deal_id));
+      const postedTitleSet = new Set((postedRows || []).map((r: any) => (r.title || '').toLowerCase().trim()));
       let newlyPosted = 0;
 
       for (const deal of deals) {
-        if (postedSet.has(deal.dealId)) continue;
+        const cleanTitle = (deal.title || '').toLowerCase().trim();
+        if (postedSet.has(deal.dealId) || postedTitleSet.has(cleanTitle)) continue;
         if (newlyPosted >= 3) break; // Limit 3 deal alerts per manual trigger button push
 
         const is100Free = deal.isFree || deal.savingsPercent >= 100;
