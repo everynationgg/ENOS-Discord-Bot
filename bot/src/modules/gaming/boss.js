@@ -208,8 +208,17 @@ async function getPlayerState(guildId, userId) {
 
     if (fallback) return fallback;
 
-    logger.error('[BOSS] Failed to initialize player state:', error?.message);
-    return null;
+    logger.error('[BOSS] Fallback player state for user:', error?.message);
+    return {
+      guild_id: guildId,
+      user_id: userId,
+      week_identifier: currentWeek,
+      ap_remaining: 5,
+      is_locked: false,
+      class_key: 'mom',
+      total_damage: 0,
+      weekly_points: 0,
+    };
   }
 
   return newPlayer;
@@ -230,10 +239,14 @@ async function getUserProfile(guildId, userId) {
     return {
       stat_crit: 0,
       stat_loot_boost: 0,
+      stat_dmg: 0,
+      stat_ap_save: 0,
+      stat_xp_boost: 0,
       ...existing,
     };
   }
 
+  // Insert minimal core columns to ensure compatibility across all DB schema versions
   const { data: newProfile, error } = await supabase
     .from('boss_user_profiles')
     .insert({
@@ -243,10 +256,8 @@ async function getUserProfile(guildId, userId) {
       xp: 0,
       unallocated_stats: 0,
       stat_dmg: 0,
-      stat_crit: 0,
       stat_ap_save: 0,
       stat_xp_boost: 0,
-      stat_loot_boost: 0,
     })
     .select()
     .maybeSingle();
@@ -259,13 +270,28 @@ async function getUserProfile(guildId, userId) {
       .eq('user_id', userId)
       .maybeSingle();
 
-    if (fallback) return { stat_crit: 0, stat_loot_boost: 0, ...fallback };
+    if (fallback) return { stat_crit: 0, stat_loot_boost: 0, stat_dmg: 0, stat_ap_save: 0, stat_xp_boost: 0, ...fallback };
 
-    logger.error('[BOSS] Failed to initialize user profile:', error?.message);
-    return null;
+    logger.error('[BOSS] Schema cache fallback for user profile:', error?.message);
+    return {
+      guild_id: guildId,
+      user_id: userId,
+      level: 1,
+      xp: 0,
+      unallocated_stats: 0,
+      stat_dmg: 0,
+      stat_crit: 0,
+      stat_ap_save: 0,
+      stat_xp_boost: 0,
+      stat_loot_boost: 0,
+    };
   }
 
-  return newProfile;
+  return {
+    stat_crit: 0,
+    stat_loot_boost: 0,
+    ...newProfile,
+  };
 }
 
 /**
