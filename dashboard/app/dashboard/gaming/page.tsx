@@ -724,6 +724,8 @@ export default function GamingPage() {
                     const rates = config.rates || {};
                     const multipliers: any[] = config.role_multipliers || [];
                     const tierRoles = config.tier_roles || {};
+                    const [dispatchingHub, setDispatchingHub] = useState(false);
+                    const [hubDispatchStatus, setHubDispatchStatus] = useState('');
 
                     return (
                       <>
@@ -773,6 +775,50 @@ export default function GamingPage() {
                               value={config.quest_channel_id || ''}
                               onChange={(e) => setConfig('quest_channel_id', e.target.value)}
                             />
+                            <div style={{ marginTop: '0.5rem' }}>
+                              <button
+                                type="button"
+                                className="btn btn-primary btn-sm"
+                                disabled={!config.quest_channel_id || dispatchingHub}
+                                onClick={async () => {
+                                  setDispatchingHub(true);
+                                  setHubDispatchStatus('Dispatching launcher card to Discord...');
+                                  try {
+                                    const res = await fetch('/api/gaming/vault/action', {
+                                      method: 'POST',
+                                      headers: { 'Content-Type': 'application/json' },
+                                      body: JSON.stringify({
+                                        action: 'dispatch_quest_hub',
+                                        channel_id: config.quest_channel_id,
+                                      }),
+                                    });
+                                    const data = await res.json();
+                                    if (res.ok && data.success) {
+                                      setHubDispatchStatus('✅ Daily Quest Hub card successfully posted to Discord!');
+                                    } else {
+                                      setHubDispatchStatus(`❌ Failed: ${data.error || 'Unknown error'}`);
+                                    }
+                                  } catch (e: any) {
+                                    setHubDispatchStatus(`❌ Error: ${e.message}`);
+                                  } finally {
+                                    setDispatchingHub(false);
+                                  }
+                                }}
+                                style={{ backgroundColor: '#10b981', border: 'none', fontWeight: 600, fontSize: '0.8rem', width: '100%' }}
+                              >
+                                {dispatchingHub ? 'Posting to Discord...' : '🚀 Dispatch Quest Hub Card to Channel'}
+                              </button>
+                              {hubDispatchStatus && (
+                                <div style={{
+                                  marginTop: '0.4rem',
+                                  fontSize: '0.8rem',
+                                  fontWeight: 500,
+                                  color: hubDispatchStatus.startsWith('✅') ? '#34d399' : hubDispatchStatus.startsWith('❌') ? '#f87171' : '#facc15'
+                                }}>
+                                  {hubDispatchStatus}
+                                </div>
+                              )}
+                            </div>
                           </div>
                         </div>
 
