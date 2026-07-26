@@ -328,6 +328,22 @@ async function buildProfileEmbed(discordId, guildId, guild) {
   const phpValue = (balance.coins || 0).toFixed(2);
   const rarity = currentTier.rarity || 'COMMON';
 
+  // Daily quest progress text
+  let questText = '';
+  const questGoal = vaultConfig.rates?.daily_quest_message_threshold || 10;
+  const questBonus = (vaultConfig.rates?.daily_quest_bonus || 0.50).toFixed(2);
+  const msgs = balance.messages_today || 0;
+
+  if (balance.quest_claimed) {
+    questText = `✅ **Completed!** Claimed +${questBonus} coins (₱${questBonus} PHP)`;
+  } else if (balance.quest_started) {
+    const qProgress = Math.min(100, Math.round((msgs / questGoal) * 100));
+    const qFilled = Math.max(0, Math.min(10, Math.round(qProgress / 10)));
+    questText = `\`[${'█'.repeat(qFilled)}${'░'.repeat(10 - qFilled)}]\` **${msgs}/${questGoal}** msgs (${qProgress}%)\n*Reward: +${questBonus} coins (₱${questBonus} PHP)*`;
+  } else {
+    questText = `⏸️ **Not Started**\n*Click the **▶️ Start Daily Quest** button below to begin tracking chat messages!*`;
+  }
+
   const embed = new EmbedBuilder()
     .setColor(currentTier.color || 0x8B5CF6)
     .setTitle(`${currentTier.emoji} ${displayName}'s Vault Profile`)
@@ -347,6 +363,10 @@ async function buildProfileEmbed(discordId, guildId, guild) {
         name: '🎙️ Voice Time',
         value: `${balance.voice_minutes} min`,
         inline: true,
+      },
+      {
+        name: '🎯 Daily Quest',
+        value: questText,
       },
       {
         name: nextTier ? `⬆️ Progress to ${nextTier.name}` : '🏆 Rank Status',
@@ -408,6 +428,56 @@ async function buildLeaderboardEmbed(guildId, guild) {
 }
 
 /**
+ * Builds a dedicated Daily Quest embed card.
+ */
+async function buildQuestEmbed(discordId, guildId, guild) {
+  const balance = await getOrCreateBalance(discordId, guildId);
+  const vaultConfig = await getVaultConfig(guildId);
+  const questGoal = vaultConfig.rates?.daily_quest_message_threshold || 10;
+  const questBonus = (vaultConfig.rates?.daily_quest_bonus || 0.50).toFixed(2);
+  const msgs = balance?.messages_today || 0;
+
+  const member = await guild.members.fetch(discordId).catch(() => null);
+  const displayName = member?.displayName || 'Member';
+
+  let statusTitle = '⏸️ Daily Quest — Not Started';
+  let desc = `Click the **▶️ Start Daily Quest** button below to begin tracking chat messages today!\n\n**Goal**: Send **${questGoal} messages**\n**Reward**: **+${questBonus} coins (₱${questBonus} PHP)**`;
+  let color = 0x3B82F6;
+
+  if (balance?.quest_claimed) {
+    statusTitle = '✅ Daily Quest — Completed!';
+    desc = `You have completed today's quest and claimed **+${questBonus} coins (₱${questBonus} PHP)**!\n\n*Resets daily at midnight.*`;
+    color = 0x10B981;
+  } else if (balance?.quest_started) {
+    const qProgress = Math.min(100, Math.round((msgs / questGoal) * 100));
+    const qFilled = Math.max(0, Math.min(15, Math.round((qProgress / 100) * 15)));
+    statusTitle = '▶️ Daily Quest — Active Progress';
+    desc = `\`[${'█'.repeat(qFilled)}${'░'.repeat(15 - qFilled)}]\` **${msgs}/${questGoal}** messages (${qProgress}%)\n\n*Send ${questGoal - msgs} more messages today to claim +${questBonus} coins (₱${questBonus} PHP)!*`;
+    color = 0xFACC15;
+  }
+
+  const embed = new EmbedBuilder()
+    .setColor(color)
+    .setTitle(`🎯 ${displayName}'s Daily Quest`)
+    .setDescription(desc)
+    .setFooter({ text: 'Every Nation Vault • Daily Reset at Midnight' })
+    .setTimestamp();
+
+  const components = [];
+  if (!balance?.quest_started) {
+    const row = new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId('vault_start_quest')
+        .setLabel('▶️ Start Daily Quest')
+        .setStyle(ButtonStyle.Success)
+    );
+    components.push(row);
+  }
+
+  return { embed, components };
+}
+
+/**
  * Cron: Reset daily quest flags at midnight
  */
 async function resetDailyQuests() {
@@ -429,6 +499,7 @@ module.exports = {
   handleVoiceLeave,
   handleStartQuest,
   buildProfileEmbed,
+  buildQuestEmbed,
   buildLeaderboardEmbed,
   resetDailyQuests,
   getOrCreateBalance,

@@ -9,6 +9,9 @@ module.exports = {
       sub.setName('profile').setDescription('View your Vault profile and coin balance')
     )
     .addSubcommand(sub =>
+      sub.setName('quest').setDescription('🎯 View your Vault daily quest progress and start it')
+    )
+    .addSubcommand(sub =>
       sub.setName('start-quest').setDescription('▶️ Explicitly start today\'s daily quest to begin message tracking')
     )
     .addSubcommand(sub =>
@@ -44,6 +47,17 @@ module.exports = {
       );
       if (!profileData || !profileData.embed) return interaction.editReply('❌ Could not load your Vault profile.');
       return interaction.editReply({ embeds: [profileData.embed], components: profileData.components || [] });
+    }
+
+    if (sub === 'quest') {
+      await interaction.deferReply();
+      const { buildQuestEmbed } = require('../modules/gaming/vault');
+      const questData = await buildQuestEmbed(
+        interaction.user.id,
+        interaction.guild.id,
+        interaction.guild
+      );
+      return interaction.editReply({ embeds: [questData.embed], components: questData.components || [] });
     }
 
     if (sub === 'start-quest') {
