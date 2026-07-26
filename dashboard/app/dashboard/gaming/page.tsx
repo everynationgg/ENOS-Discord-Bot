@@ -1277,36 +1277,122 @@ export default function GamingPage() {
                               />
                             </div>
 
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-                              <div className="form-group">
-                                <label className="form-label">Next Boss Max HP</label>
-                                <input
-                                  type="number"
-                                  className="form-input"
-                                  placeholder="e.g. 500000"
-                                  value={staged.max_hp || ''}
-                                  onChange={(e) => setConfig('staged_boss_config', { ...staged, max_hp: e.target.value })}
-                                />
-                              </div>
-                              <div className="form-group">
-                                <label className="form-label">Next Boss Image URL</label>
-                                <input
-                                  className="form-input"
-                                  placeholder="https://i.ibb.co/..."
-                                  value={staged.custom_image_url || ''}
-                                  onChange={(e) => setConfig('staged_boss_config', { ...staged, custom_image_url: e.target.value })}
-                                />
-                              </div>
+                            <div className="form-group" style={{ marginBottom: '1.25rem' }}>
+                              <label className="form-label">Next Boss Max HP</label>
+                              <input
+                                type="number"
+                                className="form-input"
+                                placeholder="e.g. 500000"
+                                value={staged.max_hp || ''}
+                                onChange={(e) => setConfig('staged_boss_config', { ...staged, max_hp: e.target.value })}
+                              />
+                            </div>
+
+                            {/* Staged Boss & Background Image Section */}
+                            <div className="section-divider">
+                              <div className="section-divider-line" />
+                              <span className="section-divider-text">🖼️ Next Week Artwork & Arena Environment</span>
+                              <div className="section-divider-line" />
+                            </div>
+
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                              <ImageUploader
+                                id="staged-boss-image-url"
+                                label="🧌 Next Boss Artwork Image"
+                                placeholder="https://.../next_boss_art.png"
+                                value={staged.custom_image_url || ''}
+                                onChange={(url) => setConfig('staged_boss_config', { ...staged, custom_image_url: url })}
+                                helpText="Full artwork image for next week's boss. (Leave blank to inherit current boss artwork)"
+                              />
+
+                              <ImageUploader
+                                id="staged-boss-bg-url"
+                                label="🌄 Next Arena Background Image (Optional 16:9)"
+                                placeholder="https://.../next_arena_bg.png"
+                                value={staged.custom_bg_url || ''}
+                                onChange={(url) => setConfig('staged_boss_config', { ...staged, custom_bg_url: url })}
+                                helpText="Custom background landscape/arena image for next week's boss."
+                              />
+                            </div>
+
+                            {/* Staged Player Class Custom Images */}
+                            <div className="section-divider">
+                              <div className="section-divider-line" />
+                              <span className="section-divider-text">🎭 Next Week Player Class Images</span>
+                              <div className="section-divider-line" />
+                            </div>
+
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
+                              <ImageUploader
+                                id="staged-boss-mom-image-url"
+                                label="🛡️ M.O.M. Class Image"
+                                placeholder="https://.../mom_character.png"
+                                value={staged.mom_image_url || ''}
+                                onChange={(url) => setConfig('staged_boss_config', { ...staged, mom_image_url: url })}
+                                helpText="Leave blank to keep active M.O.M. class image"
+                              />
+
+                              <ImageUploader
+                                id="staged-boss-dad-image-url"
+                                label="🔨 D.A.D. Class Image"
+                                placeholder="https://.../dad_character.png"
+                                value={staged.dad_image_url || ''}
+                                onChange={(url) => setConfig('staged_boss_config', { ...staged, dad_image_url: url })}
+                                helpText="Leave blank to keep active D.A.D. class image"
+                              />
+
+                              <ImageUploader
+                                id="staged-boss-kid-image-url"
+                                label="⚡ K.I.D. Class Image"
+                                placeholder="https://.../kid_character.png"
+                                value={staged.kid_image_url || ''}
+                                onChange={(url) => setConfig('staged_boss_config', { ...staged, kid_image_url: url })}
+                                helpText="Leave blank to keep active K.I.D. class image"
+                              />
                             </div>
 
                             <BossPreviewCard
                               bossName={staged.boss_name || 'Next Week Staged Boss'}
                               imageUrl={staged.custom_image_url || imageUrl}
-                              bgUrl={bgUrl}
-                              momImageUrl={momImageUrl}
-                              dadImageUrl={dadImageUrl}
-                              kidImageUrl={kidImageUrl}
-                              onFixIbbLinks={async () => {}}
+                              bgUrl={staged.custom_bg_url || bgUrl}
+                              momImageUrl={staged.mom_image_url || momImageUrl}
+                              dadImageUrl={staged.dad_image_url || dadImageUrl}
+                              kidImageUrl={staged.kid_image_url || kidImageUrl}
+                              onFixIbbLinks={async () => {
+                                const resolveUrl = async (url: string) => {
+                                  if (!url || !url.startsWith('http') || url.includes('i.ibb.co/')) return url;
+                                  try {
+                                    const res = await fetch(url, {
+                                      headers: {
+                                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+                                        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                                      }
+                                    });
+                                    if (res.ok) {
+                                      const html = await res.text();
+                                      const m = html.match(/<meta\s+property=["']og:image["']\s+content=["']([^"']+)["']/i) ||
+                                                html.match(/<img\s+src=["'](https:\/\/i\.ibb\.co\/[^"']+)["']/i) ||
+                                                html.match(/(https:\/\/i\.ibb\.co\/[a-zA-Z0-9_\-\.\/]+)/i);
+                                      if (m && m[1]) return m[1];
+                                    }
+                                  } catch (e) {}
+                                  return url;
+                                };
+
+                                const newMom = await resolveUrl(staged.mom_image_url);
+                                const newDad = await resolveUrl(staged.dad_image_url);
+                                const newKid = await resolveUrl(staged.kid_image_url);
+                                const newBg = await resolveUrl(staged.custom_bg_url);
+                                const newImg = await resolveUrl(staged.custom_image_url);
+
+                                const newStaged = { ...staged };
+                                if (newMom !== staged.mom_image_url) newStaged.mom_image_url = newMom;
+                                if (newDad !== staged.dad_image_url) newStaged.dad_image_url = newDad;
+                                if (newKid !== staged.kid_image_url) newStaged.kid_image_url = newKid;
+                                if (newBg !== staged.custom_bg_url) newStaged.custom_bg_url = newBg;
+                                if (newImg !== staged.custom_image_url) newStaged.custom_image_url = newImg;
+                                setConfig('staged_boss_config', newStaged);
+                              }}
                             />
                           </>
                         ) : (

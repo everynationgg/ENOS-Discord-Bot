@@ -107,8 +107,14 @@ async function getOrCreateActiveBoss(guildId) {
     if (stagedConfig.max_hp) finalMaxHp = Number(stagedConfig.max_hp);
     if (stagedConfig.custom_image_url) finalCustomImageUrl = stagedConfig.custom_image_url;
 
-    // Clear staged_boss_config so it doesn't re-trigger
+    // Clear staged_boss_config so it doesn't re-trigger, and promote staged artwork to active config
     const updatedConfig = { ...(featureRow?.config || {}) };
+    if (stagedConfig.custom_image_url) updatedConfig.custom_image_url = stagedConfig.custom_image_url;
+    if (stagedConfig.custom_bg_url) updatedConfig.custom_bg_url = stagedConfig.custom_bg_url;
+    if (stagedConfig.mom_image_url) updatedConfig.mom_image_url = stagedConfig.mom_image_url;
+    if (stagedConfig.dad_image_url) updatedConfig.dad_image_url = stagedConfig.dad_image_url;
+    if (stagedConfig.kid_image_url) updatedConfig.kid_image_url = stagedConfig.kid_image_url;
+
     delete updatedConfig.staged_boss_config;
     await supabase.from('guild_config').upsert({
       guild_id: guildId,
