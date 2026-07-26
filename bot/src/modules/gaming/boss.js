@@ -454,6 +454,10 @@ async function executeCombatAction(guildId, userId, actionType) {
     })
     .eq('id', profile.id);
 
+  // Trigger Weekly Boss Quest Completion in Vault
+  const { handleBossQuestCompletion } = require('./vault');
+  await handleBossQuestCompletion(userId, guildId).catch(() => {});
+
   // Log Transaction
   await supabase.from('boss_transactions').insert({
     guild_id: guildId,

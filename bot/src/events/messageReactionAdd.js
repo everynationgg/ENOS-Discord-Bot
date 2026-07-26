@@ -43,6 +43,12 @@ module.exports = {
 
     logger.info(`[REACTION] Event received: emoji=${reaction.emoji.name}, user=${user.tag || user.id}, msgId=${message.id}`);
 
+    // Trigger Reaction Daily Quest in Vault
+    try {
+      const { handleReactionQuest } = require('../modules/gaming/vault');
+      await handleReactionQuest(user.id, guild.id, guild).catch(() => {});
+    } catch (e) {}
+
     try {
       // Rule 2 (Database Check): Check if 'reaction_mirroring' is set to True for that server. If False, return.
       const featureConfig = await getFeatureConfig(guild.id, 'auto_reactions');

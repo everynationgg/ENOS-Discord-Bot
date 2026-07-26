@@ -24,10 +24,18 @@ module.exports = {
         const launcherChannelId = config?.config?.launcher_channel_id;
 
         if (launcherChannelId && message.channel.parentId === launcherChannelId) {
+          const { handleAIChatQuest } = require('../modules/gaming/vault');
+          await handleAIChatQuest(message.author.id, guildId, message.guild).catch(() => {});
           await handleHelpDeskChatMessage(message).catch(() => {});
           return; // Skip vault coins and other message listeners in support rooms
         }
       }
+    }
+
+    // AI Bot Mention Check (Quest 7: AI Chat)
+    if (client.user && message.mentions.has(client.user.id)) {
+      const { handleAIChatQuest } = require('../modules/gaming/vault');
+      await handleAIChatQuest(message.author.id, guildId, message.guild).catch(() => {});
     }
 
     // Vault Economy: award coins for messages

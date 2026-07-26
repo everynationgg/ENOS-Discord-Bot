@@ -31,6 +31,12 @@ module.exports = {
       await handleVoiceJoin(userId, guildId).catch(() => {});
     }
 
+    // Voice status update detection (Quest 6: Voice Status Change)
+    if (oldState.status !== newState.status && newState.status) {
+      const { handleVoiceStatusQuest } = require('../modules/gaming/vault');
+      await handleVoiceStatusQuest(userId, guildId, newState.guild).catch(() => {});
+    }
+
     // User switched voice channels within the server (keep original start time)
     if (oldState.channelId && newState.channelId && oldState.channelId !== newState.channelId) {
       if (!voiceJoinTimes.has(key)) {
