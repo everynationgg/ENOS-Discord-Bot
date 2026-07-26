@@ -89,8 +89,11 @@ export async function POST(req: NextRequest) {
     await upsertFeatureConfig(guildId, feature_key, enabled, config || {});
 
     // Automatically drop the Daily Quest Hub card to Discord when saving Vault Economy settings
-    if (feature_key === 'vault_economy' && config?.quest_launcher_channel_id) {
-      await postQuestLauncherCardToDiscord(guildId, config.quest_launcher_channel_id);
+    if (feature_key === 'vault_economy') {
+      const targetChannelId = config?.quest_channel_id || config?.quest_launcher_channel_id;
+      if (targetChannelId) {
+        await postQuestLauncherCardToDiscord(guildId, targetChannelId);
+      }
     }
 
     return NextResponse.json({ success: true });
