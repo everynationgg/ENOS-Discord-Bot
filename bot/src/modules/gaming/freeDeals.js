@@ -149,14 +149,29 @@ async function checkAndDispatchDeals(client, guildId) {
   const deals = await fetchAllDeals(minDiscount);
   if (!deals.length) return { count: 0 };
 
-  // Fetch ALL historical posted deal IDs and titles for this guild (permanent history)
+  // Fetch ALL historical posted deal IDs and titles from free_game_deals
   const { data: postedRows } = await supabase
     .from('free_game_deals')
     .select('deal_id, title')
     .eq('guild_id', guildId);
 
-  const postedSet = new Set((postedRows || []).map((r) => r.deal_id));
-  const postedNormSet = new Set((postedRows || []).map((r) => normalizeTitle(r.title)));
+  // Fetch ALL historical posted titles from bot_event_logs as bulletproof secondary memory
+  const { data: logRows } = await supabase
+    .from('bot_event_logs')
+    .select('details')
+    .eq('guild_id', guildId)
+    .eq('event_type', 'free_game_alert_posted');
+
+  const postedSet = new Set([
+    ...(postedRows || []).map((r) => r.deal_id),
+    ...(logRows || []).map((r) => r.details?.deal_id).filter(Boolean),
+  ]);
+
+  const postedNormSet = new Set([
+    ...(postedRows || []).map((r) => normalizeTitle(r.title)),
+    ...(logRows || []).map((r) => normalizeTitle(r.details?.title)).filter(Boolean),
+  ]);
+
   let newlyPosted = 0;
 
   for (const deal of deals) {
@@ -208,21 +223,29 @@ async function checkAndDispatchDeals(client, guildId) {
 
     if (sentMessage?.id) {
       newlyPosted++;
-      await supabase.from('free_game_deals').insert({
-        guild_id: guildId,
-        deal_id: deal.dealId,
-        title: deal.title,
-        store_name: deal.storeName,
-        normal_price: deal.normalPrice,
-        sale_price: deal.salePrice,
-        savings_percent: deal.savingsPercent,
-        deal_url: deal.dealUrl,
-        image_url: deal.imageUrl,
-        channel_id: channelId,
-        message_id: sentMessage.id,
-        expires_at: deal.expiresAt,
-        is_expired: false,
-      });
+
+      // Write to free_game_deals with error logging
+      const { error: dbErr } = await supabase.from('free_game_deals').upsert(
+        {
+          guild_id: guildId,
+          deal_id: deal.dealId,
+          title: deal.title,
+          store_name: deal.storeName,
+          normal_price: deal.normalPrice,
+          sale_price: deal.salePrice,
+          savings_percent: deal.savingsPercent,
+          deal_url: deal.dealUrl,
+          image_url: deal.imageUrl,
+          channel_id: channelId,
+          message_id: sentMessage.id,
+          expires_at: deal.expiresAt,
+        },
+        { onConflict: 'guild_id,deal_id' }
+      );
+
+      if (dbErr) {
+        logger.error(`[FREE DEALS] DB Upsert error for ${deal.title}: ${dbErr.message}`);
+      }
 
       await logBotEvent(guildId, 'free_game_alert_posted', null, {
         deal_id: deal.dealId,
@@ -230,6 +253,10 @@ async function checkAndDispatchDeals(client, guildId) {
         store: deal.storeName,
         message_id: sentMessage.id,
       });
+
+      // Add to local sets so within this loop iteration duplicates are caught
+      postedSet.add(deal.dealId);
+      if (normTitle) postedNormSet.add(normTitle);
     }
   }
 
@@ -245,8 +272,7 @@ async function cleanExpiredDeals(client) {
     const { data: expiredDeals } = await supabase
       .from('free_game_deals')
       .select('*')
-      .lte('expires_at', nowIso)
-      .or('is_expired.is.null,is_expired.eq.false');
+      .lte('expires_at', nowIso);
 
     if (!expiredDeals || !expiredDeals.length) return;
 
@@ -266,10 +292,10 @@ async function cleanExpiredDeals(client) {
         logger.warn(`[FREE DEALS CLEANER] Failed deleting message ${deal.message_id}:`, e.message);
       }
 
-      // Mark as expired in DB rather than deleting row, so title history persists permanently!
+      // Move expires_at to 2099 so cleanExpiredDeals won't run on it again, but DB row stays permanently!
       await supabase
         .from('free_game_deals')
-        .update({ is_expired: true })
+        .update({ expires_at: '2099-01-01T00:00:00.000Z' })
         .eq('id', deal.id);
     }
   } catch (err) {

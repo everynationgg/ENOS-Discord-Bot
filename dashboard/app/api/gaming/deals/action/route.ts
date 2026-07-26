@@ -153,13 +153,29 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ success: true, count: 0, message: 'No qualifying deals found matching discount threshold.' });
       }
 
+      // Fetch ALL historical posted deal IDs and titles from free_game_deals
       const { data: postedRows } = await supabaseAdmin
         .from('free_game_deals')
         .select('deal_id, title')
         .eq('guild_id', guildId);
 
-      const postedSet = new Set((postedRows || []).map((r: any) => r.deal_id));
-      const postedNormSet = new Set((postedRows || []).map((r: any) => normalizeTitle(r.title)));
+      // Fetch ALL historical posted titles from bot_event_logs as bulletproof secondary memory
+      const { data: logRows } = await supabaseAdmin
+        .from('bot_event_logs')
+        .select('details')
+        .eq('guild_id', guildId)
+        .eq('event_type', 'free_game_alert_posted');
+
+      const postedSet = new Set([
+        ...(postedRows || []).map((r: any) => r.deal_id),
+        ...(logRows || []).map((r: any) => r.details?.deal_id).filter(Boolean),
+      ]);
+
+      const postedNormSet = new Set([
+        ...(postedRows || []).map((r: any) => normalizeTitle(r.title)),
+        ...(logRows || []).map((r: any) => normalizeTitle(r.details?.title)).filter(Boolean),
+      ]);
+
       let newlyPosted = 0;
 
       for (const deal of deals) {
@@ -221,21 +237,38 @@ export async function POST(req: NextRequest) {
         if (discordRes.ok) {
           const sentMsg = await discordRes.json();
           newlyPosted++;
-          await supabaseAdmin.from('free_game_deals').insert({
+
+          await supabaseAdmin.from('free_game_deals').upsert(
+            {
+              guild_id: guildId,
+              deal_id: deal.dealId,
+              title: deal.title,
+              store_name: deal.storeName,
+              normal_price: deal.normalPrice,
+              sale_price: deal.salePrice,
+              savings_percent: deal.savingsPercent,
+              deal_url: deal.dealUrl,
+              image_url: deal.imageUrl,
+              channel_id: channelId.trim(),
+              message_id: sentMsg.id,
+              expires_at: deal.expiresAt,
+            },
+            { onConflict: 'guild_id,deal_id' }
+          );
+
+          await supabaseAdmin.from('bot_event_logs').insert({
             guild_id: guildId,
-            deal_id: deal.dealId,
-            title: deal.title,
-            store_name: deal.storeName,
-            normal_price: deal.normalPrice,
-            sale_price: deal.salePrice,
-            savings_percent: deal.savingsPercent,
-            deal_url: deal.dealUrl,
-            image_url: deal.imageUrl,
-            channel_id: channelId.trim(),
-            message_id: sentMsg.id,
-            expires_at: deal.expiresAt,
-            is_expired: false,
-          });
+            event_type: 'free_game_alert_posted',
+            details: {
+              deal_id: deal.dealId,
+              title: deal.title,
+              store: deal.storeName,
+              message_id: sentMsg.id,
+            },
+          }).catch(() => {});
+
+          postedSet.add(deal.dealId);
+          if (normTitle) postedNormSet.add(normTitle);
         }
       }
 
@@ -252,8 +285,7 @@ export async function POST(req: NextRequest) {
         .from('free_game_deals')
         .select('*')
         .eq('guild_id', guildId)
-        .lte('expires_at', nowIso)
-        .or('is_expired.is.null,is_expired.eq.false');
+        .lte('expires_at', nowIso);
 
       let deletedCount = 0;
       if (expiredDeals && expiredDeals.length > 0) {
@@ -264,7 +296,10 @@ export async function POST(req: NextRequest) {
               headers: { Authorization: `Bot ${DISCORD_TOKEN}` },
             }).catch(() => {});
           }
-          await supabaseAdmin.from('free_game_deals').update({ is_expired: true }).eq('id', deal.id);
+          await supabaseAdmin
+            .from('free_game_deals')
+            .update({ expires_at: '2099-01-01T00:00:00.000Z' })
+            .eq('id', deal.id);
           deletedCount++;
         }
       }
