@@ -66,6 +66,13 @@ async function resolveImageUrl(url) {
  */
 async function buildPublicBossEmbedPayload(guildId) {
   const boss = await getOrCreateActiveBoss(guildId);
+  if (!boss) {
+    const embed = new EmbedBuilder()
+      .setColor(0xef4444)
+      .setTitle('⚔️ Weekly Boss Bounty — Offline')
+      .setDescription('*No active boss season found.*');
+    return { embeds: [embed], components: [] };
+  }
   const currentWeek = getWeekIdentifier();
 
   // Fetch Class Distribution
@@ -153,8 +160,20 @@ async function buildPublicBossEmbedPayload(guildId) {
  */
 async function buildPersonalCombatPayload(guildId, userId, combatResult = null) {
   const boss = await getOrCreateActiveBoss(guildId);
-  const playerState = await getPlayerState(guildId, userId);
+  let playerState = await getPlayerState(guildId, userId);
   const currentWeek = getWeekIdentifier();
+
+  if (!boss) {
+    const embed = new EmbedBuilder()
+      .setColor(0xef4444)
+      .setTitle('❌ Boss Arena Offline')
+      .setDescription('No active Weekly Boss was found for this server. An admin can spawn one using `/boss spawn` or via the web dashboard.');
+    return { embeds: [embed], components: [] };
+  }
+
+  if (!playerState) {
+    playerState = { ap_remaining: 5, is_locked: false, class_key: 'mom', total_damage: 0, weekly_points: 0 };
+  }
 
   const { data: featureRow } = await supabase
     .from('guild_config')
