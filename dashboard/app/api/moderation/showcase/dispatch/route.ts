@@ -196,6 +196,25 @@ export async function POST(req: NextRequest) {
           }),
         }
       );
+
+      // If existing message was deleted from Discord (404 Unknown Message), fallback to POST new message!
+      if (!discordRes.ok && discordRes.status === 404) {
+        discordRes = await fetch(
+          `https://discord.com/api/v10/channels/${channel_id.trim()}/messages`,
+          {
+            method: 'POST',
+            headers: {
+              Authorization: `Bot ${DISCORD_TOKEN}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              embeds: [embed],
+              components,
+            }),
+          }
+        );
+        existingMessageId = null; // Mark as newly created post so new message_id saves in DB
+      }
     } else {
       // CREATE new message using POST
       discordRes = await fetch(
