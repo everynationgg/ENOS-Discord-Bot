@@ -275,9 +275,9 @@ async function build3QuestsEphemeralEmbed(discordId, guildId, guild) {
   const member = await guild.members.fetch(discordId).catch(() => null);
   const displayName = member?.displayName || 'Member';
 
-  const assigned: string[] = balance?.assigned_quests || ['chat', 'voice', 'trivia'];
+  const assigned = balance?.assigned_quests || ['chat', 'voice', 'trivia'];
 
-  const questDetails: Record<string, { title: string, render: () => string }> = {
+  const questDetails = {
     chat: {
       title: '💬 **1. Chat Active Quest** (5 msgs)',
       render: () => {
