@@ -244,10 +244,11 @@ export async function POST(req: NextRequest) {
       const lore = `A space-time realm rift merged ${gameLabel} data with ENOS core protocols. ${charName} has manifested in the server! Coordinate your triad skills to neutralize!`;
       const hp = customHp ? parseInt(customHp, 10) : 150000;
 
-      // Check for existing active boss row for current week
+      // Check for existing active normal boss row for current week for THIS guild
       const { data: existingBoss } = await supabaseAdmin
         .from('boss_seasons')
         .select('*')
+        .eq('guild_id', guildId)
         .eq('week_identifier', currentWeek)
         .eq('is_overkill', false)
         .maybeSingle();
@@ -278,10 +279,10 @@ export async function POST(req: NextRequest) {
         }
         activeBoss = updated;
       } else {
-        // Insert new row
+        // Upsert row safely
         const { data: inserted, error: insErr } = await supabaseAdmin
           .from('boss_seasons')
-          .insert({
+          .upsert({
             guild_id: guildId,
             week_identifier: currentWeek,
             boss_name: bossName,
@@ -295,7 +296,7 @@ export async function POST(req: NextRequest) {
             dad_debuff: false,
             custom_image_url: resolvedImageUrl || null,
             last_action: '⚡ Admin force spawned a new Weekly Boss!',
-          })
+          }, { onConflict: 'guild_id,week_identifier,is_overkill' })
           .select()
           .single();
 
@@ -315,6 +316,7 @@ export async function POST(req: NextRequest) {
       const { data: existingBoss } = await supabaseAdmin
         .from('boss_seasons')
         .select('*')
+        .eq('guild_id', guildId)
         .eq('week_identifier', currentWeek)
         .eq('is_overkill', false)
         .maybeSingle();
@@ -326,7 +328,7 @@ export async function POST(req: NextRequest) {
       const { data: updatedBoss, error } = await supabaseAdmin
         .from('boss_seasons')
         .update({
-          custom_image_url: customImageUrl || null,
+          custom_image_url: resolvedImageUrl || null,
           last_action: '🎨 Boss Artwork updated from Admin Dashboard!',
         })
         .eq('id', existingBoss.id)
@@ -347,11 +349,13 @@ export async function POST(req: NextRequest) {
       await supabaseAdmin
         .from('boss_seasons')
         .update({ is_defeated: true, current_hp: 0 })
+        .eq('guild_id', guildId)
         .eq('week_identifier', currentWeek);
 
       await supabaseAdmin
         .from('boss_player_states')
         .update({ ap_remaining: 5, is_locked: false })
+        .eq('guild_id', guildId)
         .eq('week_identifier', currentWeek);
 
       return NextResponse.json({ success: true, action: 'end' });
@@ -361,6 +365,7 @@ export async function POST(req: NextRequest) {
       const { data: currentBoss } = await supabaseAdmin
         .from('boss_seasons')
         .select('*')
+        .eq('guild_id', guildId)
         .eq('week_identifier', currentWeek)
         .eq('is_overkill', false)
         .maybeSingle();
@@ -377,7 +382,7 @@ export async function POST(req: NextRequest) {
       const overkillHp = Math.round(Number(currentBoss.max_hp) * 1.5);
       const { data: overkillBoss, error: okErr } = await supabaseAdmin
         .from('boss_seasons')
-        .insert({
+        .upsert({
           guild_id: currentBoss.guild_id || guildId,
           week_identifier: currentWeek,
           boss_name: `[OVERKILL] ${currentBoss.boss_name}`,
@@ -391,7 +396,7 @@ export async function POST(req: NextRequest) {
           dad_debuff: false,
           custom_image_url: currentBoss.custom_image_url,
           last_action: '⚡ OVERKILL MODE ACTIVATED! Emergency Backup System online.',
-        })
+        }, { onConflict: 'guild_id,week_identifier,is_overkill' })
         .select()
         .single();
 
