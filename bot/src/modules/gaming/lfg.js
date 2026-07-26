@@ -355,7 +355,14 @@ async function refreshLFGEmbed(guild, session) {
 
   try {
     const channel = await guild.channels.fetch(session.channel_id);
-    const message = await channel.messages.fetch(session.message_id);
+    const message = await channel.messages.fetch(session.message_id).catch(() => null);
+    if (!message) return;
+
+    if (session.status === 'closed') {
+      await message.delete().catch(() => {});
+      logger.info(`[LFG] Deleted LFG post message ${session.message_id} for closed session ${session.id}.`);
+      return;
+    }
 
     const voiceChannelId = session.voice_channel_id;
     const voiceChannelMention = voiceChannelId ? `<#${voiceChannelId}>` : 'Not configured';
