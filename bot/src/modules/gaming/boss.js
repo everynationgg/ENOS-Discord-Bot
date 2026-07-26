@@ -81,9 +81,43 @@ async function getOrCreateActiveBoss(guildId) {
     bossHp = 50000 + (targetPlayers * 35000);
   }
 
-  // Generate Boss AI Lore
+  // Generate default Boss AI Lore
   const bossData = await generateGlitchBossLore();
 
+  // Check if Guild Admin pre-staged next week's boss config in guild_config
+  const { data: featureRow } = await supabase
+    .from('guild_config')
+    .select('config')
+    .eq('guild_id', guildId)
+    .eq('feature_key', 'weekly_boss')
+    .maybeSingle();
+
+  const stagedConfig = featureRow?.config?.staged_boss_config;
+
+  let finalBossName = bossData.bossName;
+  let finalBossTitle = bossData.bossTitle;
+  let finalLore = bossData.lore;
+  let finalMaxHp = bossHp;
+  let finalCustomImageUrl = featureRow?.config?.custom_image_url || null;
+
+  if (stagedConfig && stagedConfig.enabled) {
+    if (stagedConfig.boss_name) finalBossName = stagedConfig.boss_name;
+    if (stagedConfig.boss_title) finalBossTitle = stagedConfig.boss_title;
+    if (stagedConfig.lore) finalLore = stagedConfig.lore;
+    if (stagedConfig.max_hp) finalMaxHp = Number(stagedConfig.max_hp);
+    if (stagedConfig.custom_image_url) finalCustomImageUrl = stagedConfig.custom_image_url;
+
+    // Clear staged_boss_config so it doesn't re-trigger
+    const updatedConfig = { ...(featureRow?.config || {}) };
+    delete updatedConfig.staged_boss_config;
+    await supabase.from('guild_config').upsert({
+      guild_id: guildId,
+      feature_key: 'weekly_boss',
+      config: updatedConfig,
+      updated_at: new Date().toISOString(),
+    });
+    logger.info(`[BOSS] Deployed pre-staged weekly boss for week ${currentWeek}: ${finalBossName}`);
+  }
 
   // Insert new weekly boss season in Supabase
   const { data: newBoss, error } = await supabase
@@ -91,11 +125,12 @@ async function getOrCreateActiveBoss(guildId) {
     .insert({
       guild_id: guildId,
       week_identifier: currentWeek,
-      boss_name: bossData.bossName,
-      boss_title: bossData.bossTitle,
-      lore: bossData.lore,
-      max_hp: bossHp,
-      current_hp: bossHp,
+      boss_name: finalBossName,
+      boss_title: finalBossTitle,
+      lore: finalLore,
+      custom_image_url: finalCustomImageUrl,
+      max_hp: finalMaxHp,
+      current_hp: finalMaxHp,
       is_overkill: false,
       is_defeated: false,
       mom_buff: false,

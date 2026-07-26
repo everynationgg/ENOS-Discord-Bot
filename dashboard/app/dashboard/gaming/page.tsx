@@ -1193,6 +1193,7 @@ export default function GamingPage() {
                   initialConfig={configs['weekly_boss']?.config ?? {}}
                 >
                   {(config, setConfig) => {
+                    const [bossSubTab, setBossSubTab] = useState<'active' | 'staging'>('active');
                     const gameName = config.game_name || '';
                     const bossName = config.override_name || '';
                     const baseHP = config.override_hp || '';
@@ -1202,13 +1203,119 @@ export default function GamingPage() {
                     const dadImageUrl = config.dad_image_url || '';
                     const kidImageUrl = config.kid_image_url || '';
 
+                    const staged = config.staged_boss_config || {};
+
                     return (
                       <>
-                        <div className="section-divider">
-                          <div className="section-divider-line" />
-                          <span className="section-divider-text">Boss Settings</span>
-                          <div className="section-divider-line" />
+                        <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.5rem', borderBottom: '1px solid var(--border-subtle)', pb: '0.75rem' }}>
+                          <button
+                            type="button"
+                            className={`btn btn-sm ${bossSubTab === 'active' ? 'btn-primary' : 'btn-secondary'}`}
+                            onClick={() => setBossSubTab('active')}
+                          >
+                            ⚔️ Active Boss & Live Config
+                          </button>
+                          <button
+                            type="button"
+                            className={`btn btn-sm ${bossSubTab === 'staging' ? 'btn-primary' : 'btn-secondary'}`}
+                            onClick={() => setBossSubTab('staging')}
+                          >
+                            🗓️ Next Week's Boss Stager
+                          </button>
                         </div>
+
+                        {bossSubTab === 'staging' ? (
+                          <>
+                            <div className="section-divider">
+                              <div className="section-divider-line" />
+                              <span className="section-divider-text">🗓️ Next Week's Boss Staging & Planner</span>
+                              <div className="section-divider-line" />
+                            </div>
+
+                            <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>
+                              Pre-configure next week's boss ahead of time. When Monday midnight arrives, the bot will automatically deploy this staged boss for your server!
+                            </p>
+
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
+                              <label style={{ fontSize: '0.875rem', fontWeight: 600 }}>Enable Pre-Staged Boss for Next Week</label>
+                              <input
+                                type="checkbox"
+                                checked={staged.enabled ?? false}
+                                onChange={(e) => setConfig('staged_boss_config', { ...staged, enabled: e.target.checked })}
+                              />
+                            </div>
+
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                              <div className="form-group">
+                                <label className="form-label">Next Boss Name</label>
+                                <input
+                                  className="form-input"
+                                  placeholder="e.g. Lord Vorath"
+                                  value={staged.boss_name || ''}
+                                  onChange={(e) => setConfig('staged_boss_config', { ...staged, boss_name: e.target.value })}
+                                />
+                              </div>
+                              <div className="form-group">
+                                <label className="form-label">Next Boss Title</label>
+                                <input
+                                  className="form-input"
+                                  placeholder="e.g. The Abyssal Sovereign"
+                                  value={staged.boss_title || ''}
+                                  onChange={(e) => setConfig('staged_boss_config', { ...staged, boss_title: e.target.value })}
+                                />
+                              </div>
+                            </div>
+
+                            <div className="form-group">
+                              <label className="form-label">Next Boss Lore</label>
+                              <textarea
+                                className="form-input"
+                                rows={2}
+                                placeholder="Awakened from the deep void, it seeks to devour the digital realm..."
+                                value={staged.lore || ''}
+                                onChange={(e) => setConfig('staged_boss_config', { ...staged, lore: e.target.value })}
+                              />
+                            </div>
+
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                              <div className="form-group">
+                                <label className="form-label">Next Boss Max HP</label>
+                                <input
+                                  type="number"
+                                  className="form-input"
+                                  placeholder="e.g. 500000"
+                                  value={staged.max_hp || ''}
+                                  onChange={(e) => setConfig('staged_boss_config', { ...staged, max_hp: e.target.value })}
+                                />
+                              </div>
+                              <div className="form-group">
+                                <label className="form-label">Next Boss Image URL</label>
+                                <input
+                                  className="form-input"
+                                  placeholder="https://i.ibb.co/..."
+                                  value={staged.custom_image_url || ''}
+                                  onChange={(e) => setConfig('staged_boss_config', { ...staged, custom_image_url: e.target.value })}
+                                />
+                              </div>
+                            </div>
+
+                            <BossPreviewCard
+                              bossName={staged.boss_name || 'Next Week Staged Boss'}
+                              imageUrl={staged.custom_image_url || imageUrl}
+                              bgUrl={bgUrl}
+                              momImageUrl={momImageUrl}
+                              dadImageUrl={dadImageUrl}
+                              kidImageUrl={kidImageUrl}
+                              onFixIbbLinks={async () => {}}
+                            />
+                          </>
+                        ) : (
+                          <>
+                            <div className="section-divider">
+                              <div className="section-divider-line" />
+                              <span className="section-divider-text">Boss Settings</span>
+                              <div className="section-divider-line" />
+                            </div>
 
                         <div className="form-group">
                           <label className="form-label">Boss Announcement Channel ID</label>
@@ -1473,9 +1580,11 @@ export default function GamingPage() {
                         )}
                       </div>
                     </>
-                  );
-                }}
-              </FeatureCard>
+                  )}
+                </>
+              );
+            }}
+          </FeatureCard>
               </div>
             </div>
           )}
