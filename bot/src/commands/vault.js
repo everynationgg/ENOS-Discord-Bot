@@ -19,6 +19,14 @@ module.exports = {
     )
     .addSubcommand(sub =>
       sub
+        .setName('setup-quest-channel')
+        .setDescription('Deploy the persistent Daily Quest Hub card into a channel (Admin only)')
+        .addChannelOption(opt =>
+          opt.setName('channel').setDescription('Target channel for the Daily Quest Hub').setRequired(true)
+        )
+    )
+    .addSubcommand(sub =>
+      sub
         .setName('give')
         .setDescription('Give coins to a member (Admin only)')
         .addUserOption(opt =>
@@ -72,6 +80,20 @@ module.exports = {
       const embed = await buildLeaderboardEmbed(interaction.guild.id, interaction.guild);
       if (!embed) return interaction.editReply('❌ No Vault data found yet.');
       return interaction.editReply({ embeds: [embed] });
+    }
+
+    if (sub === 'setup-quest-channel') {
+      if (!interaction.member.permissions.has(PermissionFlagsBits.ManageGuild)) {
+        return interaction.reply({ content: '❌ You need the **Manage Server** permission to setup the quest channel.', ephemeral: true });
+      }
+
+      await interaction.deferReply({ ephemeral: true });
+      const targetChannel = interaction.options.getChannel('channel');
+      const { postOrUpdateQuestLauncherChannel } = require('../modules/gaming/vault');
+      const ok = await postOrUpdateQuestLauncherChannel(interaction.client, interaction.guild.id, targetChannel.id);
+      if (!ok) return interaction.editReply('❌ Failed to deploy Quest Hub card. Ensure the channel is text-based and the bot has Send Messages permission.');
+
+      return interaction.editReply(`✅ **Daily Quest Hub deployed!** Permanent quest launcher card posted in <#${targetChannel.id}>.`);
     }
 
     if (sub === 'give') {

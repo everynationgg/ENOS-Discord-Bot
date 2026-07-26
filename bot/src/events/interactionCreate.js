@@ -88,6 +88,17 @@ module.exports = {
           const { handleBossButton } = require('../commands/boss');
           return handleBossButton(interaction);
         }
+        if (interaction.customId === 'vault_get_daily_quests') {
+          const { handleStartQuest, build3QuestsEphemeralEmbed } = require('../modules/gaming/vault');
+          await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+          await handleStartQuest(interaction.user.id, interaction.guild.id);
+          const embed = await build3QuestsEphemeralEmbed(interaction.user.id, interaction.guild.id, interaction.guild);
+          const replyMsg = await interaction.editReply({ embeds: [embed] });
+          setTimeout(() => {
+            interaction.deleteReply().catch(() => {});
+          }, 120000);
+          return replyMsg;
+        }
         if (interaction.customId === 'vault_start_quest') {
           const { handleStartQuest } = require('../modules/gaming/vault');
           await interaction.deferReply({ flags: MessageFlags.Ephemeral });

@@ -398,6 +398,10 @@ async function handleTriviaAnswerClick(interaction) {
     })
     .eq('id', participant.id);
 
+  // Trigger Daily Trivia Quest Completion in Vault
+  const { handleTriviaQuestCompletion } = require('./vault');
+  await handleTriviaQuestCompletion(interaction.user.id, interaction.guild.id, interaction.guild).catch(() => {});
+
   const cmdMention = await getLeaderboardCommandMention(interaction.client);
   const leaderboardBtnRow = new ActionRowBuilder().addComponents(
     new ButtonBuilder()

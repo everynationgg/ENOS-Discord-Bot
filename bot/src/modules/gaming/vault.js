@@ -211,7 +211,7 @@ async function handleVoiceJoin(discordId, guildId) {
 }
 
 /**
- * Called when user leaves voice — awards coins for time spent
+ * Called when user leaves voice — awards coins for time spent and updates voice quest
  */
 async function handleVoiceLeave(discordId, guildId, minutesSpent, guild) {
   const vaultConfig = await getVaultConfig(guildId);
@@ -220,13 +220,138 @@ async function handleVoiceLeave(discordId, guildId, minutesSpent, guild) {
 
   await awardCoins(discordId, guildId, earned, 'voice', guild);
 
-  // Update total voice minutes
+  // Update total voice minutes & voice quest progress
   const balance = await getOrCreateBalance(discordId, guildId);
+  const newTotalVoice = (balance?.voice_minutes || 0) + minutesSpent;
+  const newVoiceToday = (balance?.voice_minutes_today || 0) + minutesSpent;
+
+  const voiceGoal = rates.daily_quest_voice_threshold || 15;
+  let voiceQuestCompleted = balance?.quest_voice_completed || false;
+
+  if (balance?.quest_started && !voiceQuestCompleted && newVoiceToday >= voiceGoal) {
+    voiceQuestCompleted = true;
+    await awardCoins(discordId, guildId, rates.daily_quest_voice_bonus || 0.20, 'voice_quest', guild);
+  }
+
   await supabase
     .from('vault_balances')
-    .update({ voice_minutes: (balance?.voice_minutes || 0) + minutesSpent })
+    .update({
+      voice_minutes: newTotalVoice,
+      voice_minutes_today: newVoiceToday,
+      quest_voice_completed: voiceQuestCompleted,
+    })
     .eq('discord_id', discordId)
     .eq('guild_id', guildId);
+}
+
+/**
+ * Handles completing the Daily Trivia Quest for a member.
+ */
+async function handleTriviaQuestCompletion(discordId, guildId, guild) {
+  const balance = await getOrCreateBalance(discordId, guildId);
+  if (!balance?.quest_trivia_completed) {
+    const vaultConfig = await getVaultConfig(guildId);
+    const rates = { ...DEFAULT_RATES, ...vaultConfig.rates };
+
+    await supabase
+      .from('vault_balances')
+      .update({ quest_trivia_completed: true })
+      .eq('discord_id', discordId)
+      .eq('guild_id', guildId);
+
+    await awardCoins(discordId, guildId, rates.daily_quest_trivia_bonus || 0.10, 'trivia_quest', guild);
+    logger.info(`[VAULT] Trivia quest completed by ${discordId}`);
+  }
+}
+
+/**
+ * Builds the 3 Daily Quests ephemeral embed card with live progress bars.
+ */
+async function build3QuestsEphemeralEmbed(discordId, guildId, guild) {
+  const balance = await getOrCreateBalance(discordId, guildId);
+  const vaultConfig = await getVaultConfig(guildId);
+  const rates = { ...DEFAULT_RATES, ...vaultConfig.rates };
+
+  const member = await guild.members.fetch(discordId).catch(() => null);
+  const displayName = member?.displayName || 'Member';
+
+  const chatGoal = rates.daily_quest_chat_threshold || 10;
+  const chatBonus = (rates.daily_quest_chat_bonus || 0.20).toFixed(2);
+  const msgs = balance?.messages_today || 0;
+  const chatDone = balance?.quest_chat_completed || balance?.quest_claimed || msgs >= chatGoal;
+
+  const voiceGoal = rates.daily_quest_voice_threshold || 15;
+  const voiceBonus = (rates.daily_quest_voice_bonus || 0.20).toFixed(2);
+  const voiceMins = balance?.voice_minutes_today || 0;
+  const voiceDone = balance?.quest_voice_completed || voiceMins >= voiceGoal;
+
+  const triviaBonus = (rates.daily_quest_trivia_bonus || 0.10).toFixed(2);
+  const triviaDone = balance?.quest_trivia_completed || false;
+
+  const cBar = chatDone
+    ? `\`[██████████]\` **${chatGoal}/${chatGoal}** msgs (✅ +₱${chatBonus})`
+    : `\`[${'█'.repeat(Math.min(10, Math.round((msgs / chatGoal) * 10)))}${'░'.repeat(Math.max(0, 10 - Math.round((msgs / chatGoal) * 10)))}]\` **${msgs}/${chatGoal}** msgs (+₱${chatBonus})`;
+
+  const vBar = voiceDone
+    ? `\`[██████████]\` **${voiceGoal}/${voiceGoal}** mins (✅ +₱${voiceBonus})`
+    : `\`[${'█'.repeat(Math.min(10, Math.round((voiceMins / voiceGoal) * 10)))}${'░'.repeat(Math.max(0, 10 - Math.round((voiceMins / voiceGoal) * 10)))}]\` **${voiceMins}/${voiceGoal}** mins (+₱${voiceBonus})`;
+
+  const tBar = triviaDone
+    ? `\`[██████████]\` **1/1** Trivia Drop (✅ +₱${triviaBonus})`
+    : `\`[░░░░░░░░░░]\` **0/1** Trivia Drop (+₱${triviaBonus})`;
+
+  const embed = new EmbedBuilder()
+    .setColor(0x8B5CF6)
+    .setTitle(`📜 ${displayName}'s 3 Daily Quests`)
+    .setDescription(
+      `Welcome! Your daily quest tracking is now **Active** for today!\n\n` +
+      `💬 **1. Chat Active Quest**\n${cBar}\n\n` +
+      `🎙️ **2. Voice Active Quest**\n${vBar}\n\n` +
+      `🧠 **3. Daily Trivia Quest**\n${tBar}\n\n` +
+      `🏆 **Total 3-Quest Daily Reward**: **+0.50 Vault Coins (₱0.50 PHP)**`
+    )
+    .setFooter({ text: 'Every Nation Vault • Ephemeral Daily Panel' })
+    .setTimestamp();
+
+  return embed;
+}
+
+/**
+ * Posts or updates the persistent Quest Channel Launcher card.
+ */
+async function postOrUpdateQuestLauncherChannel(client, guildId, channelId) {
+  if (!channelId) return false;
+  const guild = await client.guilds.fetch(guildId).catch(() => null);
+  if (!guild) return false;
+
+  const channel = await guild.channels.fetch(channelId).catch(() => null);
+  if (!channel || !channel.isTextBased()) return false;
+
+  const embed = new EmbedBuilder()
+    .setColor(0xFACC15)
+    .setTitle('📜 Every Nation Vault — Daily Quests Hub')
+    .setDescription(
+      `Welcome to the **Daily Quest Hub**!\n\n` +
+      `Click **📜 Get Daily Quests** below to launch your personal daily quests for today. You will receive an ephemeral panel with live progress bars for:\n\n` +
+      `💬 **Chat Quest** — Send active messages in community channels.\n` +
+      `🎙️ **Voice Quest** — Hang out in voice channels with friends.\n` +
+      `🧠 **Trivia Quest** — Participate in daily AI trivia drops.\n\n` +
+      `🏆 Complete all 3 daily quests to earn bonus **Vault Coins (₱ PHP)**!`
+    )
+    .setFooter({ text: 'Every Nation Vault • ENOS Quest Launcher' })
+    .setTimestamp();
+
+  const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+  const row = new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId('vault_get_daily_quests')
+      .setLabel('📜 Get Daily Quests')
+      .setStyle(ButtonStyle.Success)
+      .setEmoji('📜')
+  );
+
+  await channel.send({ embeds: [embed], components: [row] }).catch(() => {});
+  return true;
 }
 
 /**
@@ -483,7 +608,16 @@ async function buildQuestEmbed(discordId, guildId, guild) {
 async function resetDailyQuests() {
   const { error } = await supabase
     .from('vault_balances')
-    .update({ messages_today: 0, quest_claimed: false, quest_started: false, coins_earned_today: 0 });
+    .update({
+      messages_today: 0,
+      voice_minutes_today: 0,
+      quest_claimed: false,
+      quest_started: false,
+      quest_chat_completed: false,
+      quest_voice_completed: false,
+      quest_trivia_completed: false,
+      coins_earned_today: 0,
+    });
 
   if (error) {
     logger.error('[VAULT] Failed to reset daily quests:', error.message);
@@ -498,9 +632,12 @@ module.exports = {
   handleVoiceJoin,
   handleVoiceLeave,
   handleStartQuest,
+  handleTriviaQuestCompletion,
   buildProfileEmbed,
   buildQuestEmbed,
+  build3QuestsEphemeralEmbed,
   buildLeaderboardEmbed,
+  postOrUpdateQuestLauncherChannel,
   resetDailyQuests,
   getOrCreateBalance,
 };

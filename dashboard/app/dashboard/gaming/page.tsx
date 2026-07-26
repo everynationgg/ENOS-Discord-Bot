@@ -765,13 +765,13 @@ export default function GamingPage() {
                             />
                           </div>
                           <div className="form-group">
-                            <label className="form-label">Daily Quest Bonus (₱ PHP)</label>
+                            <label className="form-label">Daily Quest Hub Channel ID</label>
                             <input
-                              id="vault-quest-bonus"
-                              type="number" step="0.1" min="0" max="100"
+                              id="vault-quest-channel"
                               className="form-input"
-                              value={rates.daily_quest_bonus ?? 0.50}
-                              onChange={(e) => setConfig('rates', { ...rates, daily_quest_bonus: parseFloat(e.target.value) })}
+                              placeholder="Channel ID to post 'Get Daily Quests' card"
+                              value={config.quest_channel_id || ''}
+                              onChange={(e) => setConfig('quest_channel_id', e.target.value)}
                             />
                           </div>
                         </div>
