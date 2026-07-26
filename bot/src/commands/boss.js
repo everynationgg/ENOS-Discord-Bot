@@ -595,6 +595,7 @@ module.exports = {
 
     // ─── 5. MY STATS PROFILE ────────────────────────────────────────────────
     if (customId === 'boss_profile') {
+      await interaction.deferReply({ flags: MessageFlags.Ephemeral });
       const profile = await getUserProfile(guildId, userId);
       const playerState = await getPlayerState(guildId, userId);
       const xpNeeded = Math.round(150 + 25 * profile.level + 7 * Math.pow(profile.level, 1.35));
@@ -615,7 +616,6 @@ module.exports = {
         );
 
       const row = new ActionRowBuilder();
-      let replyMsg;
       const timeoutMs = profile.unallocated_stats > 0 ? 15000 : 5000;
 
       if (profile.unallocated_stats > 0) {
@@ -626,16 +626,17 @@ module.exports = {
           new ButtonBuilder().setCustomId('boss_stat_add:xp_boost').setLabel('+1% XP').setStyle(ButtonStyle.Secondary).setEmoji('📈'),
           new ButtonBuilder().setCustomId('boss_stat_add:loot_boost').setLabel('+1% Loot').setStyle(ButtonStyle.Secondary).setEmoji('💰')
         );
-        replyMsg = await interaction.reply({ embeds: [embed], components: [row], flags: MessageFlags.Ephemeral, fetchReply: true });
+        await interaction.editReply({ embeds: [embed], components: [row] });
       } else {
-        replyMsg = await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral, fetchReply: true });
+        await interaction.editReply({ embeds: [embed], components: [] });
       }
-      setTimeout(() => replyMsg.delete().catch(() => {}), timeoutMs);
+      scheduleEphemeralExpiry(interaction, timeoutMs);
       return;
     }
 
     // ─── 6. LEADERBOARD ─────────────────────────────────────────────────────
     if (customId === 'boss_leaderboard') {
+      await interaction.deferReply({ flags: MessageFlags.Ephemeral });
       const currentWeek = getWeekIdentifier();
       const { data: topPlayers } = await supabase
         .from('boss_player_states')
@@ -661,8 +662,8 @@ module.exports = {
         .setDescription(lines.join('\n'))
         .setFooter({ text: 'ENOS RPG Ranking System' });
 
-      const replyMsg = await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral, fetchReply: true });
-      setTimeout(() => replyMsg.delete().catch(() => {}), 10000);
+      await interaction.editReply({ embeds: [embed] });
+      scheduleEphemeralExpiry(interaction, 10000);
       return;
     }
   },
