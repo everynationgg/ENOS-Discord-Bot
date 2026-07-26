@@ -50,7 +50,7 @@ Respond ONLY with a raw JSON object containing these keys:
 }
 Do not wrap in markdown, backticks, or write any extra text.`;
 
-  const modelsToTry = ['gemini-2.5-flash', 'gemini-flash-latest'];
+  const modelsToTry = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-flash-latest'];
   let lastError;
 
   for (const modelName of modelsToTry) {
@@ -202,6 +202,27 @@ async function triggerTriviaDrop(client, guildId) {
       .eq('id', drop.id);
 
     await logBotEvent(guildId, 'trivia_drop', null, { dropId: drop.id, channelId: channel.id });
+
+    // Send notification alert to the designated notification channel if configured
+    if (config.notification_channel_id) {
+      const notifChannel = await guild.channels.fetch(config.notification_channel_id).catch(() => null);
+      if (notifChannel && notifChannel.isTextBased()) {
+        const notifEmbed = new EmbedBuilder()
+          .setColor(0x3B82F6)
+          .setTitle('📢 Daily Trivia Drop Live!')
+          .setDescription(
+            `A new **Daily Trivia Drop** is now live!\n\n` +
+            `📍 Head over to <#${channel.id}> right now to click **Start Trivia** first and win **Vault Coins**! 🧠⚡`
+          )
+          .setFooter({ text: 'Every Nation Trivia • ENOS Notification' })
+          .setTimestamp();
+
+        await notifChannel.send({ embeds: [notifEmbed] }).catch((err) => {
+          logger.error(`[TRIVIA] Failed to send drop notification to ${config.notification_channel_id}:`, err.message);
+        });
+      }
+    }
+
     return true;
   } catch (err) {
     logger.error('[TRIVIA] Error in triggerTriviaDrop:', err.message);

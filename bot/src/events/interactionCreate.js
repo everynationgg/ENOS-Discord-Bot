@@ -88,6 +88,12 @@ module.exports = {
           const { handleBossButton } = require('../commands/boss');
           return handleBossButton(interaction);
         }
+        if (interaction.customId === 'vault_start_quest') {
+          const { handleStartQuest } = require('../modules/gaming/vault');
+          await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+          const res = await handleStartQuest(interaction.user.id, interaction.guild.id);
+          return interaction.editReply(res.message);
+        }
         if (interaction.customId.startsWith('showcase_claim_')) {
           const { handleShowcaseClaim } = require('../modules/moderation/showcase');
           return handleShowcaseClaim(interaction);

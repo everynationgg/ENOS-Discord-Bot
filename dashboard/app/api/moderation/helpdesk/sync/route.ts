@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 
-const DISCORD_TOKEN = process.env.DISCORD_TOKEN;
-
 // POST /api/moderation/helpdesk/sync — Post the permanent Help Desk trigger embed card
 export async function POST(req: NextRequest) {
   const session = await auth();
@@ -16,7 +14,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Missing launcher_channel_id' }, { status: 400 });
     }
 
-    if (!DISCORD_TOKEN) {
+    const token = process.env.DISCORD_TOKEN || process.env.DISCORD_BOT_TOKEN;
+    if (!token) {
       return NextResponse.json({ error: 'DISCORD_TOKEN is missing in the dashboard environment.' }, { status: 500 });
     }
 
@@ -24,7 +23,7 @@ export async function POST(req: NextRequest) {
     const res = await fetch(`https://discord.com/api/v10/channels/${launcher_channel_id}/messages`, {
       method: 'POST',
       headers: {
-        Authorization: `Bot ${DISCORD_TOKEN}`,
+        Authorization: `Bot ${token}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({

@@ -38,6 +38,13 @@ export default function SocialPage() {
   const [newTriggerEmoji, setNewTriggerEmoji] = useState('');
   const [loadingReactions, setLoadingReactions] = useState(false);
 
+  // Live Alerts System state (Twitch & TikTok)
+  const [liveAlerts, setLiveAlerts] = useState<any[]>([]);
+  const [newAlertHandle, setNewAlertHandle] = useState('');
+  const [newAlertPlatform, setNewAlertPlatform] = useState<'twitch' | 'tiktok'>('twitch');
+  const [newAlertChannelId, setNewAlertChannelId] = useState('');
+  const [loadingAlerts, setLoadingAlerts] = useState(false);
+
   useEffect(() => {
     if (activeTab === 'auto_reactions') {
       setLoadingReactions(true);
@@ -48,6 +55,19 @@ export default function SocialPage() {
           setLoadingReactions(false);
         })
         .catch(() => setLoadingReactions(false));
+    }
+    if (activeTab === 'live_alerts') {
+      setLoadingAlerts(true);
+      Promise.all([
+        fetch('/api/social/live-alerts').then((r) => r.json()),
+        fetch('/api/social/birthday/channels').then((r) => r.json()),
+      ])
+        .then(([alertsData, channelsData]) => {
+          setLiveAlerts(Array.isArray(alertsData) ? alertsData : []);
+          if (Array.isArray(channelsData)) setChannels(channelsData);
+          setLoadingAlerts(false);
+        })
+        .catch(() => setLoadingAlerts(false));
     }
   }, [activeTab]);
 
@@ -311,7 +331,7 @@ export default function SocialPage() {
 
               <div className="overview-item">
                 <h3>🔴 Social Sync — Live Alert Hub</h3>
-                <p>Auto-posts rich embeds when creators go live on Twitch or YouTube. Updates to 'Ended' state when stream closes.</p>
+                <p>Auto-posts rich embeds when creators go live on Twitch or TikTok. Updates to 'Ended' state when stream closes.</p>
               </div>
 
               <div className="overview-item">
@@ -332,6 +352,166 @@ export default function SocialPage() {
               <div className="overview-item">
                 <h3>🎉 Birthday Queue Workspace</h3>
                 <p>Manage and authorize upcoming birthday cards, transform rough member facts into polished greetings, and release them to Discord.</p>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'live_alerts' && (
+            <div className="split-layout-detail">
+              <div className="feature-instructions">
+                <h3>Live Stream Alert Guidelines</h3>
+                <p>
+                  Automatically notify your Discord server when creators start streaming:
+                </p>
+                <ol>
+                  <li>Select the <strong>Platform</strong> (Twitch 👾 or TikTok 🎵).</li>
+                  <li>Enter the streamer's <strong>Username / Handle</strong>.</li>
+                  <li>Select the <strong>Target Discord Channel</strong> for automated live alert announcements.</li>
+                </ol>
+                <div className="tip-box">
+                  <strong>💡 Stream Status Updates:</strong><br />
+                  The bot checks streamer status every 5 minutes and updates announcements in real time when streams go live or offline.
+                </div>
+              </div>
+
+              <div className="feature-form-card" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                <h3 style={{ margin: 0 }}>Register Stream Alert Target</h3>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr 1fr auto', gap: '0.75rem', alignItems: 'end' }}>
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label className="form-label">Platform</label>
+                    <select
+                      className="form-input"
+                      value={newAlertPlatform}
+                      onChange={(e) => setNewAlertPlatform(e.target.value as 'twitch' | 'tiktok')}
+                    >
+                      <option value="twitch">👾 Twitch</option>
+                      <option value="tiktok">🎵 TikTok</option>
+                    </select>
+                  </div>
+
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label className="form-label">Streamer Handle</label>
+                    <input
+                      className="form-input"
+                      placeholder="e.g. streamer_name"
+                      value={newAlertHandle}
+                      onChange={(e) => setNewAlertHandle(e.target.value)}
+                    />
+                  </div>
+
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label className="form-label">Target Channel</label>
+                    <select
+                      className="form-input"
+                      value={newAlertChannelId}
+                      onChange={(e) => setNewAlertChannelId(e.target.value)}
+                    >
+                      <option value="">Select channel...</option>
+                      {channels.map((ch) => (
+                        <option key={ch.id} value={ch.id}>
+                          {ch.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <button
+                    type="button"
+                    className="btn-primary"
+                    style={{ height: '38px', padding: '0 1rem' }}
+                    onClick={async () => {
+                      if (!newAlertHandle.trim() || !newAlertChannelId.trim()) {
+                        alert('Please provide streamer handle and select a target channel.');
+                        return;
+                      }
+                      try {
+                        const res = await fetch('/api/social/live-alerts', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({
+                            platform: newAlertPlatform,
+                            handle: newAlertHandle,
+                            channel_id: newAlertChannelId,
+                          }),
+                        });
+                        if (!res.ok) throw new Error('Failed to add live alert handle');
+                        const data = await res.json();
+                        if (data.alert) setLiveAlerts((prev) => [data.alert, ...prev]);
+                        setNewAlertHandle('');
+                      } catch (err: any) {
+                        alert(err.message);
+                      }
+                    }}
+                  >
+                    Add Alert
+                  </button>
+                </div>
+
+                <div className="section-divider" style={{ marginTop: '1rem' }}>
+                  <div className="section-divider-line" />
+                  <span className="section-divider-text">Configured Live Stream Alerts</span>
+                  <div className="section-divider-line" />
+                </div>
+
+                {loadingAlerts ? (
+                  <div style={{ display: 'flex', justifyContent: 'center', padding: '1rem' }}>
+                    <div className="spinner" style={{ width: 24, height: 24 }} />
+                  </div>
+                ) : liveAlerts.length === 0 ? (
+                  <p className="form-hint" style={{ textAlign: 'center', padding: '1rem' }}>
+                    No Twitch or TikTok stream alerts configured yet.
+                  </p>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: '300px', overflowY: 'auto' }}>
+                    {liveAlerts.map((alertItem) => (
+                      <div
+                        key={alertItem.id}
+                        style={{
+                          display: 'flex',
+                          justify: 'space-between',
+                          alignItems: 'center',
+                          padding: '0.75rem',
+                          backgroundColor: 'rgba(255,255,255,0.03)',
+                          borderRadius: '6px',
+                          border: '1px solid rgba(255,255,255,0.05)',
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          <span style={{ fontSize: '1.1rem' }}>
+                            {alertItem.platform === 'twitch' ? '👾' : '🎵'}
+                          </span>
+                          <div>
+                            <strong style={{ color: 'var(--text-primary)', textTransform: 'capitalize' }}>
+                              {alertItem.platform}: @{alertItem.handle}
+                            </strong>
+                            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                              Channel: <code style={{ padding: '0 4px' }}>#{channels.find((c) => c.id === alertItem.channel_id)?.name || alertItem.channel_id}</code>
+                              {alertItem.is_live ? ' · 🔴 LIVE NOW' : ' · ⚪ Offline'}
+                            </div>
+                          </div>
+                        </div>
+
+                        <button
+                          type="button"
+                          style={{ background: 'transparent', border: 'none', color: '#EF4444', cursor: 'pointer', fontSize: '0.8125rem' }}
+                          onClick={async () => {
+                            if (!confirm(`Delete stream alert for @${alertItem.handle}?`)) return;
+                            try {
+                              const res = await fetch(`/api/social/live-alerts?id=${alertItem.id}`, { method: 'DELETE' });
+                              if (!res.ok) throw new Error('Failed to delete alert');
+                              setLiveAlerts((prev) => prev.filter((a) => a.id !== alertItem.id));
+                            } catch (err: any) {
+                              alert(err.message);
+                            }
+                          }}
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           )}

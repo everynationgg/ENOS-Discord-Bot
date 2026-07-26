@@ -25,13 +25,20 @@ module.exports = {
     const userId = member.id;
     const key = `${guildId}:${userId}`;
 
-    // User joined a voice channel
+    // User joined voice for the first time
     if (!oldState.channelId && newState.channelId) {
       voiceJoinTimes.set(key, Date.now());
-      await handleVoiceJoin(userId, guildId);
+      await handleVoiceJoin(userId, guildId).catch(() => {});
     }
 
-    // User left a voice channel
+    // User switched voice channels within the server (keep original start time)
+    if (oldState.channelId && newState.channelId && oldState.channelId !== newState.channelId) {
+      if (!voiceJoinTimes.has(key)) {
+        voiceJoinTimes.set(key, Date.now());
+      }
+    }
+
+    // User completely left voice channels
     if (oldState.channelId && !newState.channelId) {
       const joinTime = voiceJoinTimes.get(key);
       if (joinTime) {

@@ -100,12 +100,23 @@ ${rawText.substring(0, 8000)}
 
   // ─── 3. Call Gemini ───────────────────────────────────────────────────────
   let summaryText = '';
-  try {
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
-    const result = await model.generateContent(prompt);
-    summaryText = result.response.text().trim();
-  } catch (err) {
-    logger.error('[DIGEST] Gemini API error:', err.message);
+  const modelsToTry = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-flash-latest'];
+  let lastError;
+
+  for (const modelName of modelsToTry) {
+    try {
+      const model = genAI.getGenerativeModel({ model: modelName });
+      const result = await model.generateContent(prompt);
+      summaryText = result.response.text().trim();
+      if (summaryText) break;
+    } catch (err) {
+      logger.warn(`[DIGEST] Model ${modelName} error: ${err.message}. Trying fallback...`);
+      lastError = err;
+    }
+  }
+
+  if (!summaryText) {
+    logger.error('[DIGEST] Gemini API failed across models:', lastError?.message);
     return;
   }
 

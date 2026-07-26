@@ -17,13 +17,23 @@ const supabase = createClient(
   }
 );
 
+// In-memory cache for feature configs (TTL: 60 seconds)
+const featureConfigCache = new Map();
+const CACHE_TTL_MS = 60 * 1000;
+
 /**
- * Fetches a guild's feature config from Supabase.
+ * Fetches a guild's feature config from Supabase (cached for 60s).
  * @param {string} guildId
  * @param {string} featureKey
  * @returns {Promise<{ enabled: boolean, config: object } | null>}
  */
 async function getFeatureConfig(guildId, featureKey) {
+  const cacheKey = `${guildId}:${featureKey}`;
+  const cached = featureConfigCache.get(cacheKey);
+  if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
+    return cached.data;
+  }
+
   const { data, error } = await supabase
     .from('guild_config')
     .select('enabled, config')
@@ -35,7 +45,20 @@ async function getFeatureConfig(guildId, featureKey) {
     logger.error(`[SUPABASE] getFeatureConfig error (${featureKey}):`, error.message);
     return null;
   }
+
+  featureConfigCache.set(cacheKey, { data, timestamp: Date.now() });
   return data;
+}
+
+/**
+ * Clears the feature config cache for a specific guild/feature or all entries.
+ */
+function clearFeatureConfigCache(guildId = null, featureKey = null) {
+  if (guildId && featureKey) {
+    featureConfigCache.delete(`${guildId}:${featureKey}`);
+  } else {
+    featureConfigCache.clear();
+  }
 }
 
 /**
@@ -120,6 +143,7 @@ module.exports = {
   supabase,
   getFeatureConfig,
   isFeatureEnabled,
+  clearFeatureConfigCache,
   logBotEvent,
   getKeyformConfig,
   addKeyformRegistration,

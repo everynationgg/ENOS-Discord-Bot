@@ -139,8 +139,8 @@ OAuth2 Scopes: `bot applications.commands`
 | Vault Economy | Gaming | ✅ |
 | Daily Slang Digest (Gemini) | System Ops | ✅ |
 | Twitch Live Alerts | Social | ✅ |
-| YouTube Live Alerts | Social | ✅ |
+| TikTok Live Alerts | Social | ✅ |
+| YouTube Live Alerts | Social | ❌ Disabled |
 | 30-Day Auto Pruning | System | ✅ |
 | Web Config Dashboard | — | ✅ |
 | Discord OAuth2 Admin Login | — | ✅ |
-yo

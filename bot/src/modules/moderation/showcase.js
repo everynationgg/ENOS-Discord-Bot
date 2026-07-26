@@ -365,10 +365,11 @@ async function handleShowcaseSelectMenu(interaction) {
     });
   } catch (err) {
     logger.error('[SHOWCASE SELECT MENU ERROR]:', err);
-    return interaction.reply({
-      content: '❌ Failed to load update details.',
-      flags: MessageFlags.Ephemeral,
-    });
+    const content = '❌ Failed to load update details.';
+    if (interaction.replied || interaction.deferred) {
+      return interaction.followUp({ content, flags: MessageFlags.Ephemeral }).catch(() => {});
+    }
+    return interaction.reply({ content, flags: MessageFlags.Ephemeral }).catch(() => {});
   }
 }
 

@@ -1,16 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 
-const DISCORD_TOKEN = process.env.DISCORD_TOKEN;
-
 // GET /api/social/birthday/channels — Fetch live text/announcement channels for the guild
 export async function GET(req: NextRequest) {
   const session = await auth();
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const guildId = req.nextUrl.searchParams.get('guild_id') || process.env.DISCORD_GUILD_ID!;
+  const token = process.env.DISCORD_TOKEN || process.env.DISCORD_BOT_TOKEN;
 
-  if (!DISCORD_TOKEN) {
+  if (!token) {
     // If bot token is not configured on the dashboard, return a helpful fallback message
     logger.warn('[BIRTHDAYS] DISCORD_TOKEN is missing in dashboard environment variables.');
     return NextResponse.json([
@@ -21,7 +20,7 @@ export async function GET(req: NextRequest) {
   try {
     const res = await fetch(`https://discord.com/api/v10/guilds/${guildId}/channels`, {
       headers: {
-        Authorization: `Bot ${DISCORD_TOKEN}`,
+        Authorization: `Bot ${token}`,
       },
     });
 

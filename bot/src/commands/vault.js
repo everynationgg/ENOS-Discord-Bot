@@ -9,6 +9,9 @@ module.exports = {
       sub.setName('profile').setDescription('View your Vault profile and coin balance')
     )
     .addSubcommand(sub =>
+      sub.setName('start-quest').setDescription('▶️ Explicitly start today\'s daily quest to begin message tracking')
+    )
+    .addSubcommand(sub =>
       sub.setName('leaderboard').setDescription('View the top 10 Vault earners')
     )
     .addSubcommand(sub =>
@@ -34,13 +37,20 @@ module.exports = {
 
     if (sub === 'profile') {
       await interaction.deferReply();
-      const embed = await buildProfileEmbed(
+      const profileData = await buildProfileEmbed(
         interaction.user.id,
         interaction.guild.id,
         interaction.guild
       );
-      if (!embed) return interaction.editReply('❌ Could not load your Vault profile.');
-      return interaction.editReply({ embeds: [embed] });
+      if (!profileData || !profileData.embed) return interaction.editReply('❌ Could not load your Vault profile.');
+      return interaction.editReply({ embeds: [profileData.embed], components: profileData.components || [] });
+    }
+
+    if (sub === 'start-quest') {
+      await interaction.deferReply({ ephemeral: true });
+      const { handleStartQuest } = require('../modules/gaming/vault');
+      const res = await handleStartQuest(interaction.user.id, interaction.guild.id);
+      return interaction.editReply(res.message);
     }
 
     if (sub === 'leaderboard') {

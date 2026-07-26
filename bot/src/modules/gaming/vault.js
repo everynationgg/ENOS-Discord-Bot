@@ -2,19 +2,26 @@ const { EmbedBuilder } = require('discord.js');
 const { supabase, getFeatureConfig, logBotEvent } = require('../../lib/supabase');
 const logger = require('../../lib/logger');
 
-// ─── Tier Configuration ────────────────────────────────────────────────────────
+// ─── Tier Configuration (9 Official Nitro Badges) ──────────────────────────────
 const DEFAULT_TIERS = [
-  { name: 'Bronze', key: 'bronze', threshold: 0, emoji: '🥉' },
-  { name: 'Gold', key: 'gold', threshold: 1000, emoji: '🥇' },
-  { name: 'Platinum', key: 'platinum', threshold: 5000, emoji: '💎' },
+  { name: 'Starter', key: 'starter', threshold: 0, emoji: '💨', rarity: 'COMMON', color: 0xF472B6 },
+  { name: 'Bronze', key: 'bronze', threshold: 40, emoji: '🟤', rarity: 'UNCOMMON', color: 0xA75D00 },
+  { name: 'Silver', key: 'silver', threshold: 125, emoji: '⚪', rarity: 'UNCOMMON', color: 0xCBD5E1 },
+  { name: 'Gold', key: 'gold', threshold: 250, emoji: '🟡', rarity: 'RARE', color: 0xFACC15 },
+  { name: 'Platinum', key: 'platinum', threshold: 500, emoji: '🪙', rarity: 'RARE', color: 0xE5E4E2 },
+  { name: 'Diamond', key: 'diamond', threshold: 1000, emoji: '🔷', rarity: 'EPIC', color: 0x38BDF8 },
+  { name: 'Emerald', key: 'emerald', threshold: 1500, emoji: '💚', rarity: 'EPIC', color: 0x10B981 },
+  { name: 'Ruby', key: 'ruby', threshold: 2500, emoji: '🔴', rarity: 'LEGENDARY', color: 0xEF4444 },
+  { name: 'Opal', key: 'opal', threshold: 3000, emoji: '🔮', rarity: 'MYTHIC', color: 0xA855F7 },
 ];
 
-// Default coin rates (overridden by dashboard config)
+// Default coin rates (Calibrated for 500 Coins/Year max ~ ₱500 PHP)
 const DEFAULT_RATES = {
-  message: 1,
-  voice_per_minute: 2,
-  daily_quest_bonus: 50,
+  message: 0.02,
+  voice_per_minute: 0.01,
+  daily_quest_bonus: 0.50,
   daily_quest_message_threshold: 10,
+  daily_cap: 1.50,
   message_rate_limit_seconds: 60,
 };
 
@@ -114,18 +121,60 @@ async function awardCoins(discordId, guildId, amount, reason, guild = null) {
 }
 
 /**
- * Awards coins for sending a message (rate-limited: 1 per N seconds).
+ * Explicitly starts the daily quest for a user so their messages begin counting.
+ */
+async function handleStartQuest(discordId, guildId) {
+  const balance = await getOrCreateBalance(discordId, guildId);
+  if (balance?.quest_started) return { success: true, message: 'Quest already started today!' };
+
+  await supabase
+    .from('vault_balances')
+    .update({ quest_started: true })
+    .eq('discord_id', discordId)
+    .eq('guild_id', guildId);
+
+  return { success: true, message: '▶️ **Daily Quest Started!** Your chat messages will now count towards today\'s quest goal.' };
+}
+
+/**
+ * Awards coins for sending a message (rate-limited: 1 per N seconds, capped at daily ceiling).
  */
 async function awardMessageCoins(discordId, guildId, guild) {
   const vaultConfig = await getVaultConfig(guildId);
   const rates = { ...DEFAULT_RATES, ...vaultConfig.rates };
 
+  // Fast RAM Cooldown Check: avoid any DB queries if message sent within rate limit
+  const ramKey = `${guildId}:${discordId}`;
+  const lastRAMTime = lastUserMessageRAMMap.get(ramKey);
+  if (lastRAMTime) {
+    const elapsedSeconds = (Date.now() - lastRAMTime) / 1000;
+    if (elapsedSeconds < rates.message_rate_limit_seconds) return;
+  }
+
   const balance = await getOrCreateBalance(discordId, guildId);
 
-  // Rate limit check
+  // Daily Earning Hard Cap Check (prevent exceeding daily 1.50 coins cap)
+  const maxDaily = rates.daily_cap || 1.50;
+  if ((balance?.coins_earned_today || 0) >= maxDaily) return;
+
+  // Rate limit check from DB timestamp
   if (balance?.last_message_at) {
     const secondsSinceLast = (Date.now() - new Date(balance.last_message_at).getTime()) / 1000;
-    if (secondsSinceLast < rates.message_rate_limit_seconds) return;
+    if (secondsSinceLast < rates.message_rate_limit_seconds) {
+      lastUserMessageRAMMap.set(ramKey, new Date(balance.last_message_at).getTime());
+      return;
+    }
+  }
+
+  // Update RAM timestamp
+  lastUserMessageRAMMap.set(ramKey, Date.now());
+
+  // EXPLICIT QUEST START REQUIREMENT:
+  // Messages only count towards daily quest if the user has explicitly started the quest today
+  if (!balance?.quest_started) {
+    // Member has not clicked 'Start Quest' yet — earn message coins if under daily cap, but do not increment quest message count
+    await awardCoins(discordId, guildId, rates.message, 'message', guild);
+    return;
   }
 
   // Update last_message_at + messages_today
@@ -276,19 +325,22 @@ async function buildProfileEmbed(discordId, guildId, guild) {
   const member = await guild.members.fetch(discordId).catch(() => null);
   const displayName = member?.displayName || 'Unknown';
 
+  const phpValue = (balance.coins || 0).toFixed(2);
+  const rarity = currentTier.rarity || 'COMMON';
+
   const embed = new EmbedBuilder()
-    .setColor(currentTier.key === 'platinum' ? 0xE5E4E2 : currentTier.key === 'gold' ? 0xFACC15 : 0x8B5CF6)
-    .setTitle(`${currentTier.emoji} ${displayName}'s Vault`)
+    .setColor(currentTier.color || 0x8B5CF6)
+    .setTitle(`${currentTier.emoji} ${displayName}'s Vault Profile`)
     .setThumbnail(member?.user.displayAvatarURL({ size: 128 }) || null)
     .addFields(
       {
-        name: '💰 Vault Coins',
-        value: `**${balance.coins.toLocaleString()}** coins`,
+        name: '💰 Vault Balance',
+        value: `**${(balance.coins || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}** coins\n*(₱${phpValue} PHP)*`,
         inline: true,
       },
       {
-        name: '📊 Current Tier',
-        value: `${currentTier.emoji} **${currentTier.name}**`,
+        name: '📊 Current Rank',
+        value: `${currentTier.emoji} **${currentTier.name}**\n\`[▲ ${rarity}]\``,
         inline: true,
       },
       {
@@ -297,7 +349,7 @@ async function buildProfileEmbed(discordId, guildId, guild) {
         inline: true,
       },
       {
-        name: nextTier ? `⬆️ Progress to ${nextTier.name}` : '🏆 Rank',
+        name: nextTier ? `⬆️ Progress to ${nextTier.name}` : '🏆 Rank Status',
         value: progressText,
       },
       {
@@ -305,10 +357,22 @@ async function buildProfileEmbed(discordId, guildId, guild) {
         value: txText,
       }
     )
-    .setFooter({ text: 'Every Nation Vault • ENOS System' })
+    .setFooter({ text: 'Every Nation Vault • ₱1 = 1 Coin' })
     .setTimestamp();
 
-  return embed;
+  // If daily quest is not started, attach interactive Start Quest button
+  const components = [];
+  if (!balance.quest_started) {
+    const row = new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId('vault_start_quest')
+        .setLabel('▶️ Start Daily Quest')
+        .setStyle(ButtonStyle.Success)
+    );
+    components.push(row);
+  }
+
+  return { embed, components };
 }
 
 /**
@@ -331,7 +395,7 @@ async function buildLeaderboardEmbed(guildId, guild) {
     top.map(async (entry, index) => {
       const tier = tiers.find(t => t.key === entry.tier) || tiers[0];
       const medal = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `**${index + 1}.**`;
-      return `${medal} ${tier.emoji} <@${entry.discord_id}> — **${entry.coins.toLocaleString()}** coins`;
+      return `${medal} ${tier.emoji} <@${entry.discord_id}> — **${entry.coins.toLocaleString()}** coins (₱${entry.coins.toFixed(2)})`;
     })
   );
 
@@ -339,7 +403,7 @@ async function buildLeaderboardEmbed(guildId, guild) {
     .setColor(0xFACC15)
     .setTitle('🏆 Vault Leaderboard — Every Nation')
     .setDescription(lines.join('\n'))
-    .setFooter({ text: 'Every Nation Vault • ENOS System' })
+    .setFooter({ text: 'Every Nation Vault • ₱1 = 1 Coin' })
     .setTimestamp();
 }
 
@@ -349,7 +413,7 @@ async function buildLeaderboardEmbed(guildId, guild) {
 async function resetDailyQuests() {
   const { error } = await supabase
     .from('vault_balances')
-    .update({ messages_today: 0, quest_claimed: false });
+    .update({ messages_today: 0, quest_claimed: false, quest_started: false, coins_earned_today: 0 });
 
   if (error) {
     logger.error('[VAULT] Failed to reset daily quests:', error.message);
@@ -363,6 +427,7 @@ module.exports = {
   awardCoins,
   handleVoiceJoin,
   handleVoiceLeave,
+  handleStartQuest,
   buildProfileEmbed,
   buildLeaderboardEmbed,
   resetDailyQuests,

@@ -729,49 +729,49 @@ export default function GamingPage() {
                       <>
                         <div className="section-divider">
                           <div className="section-divider-line" />
-                          <span className="section-divider-text">Coin Rates</span>
+                          <span className="section-divider-text">Financial Controls & Rates (1 Coin = ₱1 PHP)</span>
                           <div className="section-divider-line" />
                         </div>
 
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
                           <div className="form-group">
-                            <label className="form-label">Coins per Message</label>
+                            <label className="form-label">Daily Earning Cap (₱ PHP Max/Day)</label>
+                            <input
+                              id="vault-daily-cap"
+                              type="number" step="0.1" min="0.1" max="100"
+                              className="form-input"
+                              value={rates.daily_cap ?? 1.50}
+                              onChange={(e) => setConfig('rates', { ...rates, daily_cap: parseFloat(e.target.value) })}
+                            />
+                          </div>
+                          <div className="form-group">
+                            <label className="form-label">Coins per Message (₱ PHP)</label>
                             <input
                               id="vault-msg-rate"
-                              type="number" min={0} max={100}
+                              type="number" step="0.01" min="0" max="10"
                               className="form-input"
-                              value={rates.message ?? 1}
-                              onChange={(e) => setConfig('rates', { ...rates, message: parseInt(e.target.value) })}
+                              value={rates.message ?? 0.02}
+                              onChange={(e) => setConfig('rates', { ...rates, message: parseFloat(e.target.value) })}
                             />
                           </div>
                           <div className="form-group">
-                            <label className="form-label">Coins per Voice Min</label>
+                            <label className="form-label">Coins per Voice Min (₱ PHP)</label>
                             <input
                               id="vault-voice-rate"
-                              type="number" min={0} max={100}
+                              type="number" step="0.01" min="0" max="10"
                               className="form-input"
-                              value={rates.voice_per_minute ?? 2}
-                              onChange={(e) => setConfig('rates', { ...rates, voice_per_minute: parseInt(e.target.value) })}
+                              value={rates.voice_per_minute ?? 0.01}
+                              onChange={(e) => setConfig('rates', { ...rates, voice_per_minute: parseFloat(e.target.value) })}
                             />
                           </div>
                           <div className="form-group">
-                            <label className="form-label">Daily Quest Bonus</label>
+                            <label className="form-label">Daily Quest Bonus (₱ PHP)</label>
                             <input
                               id="vault-quest-bonus"
-                              type="number" min={0} max={500}
+                              type="number" step="0.1" min="0" max="100"
                               className="form-input"
-                              value={rates.daily_quest_bonus ?? 50}
-                              onChange={(e) => setConfig('rates', { ...rates, daily_quest_bonus: parseInt(e.target.value) })}
-                            />
-                          </div>
-                          <div className="form-group">
-                            <label className="form-label">Quest Msg Threshold</label>
-                            <input
-                              id="vault-quest-threshold"
-                              type="number" min={1} max={100}
-                              className="form-input"
-                              value={rates.daily_quest_message_threshold ?? 10}
-                              onChange={(e) => setConfig('rates', { ...rates, daily_quest_message_threshold: parseInt(e.target.value) })}
+                              value={rates.daily_quest_bonus ?? 0.50}
+                              onChange={(e) => setConfig('rates', { ...rates, daily_quest_bonus: parseFloat(e.target.value) })}
                             />
                           </div>
                         </div>
@@ -826,21 +826,30 @@ export default function GamingPage() {
 
                         <div className="section-divider">
                           <div className="section-divider-line" />
-                          <span className="section-divider-text">Tier Roles</span>
+                          <span className="section-divider-text">9 Nitro Badge Tier Roles</span>
                           <div className="section-divider-line" />
                         </div>
 
                         {[
-                          { key: 'bronze', emoji: '🥉', label: 'Bronze (Default)' },
-                          { key: 'gold', emoji: '🥇', label: 'Gold (1,000 coins)' },
-                          { key: 'platinum', emoji: '💎', label: 'Platinum (5,000 coins)' },
-                        ].map(({ key, emoji, label }) => (
-                          <div className="form-group" key={key}>
-                            <label className="form-label">{emoji} {label} — Role ID</label>
+                          { key: 'starter', emoji: '💨', label: 'Starter (0 coins)', rarity: 'COMMON' },
+                          { key: 'bronze', emoji: '🟤', label: 'Bronze (40 coins / ₱40)', rarity: 'UNCOMMON' },
+                          { key: 'silver', emoji: '⚪', label: 'Silver (125 coins / ₱125)', rarity: 'UNCOMMON' },
+                          { key: 'gold', emoji: '🟡', label: 'Gold (250 coins / ₱250)', rarity: 'RARE' },
+                          { key: 'platinum', emoji: '🪙', label: 'Platinum 1-Year (500 coins / ₱500)', rarity: 'RARE' },
+                          { key: 'diamond', emoji: '🔷', label: 'Diamond (1,000 coins / ₱1,000)', rarity: 'EPIC' },
+                          { key: 'emerald', emoji: '💚', label: 'Emerald (1,500 coins / ₱1,500)', rarity: 'EPIC' },
+                          { key: 'ruby', emoji: '🔴', label: 'Ruby (2,500 coins / ₱2,500)', rarity: 'LEGENDARY' },
+                          { key: 'opal', emoji: '🔮', label: 'Opal (3,000+ coins / ₱3,000+)', rarity: 'MYTHIC' },
+                        ].map(({ key, emoji, label, rarity }) => (
+                          <div className="form-group" key={key} style={{ marginBottom: '0.5rem' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.2rem' }}>
+                              <label className="form-label" style={{ margin: 0 }}>{emoji} {label}</label>
+                              <span style={{ fontSize: '0.7rem', color: 'var(--accent-primary)', fontWeight: 600 }}>[▲ {rarity}]</span>
+                            </div>
                             <input
                               id={`tier-role-${key}`}
                               className="form-input"
-                              placeholder="Discord Role ID"
+                              placeholder="Discord Role ID to auto-assign"
                               value={tierRoles[key] || ''}
                               onChange={(e) => setConfig('tier_roles', { ...tierRoles, [key]: e.target.value })}
                             />
@@ -1071,23 +1080,36 @@ export default function GamingPage() {
                           <span className="form-hint">Leave empty to allow all members to participate.</span>
                         </div>
 
-                        {/* Live Leaderboard Channel */}
+                        {/* Live Leaderboard & Drop Notification Channels */}
                         <div className="section-divider">
                           <div className="section-divider-line" />
-                          <span className="section-divider-text">Live Point Tracker</span>
+                          <span className="section-divider-text">Notifications & Live Leaderboard</span>
                           <div className="section-divider-line" />
                         </div>
 
-                        <div className="form-group">
-                          <label className="form-label">Leaderboard Channel ID</label>
-                          <input
-                            id="trivia-leaderboard-channel"
-                            className="form-input"
-                            placeholder="Channel where top 5 points are auto-posted"
-                            value={config.leaderboard_channel_id || ''}
-                            onChange={(e) => setConfig('leaderboard_channel_id', e.target.value)}
-                          />
-                          <span className="form-hint">Bot will post and edit a single message here as scores update. Leave empty to disable.</span>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                          <div className="form-group">
+                            <label className="form-label">Drop Notification Channel ID</label>
+                            <input
+                              id="trivia-notification-channel"
+                              className="form-input"
+                              placeholder="Channel ID to send 'Trivia Drop Live in #channel' alerts"
+                              value={config.notification_channel_id || ''}
+                              onChange={(e) => setConfig('notification_channel_id', e.target.value)}
+                            />
+                            <span className="form-hint">Posts an alert mentioning the channel ID where the trivia drop spawned. Leave empty to disable.</span>
+                          </div>
+                          <div className="form-group">
+                            <label className="form-label">Leaderboard Channel ID</label>
+                            <input
+                              id="trivia-leaderboard-channel"
+                              className="form-input"
+                              placeholder="Channel where top 5 points are auto-posted"
+                              value={config.leaderboard_channel_id || ''}
+                              onChange={(e) => setConfig('leaderboard_channel_id', e.target.value)}
+                            />
+                            <span className="form-hint">Bot will post and edit a single message here as scores update. Leave empty to disable.</span>
+                          </div>
                         </div>
 
                         {/* Manual Controls */}

@@ -5,6 +5,7 @@ const { supabase } = require('./supabase');
 // ─── Import Feature Modules ────────────────────────────────────────────────────
 const { runDailyDigest } = require('../modules/ai/digest');
 const { checkTikTokLive } = require('../modules/social/tiktok');
+const { checkTwitchLive } = require('../modules/social/twitch');
 const { pruneOldRecords } = require('../modules/system/pruner');
 const { resetDailyQuests } = require('../modules/gaming/vault');
 const { expireOldLFGSessions } = require('../modules/gaming/lfg');
@@ -49,6 +50,15 @@ function initCrons(client) {
     },
     { timezone: tz }
   );
+
+  // ─── Twitch Live Check: Every 5 minutes ───────────────────────────────────────
+  cron.schedule('*/5 * * * *', async () => {
+    try {
+      await checkTwitchLive(client);
+    } catch (err) {
+      logger.error('[CRON] Twitch check failed:', err.message);
+    }
+  });
 
   // ─── TikTok Live Check: Every 5 minutes ───────────────────────────────────────
   cron.schedule('*/5 * * * *', async () => {
