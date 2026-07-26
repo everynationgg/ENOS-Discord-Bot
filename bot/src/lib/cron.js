@@ -11,6 +11,7 @@ const { resetDailyQuests } = require('../modules/gaming/vault');
 const { expireOldLFGSessions } = require('../modules/gaming/lfg');
 const { loadBirthdayQueue, dispatchBirthdays } = require('../modules/social/birthdays');
 const { checkAndProcessTrivia } = require('../modules/gaming/trivia');
+const { checkAndDispatchDeals, cleanExpiredDeals } = require('../modules/gaming/freeDeals');
 
 /**
  * Initializes all scheduled cron jobs.
@@ -18,6 +19,32 @@ const { checkAndProcessTrivia } = require('../modules/gaming/trivia');
  */
 function initCrons(client) {
   const tz = process.env.BOT_TIMEZONE || 'Asia/Manila';
+
+  // ─── Free Game & Deal Alerts: Every 30 minutes ────────────────────────────────
+  cron.schedule('*/30 * * * *', async () => {
+    try {
+      const { data: configs } = await supabase
+        .from('guild_config')
+        .select('guild_id')
+        .eq('feature_key', 'free_game_alerts')
+        .eq('enabled', true);
+
+      for (const c of configs || []) {
+        await checkAndDispatchDeals(client, c.guild_id);
+      }
+    } catch (err) {
+      logger.error('[CRON] Free Game Alerts check failed:', err.message);
+    }
+  });
+
+  // ─── Expired Deal Message Cleaner: Every 15 minutes ───────────────────────────
+  cron.schedule('*/15 * * * *', async () => {
+    try {
+      await cleanExpiredDeals(client);
+    } catch (err) {
+      logger.error('[CRON] Expired deal message cleanup failed:', err.message);
+    }
+  });
 
   // ─── Daily Digest: Every day at configured time (default 08:00) ─────────────
   const [digestHour, digestMin] = (process.env.DIGEST_POST_TIME || '08:00').split(':');

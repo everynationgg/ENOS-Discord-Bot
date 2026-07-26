@@ -475,14 +475,15 @@ export default function GamingPage() {
   }
 
   const lfgConfig = configs['lfg'] || {};
-  const vaultConfig = configs['vault'] || {};
+  const vaultConfig = configs['vault'] || configs['vault_economy'] || {};
   const triviaConfig = configs['trivia'] || {};
+  const dealsConfig = configs['free_game_alerts'] || {};
 
   return (
     <div className="page-wrapper">
       <div className="page-header">
         <h1>🎮 Gaming</h1>
-        <p>Configure LFG party finder, Vault Economy, Trivia Drops, and game branch settings.</p>
+        <p>Configure LFG party finder, Vault Economy, Free Game Deals, Trivia Drops, and game branch settings.</p>
       </div>
 
       <div className="dashboard-layout" style={{ padding: 0 }}>
@@ -509,6 +510,13 @@ export default function GamingPage() {
             id="sidebar-game-vault"
           >
             💰 Vault Economy
+          </button>
+          <button
+            className={`sidebar-item ${activeTab === 'deals' ? 'active' : ''}`}
+            onClick={() => setActiveTab('deals')}
+            id="sidebar-game-deals"
+          >
+            🎁 Free Game Alerts
           </button>
           <button
             className={`sidebar-item ${activeTab === 'trivia' ? 'active' : ''}`}
@@ -901,6 +909,129 @@ export default function GamingPage() {
                             />
                           </div>
                         ))}
+                      </>
+                    );
+                  }}
+                </FeatureCard>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'deals' && (
+            <div className="split-layout-detail">
+              <div className="feature-instructions">
+                <h3>🎮 Free Game 50%OFF to FREE Game Alerts Guide</h3>
+                <p>
+                  Automatically monitor Steam, Epic Games Store, GOG, and Humble Store for free games and deep discount offers.
+                </p>
+                <ul>
+                  <li><strong>Target Channel ID</strong>: Text channel where deal alerts are posted.</li>
+                  <li><strong>Discount Threshold</strong>: Filter by minimum discount (e.g. 50% OFF, 75% OFF, or 100% FREE ONLY).</li>
+                  <li><strong>Interactive Claim Buttons</strong>: Attached to deal cards so members can claim directly in Discord.</li>
+                  <li><strong>Auto-Clean Expiry</strong>: Expired deal messages are automatically deleted from Discord when the deal ends.</li>
+                </ul>
+                <div className="tip-box">
+                  <strong>💡 Manual Dispatch:</strong><br />
+                  Click <strong>🚀 Force Check & Dispatch Deals Now</strong> to run an instant scan and post new deal cards to Discord right away.
+                </div>
+              </div>
+
+              <div className="feature-form-card">
+                <FeatureCard
+                  id="deals"
+                  icon="🎮"
+                  title="Free Game 50%OFF to FREE Game Alerts"
+                  description="Multi-platform deal scraping (Steam, Epic, GOG), customizable discount thresholds, interactive claim buttons, and auto-expiry message deletion."
+                  featureKey="free_game_alerts"
+                  initialEnabled={dealsConfig.enabled ?? false}
+                  initialConfig={dealsConfig.config ?? {}}
+                >
+                  {(config, setConfig) => {
+                    const [dealStatusMsg, setDealStatusMsg] = useState('');
+                    const [checkingDeals, setCheckingDeals] = useState(false);
+
+                    const handleTriggerDeals = async () => {
+                      setCheckingDeals(true);
+                      setDealStatusMsg('Scraping Steam & Epic Games Store for deals...');
+                      try {
+                        const res = await fetch('/api/gaming/deals/action', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({
+                            action: 'trigger',
+                            channel_id: config.channel_id,
+                          }),
+                        });
+                        const data = await res.json();
+                        if (res.ok && data.success) {
+                          setDealStatusMsg(`✅ ${data.message}`);
+                        } else {
+                          setDealStatusMsg(`❌ Failed: ${data.error || 'Unknown error'}`);
+                        }
+                      } catch (e: any) {
+                        setDealStatusMsg(`❌ Error: ${e.message}`);
+                      } finally {
+                        setCheckingDeals(false);
+                      }
+                    };
+
+                    return (
+                      <>
+                        <div className="section-divider">
+                          <div className="section-divider-line" />
+                          <span className="section-divider-text">Target Channel & Filtering</span>
+                          <div className="section-divider-line" />
+                        </div>
+
+                        <div className="form-group">
+                          <label className="form-label">Alert Announcement Channel ID</label>
+                          <input
+                            id="deals-channel-id"
+                            className="form-input"
+                            placeholder="Channel ID to post deal alerts"
+                            value={config.channel_id || ''}
+                            onChange={(e) => setConfig('channel_id', e.target.value)}
+                          />
+                          <span className="form-hint">Text channel where deal cards will be posted</span>
+                        </div>
+
+                        <div className="form-group">
+                          <label className="form-label">Minimum Discount Threshold Filter</label>
+                          <select
+                            id="deals-min-discount"
+                            className="form-input"
+                            value={config.min_discount_percent ?? 50}
+                            onChange={(e) => setConfig('min_discount_percent', parseInt(e.target.value))}
+                          >
+                            <option value={50}>50% OFF or Greater (Recommended)</option>
+                            <option value={75}>75% OFF or Greater (Deep Discounts)</option>
+                            <option value={90}>90% OFF or Greater</option>
+                            <option value={100}>100% FREE ONLY (Giveaways & Free Games Only)</option>
+                          </select>
+                        </div>
+
+                        <div style={{ marginTop: '1.25rem', paddingTop: '1rem', borderTop: '1px solid var(--border-color)' }}>
+                          <button
+                            type="button"
+                            className="btn btn-primary"
+                            disabled={!config.channel_id || checkingDeals}
+                            onClick={handleTriggerDeals}
+                            style={{ backgroundColor: '#10b981', border: 'none', fontWeight: 600, width: '100%' }}
+                          >
+                            {checkingDeals ? 'Scanning Platforms...' : '🚀 Force Check & Dispatch Deals Now'}
+                          </button>
+
+                          {dealStatusMsg && (
+                            <div style={{
+                              marginTop: '0.5rem',
+                              fontSize: '0.85rem',
+                              fontWeight: 500,
+                              color: dealStatusMsg.startsWith('✅') ? '#34d399' : dealStatusMsg.startsWith('❌') ? '#f87171' : '#facc15'
+                            }}>
+                              {dealStatusMsg}
+                            </div>
+                          )}
+                        </div>
                       </>
                     );
                   }}
