@@ -121,6 +121,128 @@ async function awardCoins(discordId, guildId, amount, reason, guild = null) {
 }
 
 /**
+ * Awards coins for sending a message (rate-limited: 1 per N seconds, capped at daily ceiling).
+ */
+async function awardMessageCoins(discordId, guildId, guild) {
+  const vaultConfig = await getVaultConfig(guildId);
+  const rates = { ...DEFAULT_RATES, ...vaultConfig.rates };
+
+  // Fast RAM Cooldown Check: avoid any DB queries if message sent within rate limit
+  const ramKey = `${guildId}:${discordId}`;
+  const lastRAMTime = lastUserMessageRAMMap.get(ramKey);
+  if (lastRAMTime) {
+    const elapsedSeconds = (Date.now() - lastRAMTime) / 1000;
+    if (elapsedSeconds < rates.message_rate_limit_seconds) return;
+  }
+
+  const balance = await getOrCreateBalance(discordId, guildId);
+
+  // Daily Earning Hard Cap Check (prevent exceeding daily 1.50 coins cap)
+  const maxDaily = rates.daily_cap || 1.50;
+  if ((balance?.coins_earned_today || 0) >= maxDaily) return;
+
+  // Rate limit check from DB timestamp
+  if (balance?.last_message_at) {
+    const secondsSinceLast = (Date.now() - new Date(balance.last_message_at).getTime()) / 1000;
+    if (secondsSinceLast < rates.message_rate_limit_seconds) {
+      lastUserMessageRAMMap.set(ramKey, new Date(balance.last_message_at).getTime());
+      return;
+    }
+  }
+
+  // Update RAM timestamp
+  lastUserMessageRAMMap.set(ramKey, Date.now());
+
+  if (!balance?.quest_started) {
+    await awardCoins(discordId, guildId, rates.message, 'message', guild);
+    return;
+  }
+
+  // Update last_message_at + messages_today
+  const newMessagesToday = (balance?.messages_today || 0) + 1;
+  const chatGoal = rates.daily_quest_chat_threshold || 5;
+  let chatQuestCompleted = balance?.quest_chat_completed || false;
+
+  if (!chatQuestCompleted && newMessagesToday >= chatGoal) {
+    chatQuestCompleted = true;
+    await awardCoins(discordId, guildId, rates.daily_quest_chat_bonus || 0.10, 'chat_quest', guild);
+  }
+
+  await supabase
+    .from('vault_balances')
+    .update({
+      last_message_at: new Date().toISOString(),
+      messages_today: newMessagesToday,
+      quest_chat_completed: chatQuestCompleted,
+    })
+    .eq('discord_id', discordId)
+    .eq('guild_id', guildId);
+
+  await awardCoins(discordId, guildId, rates.message, 'message', guild);
+}
+
+/**
+ * Called when user joins voice — no coins yet, just tracking start
+ */
+async function handleVoiceJoin(discordId, guildId) {
+  await getOrCreateBalance(discordId, guildId);
+}
+
+/**
+ * Called when user leaves voice — awards coins for time spent and updates voice quest
+ */
+async function handleVoiceLeave(discordId, guildId, minutesSpent, guild) {
+  const vaultConfig = await getVaultConfig(guildId);
+  const rates = { ...DEFAULT_RATES, ...vaultConfig.rates };
+  const earned = minutesSpent * rates.voice_per_minute;
+
+  await awardCoins(discordId, guildId, earned, 'voice', guild);
+
+  // Update total voice minutes & voice quest progress
+  const balance = await getOrCreateBalance(discordId, guildId);
+  const newTotalVoice = (balance?.voice_minutes || 0) + minutesSpent;
+  const newVoiceToday = (balance?.voice_minutes_today || 0) + minutesSpent;
+
+  const voiceGoal = rates.daily_quest_voice_threshold || 30;
+  let voiceQuestCompleted = balance?.quest_voice_completed || false;
+
+  if (balance?.quest_started && !voiceQuestCompleted && newVoiceToday >= voiceGoal) {
+    voiceQuestCompleted = true;
+    await awardCoins(discordId, guildId, rates.daily_quest_voice_bonus || 0.15, 'voice_quest', guild);
+  }
+
+  await supabase
+    .from('vault_balances')
+    .update({
+      voice_minutes: newTotalVoice,
+      voice_minutes_today: newVoiceToday,
+      quest_voice_completed: voiceQuestCompleted,
+    })
+    .eq('discord_id', discordId)
+    .eq('guild_id', guildId);
+}
+
+/**
+ * Handles completing the Daily Trivia Quest for a member.
+ */
+async function handleTriviaQuestCompletion(discordId, guildId, guild) {
+  const balance = await getOrCreateBalance(discordId, guildId);
+  if (!balance?.quest_trivia_completed) {
+    const vaultConfig = await getVaultConfig(guildId);
+    const rates = { ...DEFAULT_RATES, ...vaultConfig.rates };
+
+    await supabase
+      .from('vault_balances')
+      .update({ quest_trivia_completed: true })
+      .eq('discord_id', discordId)
+      .eq('guild_id', guildId);
+
+    await awardCoins(discordId, guildId, rates.daily_quest_trivia_bonus || 0.05, 'trivia_quest', guild);
+    logger.info(`[VAULT] Trivia quest completed by ${discordId}`);
+  }
+}
+
+/**
  * Explicitly starts daily quests for a user, assigning 3 quests from the 7-quest pool and auto-completing boss quest if AP was used earlier.
  */
 async function handleStartQuest(discordId, guildId) {
