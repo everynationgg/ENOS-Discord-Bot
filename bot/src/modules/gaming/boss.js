@@ -147,6 +147,18 @@ async function getOrCreateActiveBoss(guildId) {
     .single();
 
   if (error) {
+    // Fallback: Re-query active boss in case of concurrent insert
+    const { data: fallbackBoss } = await supabase
+      .from('boss_seasons')
+      .select('*')
+      .eq('guild_id', guildId)
+      .eq('week_identifier', currentWeek)
+      .order('is_overkill', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (fallbackBoss) return fallbackBoss;
+
     logger.error('[BOSS] Failed to create new weekly boss season:', error.message);
     return null;
   }
@@ -183,10 +195,20 @@ async function getPlayerState(guildId, userId) {
       weekly_points: 0,
     })
     .select()
-    .single();
+    .maybeSingle();
 
-  if (error) {
-    logger.error('[BOSS] Failed to initialize player state:', error.message);
+  if (error || !newPlayer) {
+    const { data: fallback } = await supabase
+      .from('boss_player_states')
+      .select('*')
+      .eq('guild_id', guildId)
+      .eq('user_id', userId)
+      .eq('week_identifier', currentWeek)
+      .maybeSingle();
+
+    if (fallback) return fallback;
+
+    logger.error('[BOSS] Failed to initialize player state:', error?.message);
     return null;
   }
 
@@ -227,10 +249,19 @@ async function getUserProfile(guildId, userId) {
       stat_loot_boost: 0,
     })
     .select()
-    .single();
+    .maybeSingle();
 
-  if (error) {
-    logger.error('[BOSS] Failed to initialize user profile:', error.message);
+  if (error || !newProfile) {
+    const { data: fallback } = await supabase
+      .from('boss_user_profiles')
+      .select('*')
+      .eq('guild_id', guildId)
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    if (fallback) return { stat_crit: 0, stat_loot_boost: 0, ...fallback };
+
+    logger.error('[BOSS] Failed to initialize user profile:', error?.message);
     return null;
   }
 
