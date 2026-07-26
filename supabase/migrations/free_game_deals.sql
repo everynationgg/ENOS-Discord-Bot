@@ -13,9 +13,12 @@ CREATE TABLE IF NOT EXISTS free_game_deals (
   channel_id TEXT NOT NULL,
   message_id TEXT NOT NULL,
   expires_at TIMESTAMPTZ,
+  is_expired BOOLEAN DEFAULT FALSE,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   UNIQUE(guild_id, deal_id)
 );
+
+ALTER TABLE free_game_deals ADD COLUMN IF NOT EXISTS is_expired BOOLEAN DEFAULT FALSE;
 
 CREATE INDEX IF NOT EXISTS idx_free_game_deals_expires ON free_game_deals(expires_at);
 CREATE INDEX IF NOT EXISTS idx_free_game_deals_guild ON free_game_deals(guild_id);

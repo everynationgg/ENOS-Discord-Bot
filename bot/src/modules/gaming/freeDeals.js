@@ -14,6 +14,20 @@ const STORE_NAMES = {
 };
 
 /**
+ * Normalizes game titles to prevent duplicate postings across different platforms & formats.
+ * e.g. "Amnesia: The Dark Descent (Free on Steam)" -> "amnesiathedarkdescent"
+ */
+function normalizeTitle(title) {
+  if (!title) return '';
+  return title
+    .toLowerCase()
+    .replace(/\(.*\)/g, '')
+    .replace(/\[.*\]/g, '')
+    .replace(/\b(giveaway|free|on|steam|epic|games|gog|store|key|dlc|loot|pack|edition)\b/gi, '')
+    .replace(/[^a-z0-9]/g, '');
+}
+
+/**
  * Fetches deals from CheapShark REST API filtered by minimum savings percentage.
  */
 async function fetchCheapSharkDeals(minDiscountPercent = 50) {
@@ -34,7 +48,6 @@ async function fetchCheapSharkDeals(minDiscountPercent = 50) {
         const savings = Math.round(parseFloat(d.savings || '0'));
         const storeName = STORE_NAMES[d.storeID] || `Store #${d.storeID}`;
         const isFree = sale === 0 || savings === 100;
-        // Default expiry is 7 days if not provided
         const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
 
         return {
@@ -68,9 +81,13 @@ async function fetchGamerPowerDeals() {
 
     return data.slice(0, 10).map((d) => {
       const normal = parseFloat((d.worth || '0').replace('$', '').trim()) || 19.99;
-      const expiresAt = d.end_date && d.end_date !== 'N/A'
-        ? new Date(d.end_date).toISOString()
-        : new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString();
+      let expiresAt = new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString();
+      if (d.end_date && d.end_date !== 'N/A') {
+        const parsed = new Date(d.end_date);
+        if (!isNaN(parsed.getTime()) && parsed.getTime() > Date.now()) {
+          expiresAt = parsed.toISOString();
+        }
+      }
 
       return {
         dealId: `gp_${d.id}`,
@@ -92,7 +109,7 @@ async function fetchGamerPowerDeals() {
 }
 
 /**
- * Scrapes and aggregates deals from multiple platforms.
+ * Scrapes and aggregates deals from multiple platforms with title normalization.
  */
 async function fetchAllDeals(minDiscountPercent = 50) {
   const [csDeals, gpDeals] = await Promise.all([
@@ -102,8 +119,9 @@ async function fetchAllDeals(minDiscountPercent = 50) {
 
   const dealMap = new Map();
   [...gpDeals, ...csDeals].forEach((d) => {
-    if (!dealMap.has(d.dealId)) {
-      dealMap.set(d.dealId, d);
+    const normKey = normalizeTitle(d.title);
+    if (normKey && !dealMap.has(normKey) && !dealMap.has(d.dealId)) {
+      dealMap.set(normKey, d);
     }
   });
 
@@ -131,19 +149,22 @@ async function checkAndDispatchDeals(client, guildId) {
   const deals = await fetchAllDeals(minDiscount);
   if (!deals.length) return { count: 0 };
 
-  // Fetch previously posted deal IDs and titles for this guild
+  // Fetch ALL historical posted deal IDs and titles for this guild (permanent history)
   const { data: postedRows } = await supabase
     .from('free_game_deals')
     .select('deal_id, title')
     .eq('guild_id', guildId);
 
   const postedSet = new Set((postedRows || []).map((r) => r.deal_id));
-  const postedTitleSet = new Set((postedRows || []).map((r) => (r.title || '').toLowerCase().trim()));
+  const postedNormSet = new Set((postedRows || []).map((r) => normalizeTitle(r.title)));
   let newlyPosted = 0;
 
   for (const deal of deals) {
-    const cleanTitle = (deal.title || '').toLowerCase().trim();
-    if (postedSet.has(deal.dealId) || postedTitleSet.has(cleanTitle)) continue;
+    const normTitle = normalizeTitle(deal.title);
+    if (postedSet.has(deal.dealId) || (normTitle && postedNormSet.has(normTitle))) {
+      continue;
+    }
+
     if (newlyPosted >= 5) break; // Cap at 5 new deal alerts per batch run to avoid spam
 
     const is100Free = deal.isFree || deal.savingsPercent >= 100;
@@ -200,6 +221,7 @@ async function checkAndDispatchDeals(client, guildId) {
         channel_id: channelId,
         message_id: sentMessage.id,
         expires_at: deal.expiresAt,
+        is_expired: false,
       });
 
       await logBotEvent(guildId, 'free_game_alert_posted', null, {
@@ -215,7 +237,7 @@ async function checkAndDispatchDeals(client, guildId) {
 }
 
 /**
- * Worker: Auto-deletes Discord messages for expired deals and cleans DB records.
+ * Worker: Auto-deletes Discord messages for expired deals while preserving database history.
  */
 async function cleanExpiredDeals(client) {
   try {
@@ -223,7 +245,8 @@ async function cleanExpiredDeals(client) {
     const { data: expiredDeals } = await supabase
       .from('free_game_deals')
       .select('*')
-      .lte('expires_at', nowIso);
+      .lte('expires_at', nowIso)
+      .or('is_expired.is.null,is_expired.eq.false');
 
     if (!expiredDeals || !expiredDeals.length) return;
 
@@ -243,7 +266,11 @@ async function cleanExpiredDeals(client) {
         logger.warn(`[FREE DEALS CLEANER] Failed deleting message ${deal.message_id}:`, e.message);
       }
 
-      await supabase.from('free_game_deals').delete().eq('id', deal.id);
+      // Mark as expired in DB rather than deleting row, so title history persists permanently!
+      await supabase
+        .from('free_game_deals')
+        .update({ is_expired: true })
+        .eq('id', deal.id);
     }
   } catch (err) {
     logger.error('[FREE DEALS CLEANER] Error in cleanExpiredDeals worker:', err.message);
@@ -251,6 +278,7 @@ async function cleanExpiredDeals(client) {
 }
 
 module.exports = {
+  normalizeTitle,
   fetchCheapSharkDeals,
   fetchGamerPowerDeals,
   fetchAllDeals,

@@ -23,6 +23,16 @@ const STORE_NAMES: Record<string, string> = {
   '25': 'Epic Games Store',
 };
 
+function normalizeTitle(title: string) {
+  if (!title) return '';
+  return title
+    .toLowerCase()
+    .replace(/\(.*\)/g, '')
+    .replace(/\[.*\]/g, '')
+    .replace(/\b(giveaway|free|on|steam|epic|games|gog|store|key|dlc|loot|pack|edition)\b/gi, '')
+    .replace(/[^a-z0-9]/g, '');
+}
+
 async function fetchCheapSharkDeals(minDiscountPercent = 50) {
   try {
     const res = await fetch(`https://www.cheapshark.com/api/1.0/deals?upperPrice=50&sortBy=Savings&desc=1&pageSize=20`);
@@ -70,9 +80,13 @@ async function fetchGamerPowerDeals() {
 
     return data.slice(0, 10).map((d: any) => {
       const normal = parseFloat((d.worth || '0').replace('$', '').trim()) || 19.99;
-      const expiresAt = d.end_date && d.end_date !== 'N/A'
-        ? new Date(d.end_date).toISOString()
-        : new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString();
+      let expiresAt = new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString();
+      if (d.end_date && d.end_date !== 'N/A') {
+        const parsed = new Date(d.end_date);
+        if (!isNaN(parsed.getTime()) && parsed.getTime() > Date.now()) {
+          expiresAt = parsed.toISOString();
+        }
+      }
 
       return {
         dealId: `gp_${d.id}`,
@@ -128,7 +142,10 @@ export async function POST(req: NextRequest) {
 
       const dealMap = new Map();
       [...gpDeals, ...csDeals].forEach((d) => {
-        if (!dealMap.has(d.dealId)) dealMap.set(d.dealId, d);
+        const normKey = normalizeTitle(d.title);
+        if (normKey && !dealMap.has(normKey) && !dealMap.has(d.dealId)) {
+          dealMap.set(normKey, d);
+        }
       });
       const deals = Array.from(dealMap.values());
 
@@ -142,12 +159,15 @@ export async function POST(req: NextRequest) {
         .eq('guild_id', guildId);
 
       const postedSet = new Set((postedRows || []).map((r: any) => r.deal_id));
-      const postedTitleSet = new Set((postedRows || []).map((r: any) => (r.title || '').toLowerCase().trim()));
+      const postedNormSet = new Set((postedRows || []).map((r: any) => normalizeTitle(r.title)));
       let newlyPosted = 0;
 
       for (const deal of deals) {
-        const cleanTitle = (deal.title || '').toLowerCase().trim();
-        if (postedSet.has(deal.dealId) || postedTitleSet.has(cleanTitle)) continue;
+        const normTitle = normalizeTitle(deal.title);
+        if (postedSet.has(deal.dealId) || (normTitle && postedNormSet.has(normTitle))) {
+          continue;
+        }
+
         if (newlyPosted >= 3) break; // Limit 3 deal alerts per manual trigger button push
 
         const is100Free = deal.isFree || deal.savingsPercent >= 100;
@@ -214,6 +234,7 @@ export async function POST(req: NextRequest) {
             channel_id: channelId.trim(),
             message_id: sentMsg.id,
             expires_at: deal.expiresAt,
+            is_expired: false,
           });
         }
       }
@@ -231,7 +252,8 @@ export async function POST(req: NextRequest) {
         .from('free_game_deals')
         .select('*')
         .eq('guild_id', guildId)
-        .lte('expires_at', nowIso);
+        .lte('expires_at', nowIso)
+        .or('is_expired.is.null,is_expired.eq.false');
 
       let deletedCount = 0;
       if (expiredDeals && expiredDeals.length > 0) {
@@ -242,7 +264,7 @@ export async function POST(req: NextRequest) {
               headers: { Authorization: `Bot ${DISCORD_TOKEN}` },
             }).catch(() => {});
           }
-          await supabaseAdmin.from('free_game_deals').delete().eq('id', deal.id);
+          await supabaseAdmin.from('free_game_deals').update({ is_expired: true }).eq('id', deal.id);
           deletedCount++;
         }
       }
