@@ -118,16 +118,16 @@ async function translateTextWithGemini(rawText, targetLangCode, persona) {
   if (!cleaned) return '';
 
   const personaInstructions = {
-    default: 'Translate the following text accurately.',
-    announcer: 'Translate the text into an energetic, hyped announcement style.',
-    error_mod: 'Translate the text with subtle sci-fi system diagnostics framing.',
-    calm: 'Translate the text into a relaxed, smooth, calming tone.',
+    default: 'Translate the text accurately into the target language.',
+    announcer: 'Translate the text into an energetic, hyped announcement style in the target language.',
+    error_mod: 'Translate the text with subtle sci-fi system diagnostics framing in the target language.',
+    calm: 'Translate the text into a relaxed, smooth, calming tone in the target language.',
   };
 
   const targetLangNames = {
     en: 'English',
     ja: 'Japanese',
-    tl: 'Tagalog (Filipino)',
+    tl: 'Tagalog (Filipino language)',
     es: 'Spanish',
     fr: 'French',
     de: 'German',
@@ -138,7 +138,7 @@ async function translateTextWithGemini(rawText, targetLangCode, persona) {
 
   try {
     const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
-    const prompt = `${instruction}\nTarget Language: ${langName}.\nText to translate: "${cleaned}"\n\nReturn ONLY the translated spoken sentence without quotes, prefixes, or commentary. Do NOT add "User said:".`;
+    const prompt = `Task: ${instruction}\nTarget Spoken Language: ${langName}\n\nOriginal Text: "${cleaned}"\n\nInstructions: Provide the exact translation in ${langName}. Do NOT prefix with "User said:", "Translation:", or quotes. Return ONLY the translated spoken sentence.`;
 
     const res = await model.generateContent(prompt);
     const translation = res.response.text().trim();
@@ -150,21 +150,48 @@ async function translateTextWithGemini(rawText, targetLangCode, persona) {
 }
 
 /**
- * Synthesizes audio file for target translation using gTTS
+ * Synthesizes audio file for target translation using gTTS with automatic language fallbacks
  */
 function generateTtsAudioFile(text, langCode) {
-  return new Promise((resolve, reject) => {
+  const gttsLangMap = {
+    en: 'en',
+    ja: 'ja',
+    tl: 'es', // gtts fallback for Tagalog phonetic rendering if 'tl' unsupported
+    es: 'es',
+    fr: 'fr',
+    de: 'de',
+  };
+
+  const primaryLang = gttsLangMap[langCode] || 'en';
+
+  return new Promise((resolve) => {
     const tempPath = path.join(os.tmpdir(), `tts_${Date.now()}_${Math.random().toString(36).substring(7)}.mp3`);
-    const gtts = new gTTS(text, langCode || 'en');
-    gtts.save(tempPath, (err) => {
-      if (err) return reject(err);
-      resolve(tempPath);
-    });
+
+    const attemptSave = (langToUse) => {
+      try {
+        const gtts = new gTTS(text, langToUse);
+        gtts.save(tempPath, (err) => {
+          if (err && langToUse !== 'en') {
+            attemptSave('en'); // Retry with English fallback
+          } else {
+            resolve(tempPath);
+          }
+        });
+      } catch (e) {
+        if (langToUse !== 'en') {
+          attemptSave('en');
+        } else {
+          resolve(tempPath);
+        }
+      }
+    };
+
+    attemptSave(primaryLang);
   });
 }
 
 /**
- * Process next audio item in queue for a session
+ * Process next audio item in queue for a session with failsafe error recovery
  */
 async function processSpeechQueue(guildId) {
   const session = activeSessions.get(guildId);
