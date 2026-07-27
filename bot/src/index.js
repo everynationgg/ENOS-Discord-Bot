@@ -45,9 +45,11 @@ client.cooldowns = new Collection();
   }
 })();
 
-// ─── Initialize Cron Jobs after ready ─────────────────────────────────────────
+// ─── Initialize Cron Jobs & Voice Herald Sub-Bot after ready ─────────────────
 client.once('ready', async () => {
   initCrons(client);
+  const { initVoiceBot } = require('./modules/social/tts');
+  initVoiceBot(client);
   logger.info(`[READY] Logged in as ${client.user.tag}`);
 });
 

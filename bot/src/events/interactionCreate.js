@@ -113,6 +113,10 @@ module.exports = {
           const { handleShowcaseFeedbackButton } = require('../modules/moderation/showcase');
           return handleShowcaseFeedbackButton(interaction);
         }
+        if (interaction.customId.startsWith('tts_')) {
+          const { handleTtsComponent } = require('../commands/tts');
+          return handleTtsComponent(interaction);
+        }
         return;
       }
 
@@ -162,8 +166,9 @@ module.exports = {
         if (interaction.customId === 'verify_discovery') {
           return handleDiscoverySelect(interaction);
         }
-        if (interaction.customId === 'verify_game_branch') {
-          return handleGameBranchSelect(interaction);
+        if (interaction.customId.startsWith('tts_select:')) {
+          const { handleTtsComponent } = require('../commands/tts');
+          return handleTtsComponent(interaction);
         }
         return;
       }

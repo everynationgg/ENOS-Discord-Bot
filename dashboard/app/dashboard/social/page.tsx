@@ -43,7 +43,16 @@ export default function SocialPage() {
   const [newAlertHandle, setNewAlertHandle] = useState('');
   const [newAlertPlatform, setNewAlertPlatform] = useState<'twitch' | 'tiktok'>('twitch');
   const [newAlertChannelId, setNewAlertChannelId] = useState('');
-  const [loadingAlerts, setLoadingAlerts] = useState(false);
+  // EN TTS System state
+  const [ttsEnabled, setTtsEnabled] = useState(true);
+  const [ttsLanguage, setTtsLanguage] = useState('en');
+  const [ttsVoiceModel, setTtsVoiceModel] = useState('female');
+  const [ttsPersona, setTtsPersona] = useState('default');
+  const [ttsMaxChars, setTtsMaxChars] = useState(200);
+  const [ttsIgnoredPrefixes, setTtsIgnoredPrefixes] = useState('!, //, (');
+  const [ttsVoiceBotClientId, setTtsVoiceBotClientId] = useState('1531251424456081569');
+  const [loadingTts, setLoadingTts] = useState(false);
+  const [saveTtsStatus, setSaveTtsStatus] = useState<SaveStatus>('idle');
 
   useEffect(() => {
     if (activeTab === 'auto_reactions') {
@@ -68,6 +77,23 @@ export default function SocialPage() {
           setLoadingAlerts(false);
         })
         .catch(() => setLoadingAlerts(false));
+    }
+    if (activeTab === 'en_tts') {
+      setLoadingTts(true);
+      fetch('/api/social/tts/config')
+        .then((r) => r.json())
+        .then((data) => {
+          if (data.voice_bot_client_id) setTtsVoiceBotClientId(data.voice_bot_client_id);
+          const cfg = data.config || {};
+          setTtsEnabled(cfg.enabled ?? true);
+          setTtsLanguage(cfg.default_language || 'en');
+          setTtsVoiceModel(cfg.default_voice_model || 'female');
+          setTtsPersona(cfg.default_persona || 'default');
+          setTtsMaxChars(cfg.max_characters || 200);
+          setTtsIgnoredPrefixes(cfg.ignored_prefixes || '!, //, (');
+          setLoadingTts(false);
+        })
+        .catch(() => setLoadingTts(false));
     }
   }, [activeTab]);
 
@@ -255,6 +281,35 @@ export default function SocialPage() {
     }
   };
 
+  const saveTtsSettings = async () => {
+    setSaveTtsStatus('saving');
+    try {
+      const res = await fetch('/api/social/tts/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          config: {
+            enabled: ttsEnabled,
+            default_language: ttsLanguage,
+            default_voice_model: ttsVoiceModel,
+            default_persona: ttsPersona,
+            max_characters: ttsMaxChars,
+            ignored_prefixes: ttsIgnoredPrefixes,
+          },
+        }),
+      });
+
+      if (res.ok) {
+        setSaveTtsStatus('saved');
+        setTimeout(() => setSaveTtsStatus('idle'), 2500);
+      } else {
+        setSaveTtsStatus('error');
+      }
+    } catch (e) {
+      setSaveTtsStatus('error');
+    }
+  };
+
   if (loading) {
     return (
       <div className="page-wrapper">
@@ -317,6 +372,13 @@ export default function SocialPage() {
             id="sidebar-social-queue"
           >
             🎉 Birthday Queue Workspace
+          </button>
+          <button
+            className={`sidebar-item ${activeTab === 'en_tts' ? 'active' : ''}`}
+            onClick={() => setActiveTab('en_tts')}
+            id="sidebar-social-tts"
+          >
+            🎙️ EN TTS & Voice Herald
           </button>
         </aside>
 
@@ -1214,6 +1276,132 @@ export default function SocialPage() {
                     })}
                   </div>
                 )}
+              </div>
+            </div>
+          )}
+          {activeTab === 'en_tts' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+              <div style={{ padding: '1.5rem', background: 'var(--bg-card)', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', paddingBottom: '1rem', borderBottom: '1px solid var(--border-color)', flexWrap: 'wrap', gap: '1rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                    <span style={{ fontSize: '1.75rem' }}>🎙️</span>
+                    <div>
+                      <h2 style={{ fontSize: '1.2rem', fontWeight: 700, margin: 0 }}>EN TTS — Text-To-Speech & Voice Herald</h2>
+                      <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Configure dedicated voice sub-bot, auto-translation, and character personas</span>
+                    </div>
+                  </div>
+                  <a
+                    href={`https://discord.com/api/oauth2/authorize?client_id=${ttsVoiceBotClientId}&permissions=3146752&scope=bot`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="btn btn-primary btn-sm"
+                    style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', textDecoration: 'none' }}
+                  >
+                    🔗 Invite Voice Herald Bot
+                  </a>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                  <div className="form-group">
+                    <label className="form-label" style={{ fontWeight: 600 }}>Master Feature Switch</label>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginTop: '0.35rem' }}>
+                      <input
+                        type="checkbox"
+                        checked={ttsEnabled}
+                        onChange={(e) => setTtsEnabled(e.target.checked)}
+                        style={{ width: 18, height: 18, cursor: 'pointer' }}
+                      />
+                      <span style={{ fontSize: '0.9rem' }}>Enable EN TTS & Voice Herald Sub-Bot in Voice Channels</span>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.25rem' }}>
+                    <div className="form-group">
+                      <label className="form-label" style={{ fontWeight: 600 }}>Default Spoken Language</label>
+                      <select
+                        className="input-field"
+                        value={ttsLanguage}
+                        onChange={(e) => setTtsLanguage(e.target.value)}
+                        style={{ width: '100%', marginTop: '0.35rem' }}
+                      >
+                        <option value="en">English (US)</option>
+                        <option value="ja">Japanese (日本語)</option>
+                        <option value="tl">Tagalog (Filipino)</option>
+                        <option value="es">Spanish (Español)</option>
+                        <option value="fr">French (Français)</option>
+                        <option value="de">German (Deutsch)</option>
+                      </select>
+                    </div>
+
+                    <div className="form-group">
+                      <label className="form-label" style={{ fontWeight: 600 }}>Default Voice Model / Pitch</label>
+                      <select
+                        className="input-field"
+                        value={ttsVoiceModel}
+                        onChange={(e) => setTtsVoiceModel(e.target.value)}
+                        style={{ width: '100%', marginTop: '0.35rem' }}
+                      >
+                        <option value="female">Female Voice</option>
+                        <option value="male">Male Voice</option>
+                        <option value="neutral">Neutral Voice</option>
+                        <option value="deep">Deep Voice</option>
+                      </select>
+                    </div>
+
+                    <div className="form-group">
+                      <label className="form-label" style={{ fontWeight: 600 }}>Default Character Persona</label>
+                      <select
+                        className="input-field"
+                        value={ttsPersona}
+                        onChange={(e) => setTtsPersona(e.target.value)}
+                        style={{ width: '100%', marginTop: '0.35rem' }}
+                      >
+                        <option value="default">Default Natural</option>
+                        <option value="announcer">Hype Stadium Announcer</option>
+                        <option value="error_mod">Glitched / ERROR-MOD</option>
+                        <option value="calm">Calm & Chill</option>
+                      </select>
+                    </div>
+
+                    <div className="form-group">
+                      <label className="form-label" style={{ fontWeight: 600 }}>Max Characters Per Message</label>
+                      <input
+                        type="number"
+                        className="input-field"
+                        value={ttsMaxChars}
+                        onChange={(e) => setTtsMaxChars(Number(e.target.value))}
+                        style={{ width: '100%', marginTop: '0.35rem' }}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label" style={{ fontWeight: 600 }}>Ignored Message Prefixes</label>
+                    <input
+                      type="text"
+                      className="input-field"
+                      value={ttsIgnoredPrefixes}
+                      onChange={(e) => setTtsIgnoredPrefixes(e.target.value)}
+                      placeholder="!, //, ("
+                      style={{ width: '100%', marginTop: '0.35rem' }}
+                    />
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginTop: '0.25rem' }}>
+                      Messages starting with these symbols will not be spoken aloud by TTS.
+                    </span>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginTop: '0.5rem', paddingTop: '1rem', borderTop: '1px solid var(--border-color)' }}>
+                    <button
+                      className="btn btn-primary"
+                      onClick={saveTtsSettings}
+                      disabled={saveTtsStatus === 'saving'}
+                    >
+                      {saveTtsStatus === 'saving' ? '⏳ Saving...' : '💾 Save TTS Settings'}
+                    </button>
+                    {saveTtsStatus === 'saved' && <span style={{ color: '#22c55e', fontSize: '0.875rem' }}>✓ Settings saved successfully!</span>}
+                    {saveTtsStatus === 'error' && <span style={{ color: '#ef4444', fontSize: '0.875rem' }}>❌ Failed to save settings.</span>}
+                  </div>
+                </div>
               </div>
             </div>
           )}

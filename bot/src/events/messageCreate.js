@@ -49,5 +49,9 @@ module.exports = {
     if (reactionsEnabled) {
       await handleMessageAutoReactions(message).catch(() => {});
     }
+
+    // EN TTS: Queue text message for voice playback if active in VC text chat
+    const { queueTextMessage } = require('../modules/social/tts');
+    queueTextMessage(guildId, message.channel.id, message.content);
   },
 };
