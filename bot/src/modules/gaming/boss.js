@@ -471,9 +471,10 @@ async function executeCombatAction(guildId, userId, actionType) {
     totalDmg *= 2;
   }
 
-  // Overkill Mode 1.5x Bonus Multiplier
+  // Points per AP spent (AP-scaled, not damage-based): 2 pts per AP, 1.5x overkill bonus
+  // This is only used for the transaction log display — weekly_points are set at boss defeat
   const pointsMultiplier = boss.is_overkill ? 1.5 : 1.0;
-  let pointsEarned = Math.round(totalDmg * pointsMultiplier);
+  const pointsEarned = Math.round(apCost * 2 * pointsMultiplier);
 
   // XP Math: 100 XP per AP spent + stat_xp_boost (+1% per point, max 10%)
   const xpMultiplier = 1 + (Math.min(10, profile.stat_xp_boost || 0) * 0.01);
@@ -529,13 +530,18 @@ async function executeCombatAction(guildId, userId, actionType) {
   }
 
   // Update Player AP & Damage
+  // weekly_points is accumulated as AP-contribution (2 pts per AP, 1.5x overkill)
+  // Final slay points (6-10) are set correctly at boss defeat in triggerOverkillRevival/handleOverkillDefeat
   const newAp = playerState.ap_remaining - actualApDeducted;
+  const apContribPoints = Math.round(actualApDeducted * 2 * pointsMultiplier);
+  const newWeeklyPoints = (playerState.weekly_points || 0) + apContribPoints;
   await supabase
     .from('boss_player_states')
     .update({
       ap_remaining: newAp,
       is_locked: true,
       total_damage: playerState.total_damage + totalDmg,
+      weekly_points: newWeeklyPoints,
       updated_at: new Date().toISOString(),
     })
     .eq('id', playerState.id);
