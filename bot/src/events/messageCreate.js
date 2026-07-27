@@ -3,6 +3,7 @@ const { awardMessageCoins } = require('../modules/gaming/vault');
 const { isFeatureEnabled, getFeatureConfig } = require('../lib/supabase');
 const { handleMessageAutoReactions } = require('../modules/social/autoReaction');
 const { handleHelpDeskChatMessage } = require('../modules/moderation/helpdesk');
+const logger = require('../lib/logger');
 
 module.exports = {
   name: Events.MessageCreate,
@@ -15,6 +16,9 @@ module.exports = {
     if (message.author.bot || !message.guild || message.system) return;
 
     const guildId = message.guild.id;
+    const userId = message.author.id;
+
+    logger.info(`[VAULT] messageCreate fired: user=${userId} guild=${guildId} content="${message.content.substring(0, 30)}"`);
 
     // AI Support Help Desk: process support thread conversations
     if (message.channel.isThread()) {
@@ -40,8 +44,11 @@ module.exports = {
 
     // Vault Economy: award coins for messages
     const vaultEnabled = await isFeatureEnabled(guildId, 'vault');
+    logger.info(`[VAULT] vault feature enabled=${vaultEnabled} for guild=${guildId}`);
     if (vaultEnabled) {
-      await awardMessageCoins(message.author.id, guildId, message.guild).catch(() => {});
+      await awardMessageCoins(message.author.id, guildId, message.guild).catch((err) => {
+        logger.error(`[VAULT] awardMessageCoins error: ${err.message}`);
+      });
     }
 
     // Auto-Reactions: react to trigger words
