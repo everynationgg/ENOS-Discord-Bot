@@ -659,6 +659,7 @@ async function triggerOverkillRevival(guildId, boss) {
       current_hp: boss.max_hp,
       is_overkill: true,
       is_defeated: false,
+      custom_image_url: boss.custom_image_url || null,
       mom_buff: false,
       dad_debuff: false,
       last_action: '⚡ OVERKILL MODE ACTIVATED! Emergency Backup System online.',
