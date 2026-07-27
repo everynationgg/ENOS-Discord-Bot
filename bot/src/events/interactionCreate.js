@@ -47,27 +47,15 @@ module.exports = {
         logger.info(`[INTERACTION] Button click: customId="${interaction.customId}" user=${interaction.user.id}`);
         if (interaction.customId === 'vault_get_daily_quests') {
           try {
-            if (!interaction.deferred && !interaction.replied) {
-              await interaction.deferReply({ flags: MessageFlags.Ephemeral }).catch(e => {
-                logger.warn(`[INTERACTION] deferReply notice: ${e.message}`);
-              });
-            }
             const { handleStartQuest, build3QuestsEphemeralEmbed } = require('../modules/gaming/vault');
             await handleStartQuest(interaction.user.id, interaction.guild.id);
             const embed = await build3QuestsEphemeralEmbed(interaction.user.id, interaction.guild.id, interaction.guild);
 
-            if (interaction.deferred || interaction.replied) {
-              const replyMsg = await interaction.editReply({ embeds: [embed] }).catch(async (e) => {
-                logger.warn(`[INTERACTION] editReply fallback notice: ${e.message}`);
+            if (!interaction.replied && !interaction.deferred) {
+              const replyMsg = await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral, withResponse: true }).then(r => r?.resource?.message).catch(async (e) => {
+                logger.warn(`[INTERACTION] Direct reply fallback notice: ${e.message}`);
                 return await interaction.followUp({ embeds: [embed], flags: MessageFlags.Ephemeral }).catch(() => null);
               });
-              if (replyMsg) {
-                setTimeout(() => {
-                  interaction.deleteReply().catch(() => {});
-                }, 120000);
-              }
-            } else {
-              const replyMsg = await interaction.followUp({ embeds: [embed], flags: MessageFlags.Ephemeral }).catch(() => null);
               if (replyMsg) {
                 setTimeout(() => {
                   interaction.deleteReply().catch(() => {});
