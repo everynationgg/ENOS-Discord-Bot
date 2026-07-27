@@ -100,9 +100,9 @@ function initCrons(client) {
   cron.schedule(
     '0 0 * * *',
     async () => {
-      logger.info('[CRON] Resetting daily quests...');
+      logger.info('[CRON] Resetting daily quests and respawning Daily Quest Hub launchers...');
       try {
-        await resetDailyQuests();
+        await resetDailyQuests(client);
       } catch (err) {
         logger.error('[CRON] Quest reset failed:', err.message);
       }

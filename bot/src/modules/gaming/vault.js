@@ -596,6 +596,11 @@ async function build3QuestsEphemeralEmbed(discordId, guildId, guild) {
 
 /**
  * Posts or updates the persistent Quest Channel Launcher card.
+ * Sweeps and deletes old launcher messages before posting a fresh launcher embed.
+ * @param {import('discord.js').Client} client
+ * @param {string} guildId
+ * @param {string} channelId
+ * @returns {Promise<boolean>}
  */
 async function postOrUpdateQuestLauncherChannel(client, guildId, channelId) {
   if (!channelId) return false;
@@ -604,6 +609,40 @@ async function postOrUpdateQuestLauncherChannel(client, guildId, channelId) {
 
   const channel = await guild.channels.fetch(channelId).catch(() => null);
   if (!channel || !channel.isTextBased()) return false;
+
+  // Fetch guild config to check for existing launcher message ID
+  const { data: featureRow } = await supabase
+    .from('guild_config')
+    .select('*')
+    .eq('guild_id', guildId)
+    .in('feature_key', ['vault', 'vault_economy'])
+    .maybeSingle();
+
+  const config = featureRow?.config || {};
+  const oldMessageId = config.quest_launcher_message_id;
+
+  if (oldMessageId) {
+    const oldMsg = await channel.messages.fetch(oldMessageId).catch(() => null);
+    if (oldMsg) {
+      await oldMsg.delete().catch(() => {});
+    }
+  }
+
+  // Also sweep recent messages in quest channel to delete any duplicate/stray launcher embeds
+  const recentMsgs = await channel.messages.fetch({ limit: 25 }).catch(() => null);
+  if (recentMsgs && recentMsgs.size > 0) {
+    for (const msg of recentMsgs.values()) {
+      if (msg.author.id === client.user.id && msg.embeds && msg.embeds.length > 0) {
+        const embed = msg.embeds[0];
+        const isLauncher =
+          embed.title === '📜 Every Nation Vault — Daily Quests Hub' ||
+          embed.footer?.text?.includes('ENOS Quest Launcher');
+        if (isLauncher) {
+          await msg.delete().catch(() => {});
+        }
+      }
+    }
+  }
 
   const embed = new EmbedBuilder()
     .setColor(0xFACC15)
@@ -628,7 +667,31 @@ async function postOrUpdateQuestLauncherChannel(client, guildId, channelId) {
       .setEmoji('📜')
   );
 
-  await channel.send({ embeds: [embed], components: [row] }).catch(() => {});
+  const sentMessage = await channel.send({ embeds: [embed], components: [row] }).catch((err) => {
+    logger.error(`[VAULT] Failed to send Quest Hub launcher message to channel ${channelId}:`, err.message);
+    return null;
+  });
+
+  if (sentMessage) {
+    const updatedConfig = {
+      ...config,
+      quest_channel_id: channelId,
+      quest_launcher_channel_id: channelId,
+      quest_launcher_message_id: sentMessage.id,
+    };
+    for (const key of ['vault', 'vault_economy']) {
+      await supabase
+        .from('guild_config')
+        .upsert({
+          guild_id: guildId,
+          feature_key: key,
+          enabled: true,
+          config: updatedConfig,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'guild_id,feature_key' });
+    }
+  }
+
   return true;
 }
 
@@ -881,9 +944,10 @@ async function buildQuestEmbed(discordId, guildId, guild) {
 }
 
 /**
- * Cron: Reset daily quest flags at midnight
+ * Cron: Reset daily quest flags at midnight and respawn fresh Quest Hub Launcher embed cards.
+ * @param {import('discord.js').Client} [client]
  */
-async function resetDailyQuests() {
+async function resetDailyQuests(client) {
   const { error } = await supabase
     .from('vault_balances')
     .update({
@@ -908,6 +972,34 @@ async function resetDailyQuests() {
     logger.error('[VAULT] Failed to reset daily quests:', error.message);
   } else {
     logger.info('[VAULT] Daily quests reset for all users.');
+  }
+
+  // Delete yesterday's launcher embed and respawn a fresh launcher embed for the new day
+  if (client) {
+    try {
+      const { data: configs } = await supabase
+        .from('guild_config')
+        .select('*')
+        .in('feature_key', ['vault', 'vault_economy'])
+        .eq('enabled', true);
+
+      const processedGuilds = new Set();
+      for (const entry of configs || []) {
+        if (processedGuilds.has(entry.guild_id)) continue;
+        processedGuilds.add(entry.guild_id);
+
+        const config = entry.config || {};
+        const qChannelId = config.quest_channel_id || config.quest_launcher_channel_id;
+        if (qChannelId) {
+          logger.info(`[VAULT CRON] Respawning Daily Quest Hub for guild ${entry.guild_id} in channel ${qChannelId}`);
+          await postOrUpdateQuestLauncherChannel(client, entry.guild_id, qChannelId).catch((err) => {
+            logger.error(`[VAULT CRON] Failed to respawn Quest Hub for guild ${entry.guild_id}:`, err.message);
+          });
+        }
+      }
+    } catch (err) {
+      logger.error('[VAULT] Error refreshing Quest Hub launchers during daily reset:', err.message);
+    }
   }
 }
 

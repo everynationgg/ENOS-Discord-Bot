@@ -162,6 +162,68 @@ async function closeActiveDrop(guildId: string, status: 'completed' | 'skipped' 
     }
   }
 
+  // Delete active notification alert message if configured
+  if (token) {
+    try {
+      const { data: featureRow } = await supabaseAdmin
+        .from('guild_config')
+        .select('config')
+        .eq('guild_id', guildId)
+        .eq('feature_key', 'trivia')
+        .maybeSingle();
+
+      if (featureRow?.config) {
+        const config = featureRow.config;
+        const notifChannelId = config.active_notif_channel_id || config.notification_channel_id;
+        const notifMsgId = config.active_notif_message_id;
+
+        if (notifChannelId && notifMsgId) {
+          await fetch(`https://discord.com/api/v10/channels/${notifChannelId}/messages/${notifMsgId}`, {
+            method: 'DELETE',
+            headers: { Authorization: `Bot ${token}` },
+          }).catch(() => {});
+        }
+
+        // Sweep notification channel for stray trivia notification embeds
+        if (config.notification_channel_id) {
+          const sweepRes = await fetch(`https://discord.com/api/v10/channels/${config.notification_channel_id}/messages?limit=25`, {
+            headers: { Authorization: `Bot ${token}` },
+          }).catch(() => null);
+
+          if (sweepRes && sweepRes.ok) {
+            const msgs = await sweepRes.json();
+            for (const msg of msgs || []) {
+              if (msg.embeds && msg.embeds.length > 0) {
+                const embed = msg.embeds[0];
+                const isTriviaNotif =
+                  embed.title === '📢 Daily Trivia Drop Live!' ||
+                  embed.footer?.text?.includes('Every Nation Trivia') ||
+                  embed.description?.includes('Daily Trivia Drop');
+                if (isTriviaNotif) {
+                  await fetch(`https://discord.com/api/v10/channels/${config.notification_channel_id}/messages/${msg.id}`, {
+                    method: 'DELETE',
+                    headers: { Authorization: `Bot ${token}` },
+                  }).catch(() => {});
+                }
+              }
+            }
+          }
+        }
+
+        const updatedConfig = { ...config };
+        delete updatedConfig.active_notif_channel_id;
+        delete updatedConfig.active_notif_message_id;
+        await supabaseAdmin
+          .from('guild_config')
+          .update({ config: updatedConfig })
+          .eq('guild_id', guildId)
+          .eq('feature_key', 'trivia');
+      }
+    } catch (e) {
+      console.error('[TRIVIA ACTION] Error cleaning up notification message on close:', e);
+    }
+  }
+
   return true;
 }
 
@@ -274,9 +336,47 @@ async function triggerInstantDrop(guildId: string) {
     .update({ message_id: messageData.id })
     .eq('id', drop.id);
 
-  // Update last_drop_date in guild_config
+  const updatedConfig: Record<string, any> = { ...config };
+
+  // Send notification alert to notification channel if configured
+  if (token && config.notification_channel_id) {
+    try {
+      const notifRes = await fetch(`https://discord.com/api/v10/channels/${config.notification_channel_id}/messages`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bot ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          embeds: [
+            {
+              title: '📢 Daily Trivia Drop Live!',
+              description:
+                `A new **Daily Trivia Drop** is now live!\n\n` +
+                `📍 Head over to <#${chosen.channel_id}> right now to click **Start Trivia** first and win **Vault Coins**! 🧠⚡`,
+              color: 3900150,
+              footer: { text: 'Every Nation Trivia • ENOS Notification' },
+              timestamp: new Date().toISOString(),
+            },
+          ],
+        }),
+      });
+
+      if (notifRes.ok) {
+        const notifData = await notifRes.json();
+        updatedConfig.active_notif_channel_id = config.notification_channel_id;
+        updatedConfig.active_notif_message_id = notifData.id;
+      }
+    } catch (e) {
+      console.error('[TRIVIA ACTION] Failed to post trivia notification embed:', e);
+    }
+  }
+
+  // Update last_drop_date and active_notif config in guild_config
   const todayStr = new Date().toISOString().split('T')[0];
-  const updatedConfig = { ...config, last_drop_date: todayStr, manual_trigger_requested: false };
+  updatedConfig.last_drop_date = todayStr;
+  updatedConfig.manual_trigger_requested = false;
+
   await supabaseAdmin
     .from('guild_config')
     .update({ config: updatedConfig })

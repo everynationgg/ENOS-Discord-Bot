@@ -207,6 +207,9 @@ async function triggerTriviaDrop(client, guildId) {
     if (config.notification_channel_id) {
       const notifChannel = await guild.channels.fetch(config.notification_channel_id).catch(() => null);
       if (notifChannel && notifChannel.isTextBased()) {
+        // Delete any existing notification message first
+        await deleteActiveTriviaNotification(guild, config);
+
         const notifEmbed = new EmbedBuilder()
           .setColor(0x3B82F6)
           .setTitle('📢 Daily Trivia Drop Live!')
@@ -217,9 +220,19 @@ async function triggerTriviaDrop(client, guildId) {
           .setFooter({ text: 'Every Nation Trivia • ENOS Notification' })
           .setTimestamp();
 
-        await notifChannel.send({ embeds: [notifEmbed] }).catch((err) => {
+        const notifMsg = await notifChannel.send({ embeds: [notifEmbed] }).catch((err) => {
           logger.error(`[TRIVIA] Failed to send drop notification to ${config.notification_channel_id}:`, err.message);
         });
+
+        if (notifMsg) {
+          config.active_notif_channel_id = config.notification_channel_id;
+          config.active_notif_message_id = notifMsg.id;
+          await supabase
+            .from('guild_config')
+            .update({ config })
+            .eq('guild_id', guildId)
+            .eq('feature_key', 'trivia');
+        }
       }
     }
 
@@ -537,6 +550,12 @@ async function handleTriviaAnswerClick(interaction) {
             .setDisabled(true)
         );
         await message.edit({ embeds: [updatedEmbed], components: [disabledRow] }).catch(() => { });
+
+        // Session completed - delete active trivia notification
+        const featureConfig = await getFeatureConfig(interaction.guild.id, 'trivia');
+        if (featureConfig?.config) {
+          await deleteActiveTriviaNotification(interaction.guild, featureConfig.config);
+        }
       } else {
         await message.edit({ embeds: [updatedEmbed] }).catch(() => { });
       }
@@ -650,6 +669,12 @@ async function forceCloseDrop(client, guildId, dropId, status = 'completed') {
 
     const guild = await client.guilds.fetch(guildId).catch(() => null);
     if (!guild) return;
+
+    // Delete active trivia notification message from notification channel
+    const featureConfig = await getFeatureConfig(guildId, 'trivia');
+    if (featureConfig?.config) {
+      await deleteActiveTriviaNotification(guild, featureConfig.config);
+    }
 
     const channel = await guild.channels.fetch(drop.channel_id).catch(() => null);
     if (!channel) return;
@@ -787,6 +812,11 @@ async function checkAndProcessTrivia(client) {
 
       const actualDropsToday = dropsToday?.length || 0;
       const hasActiveDrop = dropsToday?.some((d) => d.status === 'active');
+
+      // If no active drop is present, sweep any stray trivia drop notification embeds from notification channel
+      if (!hasActiveDrop) {
+        await cleanupStrayTriviaNotifications(client, guildId, config);
+      }
 
       // Ensure scheduling exists for today
       let isConfigDirty = false;
@@ -951,6 +981,80 @@ async function handleTriviaLeaderboardButton(interaction) {
   return interaction.editReply({ embeds: [embed] });
 }
 
+/**
+ * Deletes the active trivia notification message from Discord, if any exists.
+ * @param {import('discord.js').Guild} guild
+ * @param {object} config
+ */
+async function deleteActiveTriviaNotification(guild, config) {
+  try {
+    if (!guild || !config) return;
+    const notifChannelId = config.active_notif_channel_id || config.notification_channel_id;
+    const notifMsgId = config.active_notif_message_id;
+
+    if (notifChannelId && notifMsgId) {
+      const notifChannel = await guild.channels.fetch(notifChannelId).catch(() => null);
+      if (notifChannel && notifChannel.isTextBased()) {
+        const notifMsg = await notifChannel.messages.fetch(notifMsgId).catch(() => null);
+        if (notifMsg) {
+          await notifMsg.delete().catch(() => {});
+        }
+      }
+    }
+
+    if (config.active_notif_message_id || config.active_notif_channel_id) {
+      delete config.active_notif_message_id;
+      delete config.active_notif_channel_id;
+      await supabase
+        .from('guild_config')
+        .update({ config })
+        .eq('guild_id', guild.id)
+        .eq('feature_key', 'trivia');
+    }
+  } catch (err) {
+    logger.error('[TRIVIA] deleteActiveTriviaNotification error:', err.message);
+  }
+}
+
+/**
+ * Sweeps and deletes any stray/abandoned "Daily Trivia Drop Live!" notifications in notification channel
+ * if no trivia session is active.
+ * @param {import('discord.js').Client} client
+ * @param {string} guildId
+ * @param {object} config
+ */
+async function cleanupStrayTriviaNotifications(client, guildId, config) {
+  try {
+    const guild = await client.guilds.fetch(guildId).catch(() => null);
+    if (!guild || !config?.notification_channel_id) return;
+
+    // Delete tracked message first if set
+    await deleteActiveTriviaNotification(guild, config);
+
+    // Also scan recent messages in notification channel to delete any orphan trivia notification embeds
+    const notifChannel = await guild.channels.fetch(config.notification_channel_id).catch(() => null);
+    if (notifChannel && notifChannel.isTextBased()) {
+      const recentMsgs = await notifChannel.messages.fetch({ limit: 25 }).catch(() => null);
+      if (recentMsgs && recentMsgs.size > 0) {
+        for (const msg of recentMsgs.values()) {
+          if (msg.author.id === client.user.id && msg.embeds && msg.embeds.length > 0) {
+            const embed = msg.embeds[0];
+            const isTriviaNotif =
+              embed.title === '📢 Daily Trivia Drop Live!' ||
+              embed.footer?.text?.includes('Every Nation Trivia') ||
+              embed.description?.includes('Daily Trivia Drop');
+            if (isTriviaNotif) {
+              await msg.delete().catch(() => {});
+            }
+          }
+        }
+      }
+    }
+  } catch (err) {
+    logger.error('[TRIVIA] cleanupStrayTriviaNotifications error:', err.message);
+  }
+}
+
 module.exports = {
   triggerTriviaDrop,
   handleTriviaStartClick,
@@ -959,6 +1063,9 @@ module.exports = {
   forceCloseDrop,
   updateLiveLeaderboard,
   checkAndProcessTrivia,
+  deleteActiveTriviaNotification,
+  cleanupStrayTriviaNotifications,
 };
 // Trivia module helper comment
+
 

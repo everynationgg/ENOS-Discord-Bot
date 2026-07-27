@@ -31,6 +31,49 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'DISCORD_TOKEN is missing on server.' }, { status: 500 });
       }
 
+      const targetChannelId = chId.trim();
+
+      // Fetch existing config to check for old launcher message ID
+      const { data: existing } = await supabaseAdmin
+        .from('guild_config')
+        .select('config')
+        .eq('guild_id', guildId)
+        .in('feature_key', ['vault', 'vault_economy'])
+        .maybeSingle();
+
+      const config = existing?.config || {};
+      if (config.quest_launcher_message_id) {
+        await fetch(`https://discord.com/api/v10/channels/${targetChannelId}/messages/${config.quest_launcher_message_id}`, {
+          method: 'DELETE',
+          headers: { Authorization: `Bot ${DISCORD_TOKEN}` },
+        }).catch(() => {});
+      }
+
+      // Sweep recent messages in target channel for stray launcher embeds
+      try {
+        const sweepRes = await fetch(`https://discord.com/api/v10/channels/${targetChannelId}/messages?limit=25`, {
+          headers: { Authorization: `Bot ${DISCORD_TOKEN}` },
+        }).catch(() => null);
+
+        if (sweepRes && sweepRes.ok) {
+          const msgs = await sweepRes.json();
+          for (const msg of msgs || []) {
+            if (msg.embeds && msg.embeds.length > 0) {
+              const embed = msg.embeds[0];
+              const isLauncher =
+                embed.title === '📜 Every Nation Vault — Daily Quests Hub' ||
+                embed.footer?.text?.includes('ENOS Quest Launcher');
+              if (isLauncher) {
+                await fetch(`https://discord.com/api/v10/channels/${targetChannelId}/messages/${msg.id}`, {
+                  method: 'DELETE',
+                  headers: { Authorization: `Bot ${DISCORD_TOKEN}` },
+                }).catch(() => {});
+              }
+            }
+          }
+        }
+      } catch (e) {}
+
       const embed = {
         title: '📜 Every Nation Vault — Daily Quests Hub',
         description:
@@ -60,7 +103,7 @@ export async function POST(req: NextRequest) {
         },
       ];
 
-      const res = await fetch(`https://discord.com/api/v10/channels/${chId.trim()}/messages`, {
+      const res = await fetch(`https://discord.com/api/v10/channels/${targetChannelId}/messages`, {
         method: 'POST',
         headers: {
           Authorization: `Bot ${DISCORD_TOKEN}`,
@@ -76,25 +119,23 @@ export async function POST(req: NextRequest) {
 
       const sentMsg = await res.json();
 
-      // Save channel_id in guild_config
-      const { data: existing } = await supabaseAdmin
-        .from('guild_config')
-        .select('config')
-        .eq('guild_id', guildId)
-        .eq('feature_key', 'vault_economy')
-        .maybeSingle();
+      // Save channel_id and message_id in guild_config
+      const updatedConfig = {
+        ...config,
+        quest_channel_id: targetChannelId,
+        quest_launcher_channel_id: targetChannelId,
+        quest_launcher_message_id: sentMsg.id,
+      };
 
-      await supabaseAdmin.from('guild_config').upsert({
-        guild_id: guildId,
-        feature_key: 'vault_economy',
-        enabled: true,
-        config: {
-          ...(existing?.config || {}),
-          quest_channel_id: chId.trim(),
-          quest_launcher_channel_id: chId.trim(),
-        },
-        updated_at: new Date().toISOString(),
-      });
+      for (const fKey of ['vault', 'vault_economy']) {
+        await supabaseAdmin.from('guild_config').upsert({
+          guild_id: guildId,
+          feature_key: fKey,
+          enabled: true,
+          config: updatedConfig,
+          updated_at: new Date().toISOString(),
+        });
+      }
 
       return NextResponse.json({ success: true, message_id: sentMsg.id });
     }
