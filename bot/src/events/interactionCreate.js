@@ -97,23 +97,30 @@ module.exports = {
             await handleStartQuest(interaction.user.id, interaction.guild.id);
             const embed = await build3QuestsEphemeralEmbed(interaction.user.id, interaction.guild.id, interaction.guild);
 
-            if (interaction.deferred) {
-              const replyMsg = await interaction.editReply({ embeds: [embed] });
+            let replyMsg;
+            if (interaction.deferred || interaction.replied) {
+              replyMsg = await interaction.editReply({ embeds: [embed] }).catch(async () => {
+                return await interaction.followUp({ embeds: [embed], flags: MessageFlags.Ephemeral }).catch(() => null);
+              });
+            } else {
+              replyMsg = await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral, fetchReply: true }).catch(async () => {
+                return await interaction.followUp({ embeds: [embed], flags: MessageFlags.Ephemeral }).catch(() => null);
+              });
+            }
+
+            if (replyMsg) {
               setTimeout(() => {
                 interaction.deleteReply().catch(() => {});
               }, 120000);
-              return replyMsg;
-            } else if (!interaction.replied) {
-              return await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
-            } else {
-              return await interaction.followUp({ embeds: [embed], flags: MessageFlags.Ephemeral });
             }
+            return replyMsg;
           } catch (err) {
-            logger.error('[INTERACTION] Error in vault_get_daily_quests:', err.message);
-            if (interaction.deferred) {
-              return interaction.editReply({ content: '❌ Failed to load daily quests. Please try again.' }).catch(() => {});
-            } else if (!interaction.replied) {
-              return interaction.reply({ content: '❌ Failed to load daily quests. Please try again.', flags: MessageFlags.Ephemeral }).catch(() => {});
+            logger.error('[INTERACTION] Error in vault_get_daily_quests:', err.message || err);
+            const errorMsg = '❌ Failed to load daily quests. Please try again.';
+            if (interaction.deferred || interaction.replied) {
+              return interaction.editReply({ content: errorMsg }).catch(() => {});
+            } else {
+              return interaction.followUp({ content: errorMsg, flags: MessageFlags.Ephemeral }).catch(() => {});
             }
           }
         }
@@ -124,13 +131,14 @@ module.exports = {
             }
             const { handleStartQuest } = require('../modules/gaming/vault');
             const res = await handleStartQuest(interaction.user.id, interaction.guild.id);
-            if (interaction.deferred) {
-              return interaction.editReply(res.message);
-            } else if (!interaction.replied) {
-              return interaction.reply({ content: res.message, flags: MessageFlags.Ephemeral });
+            const content = res.message || '▶️ **Daily Quests Activated!**';
+            if (interaction.deferred || interaction.replied) {
+              return await interaction.editReply({ content }).catch(() => {});
+            } else {
+              return await interaction.followUp({ content, flags: MessageFlags.Ephemeral }).catch(() => {});
             }
           } catch (err) {
-            logger.error('[INTERACTION] Error in vault_start_quest:', err.message);
+            logger.error('[INTERACTION] Error in vault_start_quest:', err.message || err);
           }
         }
         if (interaction.customId.startsWith('showcase_claim_')) {
