@@ -72,8 +72,9 @@ export default function SocialPage() {
         fetch('/api/social/birthday/channels').then((r) => r.json()),
       ])
         .then(([alertsData, channelsData]) => {
-          setLiveAlerts(Array.isArray(alertsData) ? alertsData : []);
-          if (Array.isArray(channelsData)) setChannels(channelsData);
+          setLiveAlerts(Array.isArray(alertsData) ? alertsData : (alertsData?.alerts || []));
+          const channelList = Array.isArray(channelsData) ? channelsData : (channelsData?.channels || []);
+          setChannels(channelList);
           setLoadingAlerts(false);
         })
         .catch(() => setLoadingAlerts(false));
@@ -526,12 +527,12 @@ export default function SocialPage() {
                   </p>
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: '300px', overflowY: 'auto' }}>
-                    {liveAlerts.map((alertItem) => (
+                    {(liveAlerts || []).map((alertItem) => (
                       <div
                         key={alertItem.id}
                         style={{
                           display: 'flex',
-                          justify: 'space-between',
+                          justifyContent: 'space-between',
                           alignItems: 'center',
                           padding: '0.75rem',
                           backgroundColor: 'rgba(255,255,255,0.03)',
@@ -548,7 +549,7 @@ export default function SocialPage() {
                               {alertItem.platform}: @{alertItem.handle}
                             </strong>
                             <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                              Channel: <code style={{ padding: '0 4px' }}>#{channels.find((c) => c.id === alertItem.channel_id)?.name || alertItem.channel_id}</code>
+                              Channel: <code style={{ padding: '0 4px' }}>#{(channels || []).find((c) => c.id === alertItem.channel_id)?.name || alertItem.channel_id}</code>
                               {alertItem.is_live ? ' · 🔴 LIVE NOW' : ' · ⚪ Offline'}
                             </div>
                           </div>

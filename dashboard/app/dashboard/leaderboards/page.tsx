@@ -235,7 +235,7 @@ export default function LeaderboardsDashboard() {
               <div
                 style={{
                   display: 'flex',
-                  justify: 'space-between',
+                  justifyContent: 'space-between',
                   alignItems: 'center',
                   flexWrap: 'wrap',
                   gap: '0.75rem',
