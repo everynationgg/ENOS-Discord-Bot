@@ -7,6 +7,7 @@ const voiceJoinTimes = new Map();
 
 module.exports = {
   name: Events.VoiceStateUpdate,
+  voiceJoinTimes,
   /**
    * @param {import('discord.js').VoiceState} oldState
    * @param {import('discord.js').VoiceState} newState

@@ -453,7 +453,18 @@ async function build3QuestsEphemeralEmbed(discordId, guildId, guild) {
       title: '🎙️ **2. Voice Active Quest** (30 mins)',
       render: () => {
         const goal = rates.daily_quest_voice_threshold || 30;
-        const mins = balance?.voice_minutes_today || 0;
+        let mins = balance?.voice_minutes_today || 0;
+
+        // Calculate live active voice minutes if currently connected in VC
+        try {
+          const { voiceJoinTimes } = require('../../events/voiceStateUpdate');
+          const joinTime = voiceJoinTimes?.get(`${guildId}:${discordId}`);
+          if (joinTime) {
+            const activeSessionMins = Math.floor((Date.now() - joinTime) / 60000);
+            mins += Math.max(0, activeSessionMins);
+          }
+        } catch (e) {}
+
         const done = balance?.quest_voice_completed || mins >= goal;
         const bonus = (rates.daily_quest_voice_bonus || 0.15).toFixed(2);
         return done
