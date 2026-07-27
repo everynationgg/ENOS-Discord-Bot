@@ -91,26 +91,37 @@ module.exports = {
         if (interaction.customId === 'vault_get_daily_quests') {
           try {
             if (!interaction.deferred && !interaction.replied) {
-              await interaction.deferReply({ ephemeral: true });
+              await interaction.deferReply({ ephemeral: true }).catch(() => {});
             }
             const { handleStartQuest, build3QuestsEphemeralEmbed } = require('../modules/gaming/vault');
             await handleStartQuest(interaction.user.id, interaction.guild.id);
             const embed = await build3QuestsEphemeralEmbed(interaction.user.id, interaction.guild.id, interaction.guild);
 
-            const replyMsg = await interaction.editReply({ embeds: [embed] });
-            setTimeout(() => {
-              interaction.deleteReply().catch(() => {});
-            }, 120000);
-            return replyMsg;
+            if (interaction.deferred || interaction.replied) {
+              const replyMsg = await interaction.editReply({ embeds: [embed] }).catch(() => null);
+              if (replyMsg) {
+                setTimeout(() => {
+                  interaction.deleteReply().catch(() => {});
+                }, 120000);
+              }
+            } else {
+              const replyMsg = await interaction.reply({ embeds: [embed], ephemeral: true }).catch(() => null);
+              if (replyMsg) {
+                setTimeout(() => {
+                  interaction.deleteReply().catch(() => {});
+                }, 120000);
+              }
+            }
           } catch (err) {
             logger.error('[INTERACTION] Error in vault_get_daily_quests:', err.message || err);
             const errorMsg = '❌ Failed to load daily quests. Please try again.';
             if (interaction.deferred || interaction.replied) {
-              return interaction.editReply({ content: errorMsg }).catch(() => {});
+              await interaction.editReply({ content: errorMsg }).catch(() => {});
             } else {
-              return interaction.reply({ content: errorMsg, ephemeral: true }).catch(() => {});
+              await interaction.reply({ content: errorMsg, ephemeral: true }).catch(() => {});
             }
           }
+          return;
         }
         if (interaction.customId === 'vault_start_quest') {
           try {
@@ -121,13 +132,14 @@ module.exports = {
             const res = await handleStartQuest(interaction.user.id, interaction.guild.id);
             const content = res.message || '▶️ **Daily Quests Activated!**';
             if (interaction.deferred || interaction.replied) {
-              return await interaction.editReply({ content }).catch(() => {});
+              await interaction.editReply({ content }).catch(() => {});
             } else {
-              return await interaction.followUp({ content, ephemeral: true }).catch(() => {});
+              await interaction.reply({ content, ephemeral: true }).catch(() => {});
             }
           } catch (err) {
             logger.error('[INTERACTION] Error in vault_start_quest:', err.message || err);
           }
+          return;
         }
         if (interaction.customId.startsWith('showcase_claim_')) {
           const { handleShowcaseClaim } = require('../modules/moderation/showcase');
