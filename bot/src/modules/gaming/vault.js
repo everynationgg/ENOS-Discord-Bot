@@ -358,22 +358,24 @@ async function handleStartQuest(discordId, guildId) {
 
   // Re-fetch final state to log accurate snapshot
   const finalBalance = await getOrCreateBalance(discordId, guildId);
-  await supabase.from('vault_quest_log').insert({
-    guild_id: guildId,
-    discord_id: discordId,
-    action: 'view_quests',
-    snapshot: {
-      assigned_quests: assigned,
-      messages_today: finalBalance?.messages_today || 0,
-      voice_minutes_today: finalBalance?.voice_minutes_today || 0,
-      quest_chat_completed: chatDone,
-      quest_voice_completed: voiceDone,
-      quest_trivia_completed: finalBalance?.quest_trivia_completed || false,
-      quest_boss_done: bossDone,
-      quest_claimed_reaction: reactionDone,
-      quest_ai_chat_done: finalBalance?.quest_ai_chat_done || false,
-    },
-  }).catch(() => {});
+  try {
+    await supabase.from('vault_quest_log').insert({
+      guild_id: guildId,
+      discord_id: discordId,
+      action: 'view_quests',
+      snapshot: {
+        assigned_quests: assigned,
+        messages_today: finalBalance?.messages_today || 0,
+        voice_minutes_today: finalBalance?.voice_minutes_today || 0,
+        quest_chat_completed: chatDone,
+        quest_voice_completed: voiceDone,
+        quest_trivia_completed: finalBalance?.quest_trivia_completed || false,
+        quest_boss_done: bossDone,
+        quest_claimed_reaction: reactionDone,
+        quest_ai_chat_done: finalBalance?.quest_ai_chat_done || false,
+      },
+    });
+  } catch (e) {}
 
   return { success: true, message: '▶️ **Daily Quests Activated!** Your 3 daily quests are live for today.' };
 }
