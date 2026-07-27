@@ -91,28 +91,16 @@ module.exports = {
         if (interaction.customId === 'vault_get_daily_quests') {
           try {
             if (!interaction.deferred && !interaction.replied) {
-              await interaction.deferReply({ flags: MessageFlags.Ephemeral }).catch(() => {});
+              await interaction.deferReply({ flags: MessageFlags.Ephemeral });
             }
             const { handleStartQuest, build3QuestsEphemeralEmbed } = require('../modules/gaming/vault');
             await handleStartQuest(interaction.user.id, interaction.guild.id);
             const embed = await build3QuestsEphemeralEmbed(interaction.user.id, interaction.guild.id, interaction.guild);
 
-            let replyMsg;
-            if (interaction.deferred || interaction.replied) {
-              replyMsg = await interaction.editReply({ embeds: [embed] }).catch(async () => {
-                return await interaction.followUp({ embeds: [embed], flags: MessageFlags.Ephemeral }).catch(() => null);
-              });
-            } else {
-              replyMsg = await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral, withResponse: true }).then(res => res?.resource?.message).catch(async () => {
-                return await interaction.followUp({ embeds: [embed], flags: MessageFlags.Ephemeral }).catch(() => null);
-              });
-            }
-
-            if (replyMsg) {
-              setTimeout(() => {
-                interaction.deleteReply().catch(() => {});
-              }, 120000);
-            }
+            const replyMsg = await interaction.editReply({ embeds: [embed] });
+            setTimeout(() => {
+              interaction.deleteReply().catch(() => {});
+            }, 120000);
             return replyMsg;
           } catch (err) {
             logger.error('[INTERACTION] Error in vault_get_daily_quests:', err.message || err);
@@ -120,7 +108,7 @@ module.exports = {
             if (interaction.deferred || interaction.replied) {
               return interaction.editReply({ content: errorMsg }).catch(() => {});
             } else {
-              return interaction.followUp({ content: errorMsg, flags: MessageFlags.Ephemeral }).catch(() => {});
+              return interaction.reply({ content: errorMsg, flags: MessageFlags.Ephemeral }).catch(() => {});
             }
           }
         }
