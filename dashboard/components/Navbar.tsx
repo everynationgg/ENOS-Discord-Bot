@@ -9,6 +9,7 @@ const NAV_ITEMS = [
   { href: '/dashboard', label: 'Home', icon: '🏠' },
   { href: '/dashboard/moderation', label: 'Moderation', icon: '🛡️' },
   { href: '/dashboard/gaming', label: 'Gaming', icon: '🎮' },
+  { href: '/dashboard/leaderboards', label: 'Leaderboards', icon: '🏆' },
   { href: '/dashboard/social', label: 'Social', icon: '📡' },
   { href: '/dashboard/system-ops', label: 'System Ops', icon: '⚙️' },
   { href: '/dashboard/logs', label: 'Logs', icon: '📋' },

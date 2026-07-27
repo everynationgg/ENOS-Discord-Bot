@@ -495,6 +495,12 @@ async function handleTriviaAnswerClick(interaction) {
     reason: `${winners.length + 1}_place`,
   });
 
+  // Award Vault Coins 1:1 for Trivia Win
+  try {
+    const { awardCoins } = require('./vault');
+    await awardCoins(interaction.user.id, interaction.guild.id, winnerPoints, 'trivia_win', interaction.guild).catch(() => {});
+  } catch (e) {}
+
   // Log bot event
   await logBotEvent(interaction.guild.id, 'trivia_win', interaction.user.id, {
     dropId,

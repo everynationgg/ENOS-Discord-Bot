@@ -229,6 +229,10 @@ async function buildPersonalCombatPayload(guildId, userId, combatResult = null) 
     levelUpBanner = `🎉 **LEVEL UP! You reached Level ${combatResult.newLevel}!** (+1 Stat Point earned! Click **My Stats** to allocate it)\n\n`;
   }
 
+  const apUsed = Math.max(0, 5 - (playerState.ap_remaining || 0));
+  const maxSlayPoints = boss.is_overkill ? 15 : 10;
+  const projectedPoints = Math.round((apUsed / 5) * maxSlayPoints);
+
   const embed = new EmbedBuilder()
     .setColor(combatResult?.leveledUp ? 0xfacc15 : (boss.is_overkill ? 0xef4444 : 0x38bdf8))
     .setTitle(`🗡️ Personal Arena — ${classTitles[activeClass]}`)
@@ -239,6 +243,7 @@ async function buildPersonalCombatPayload(guildId, userId, combatResult = null) 
       `🛡️ **M.O.M. Buff**: ${boss.mom_buff ? '✅ **ACTIVE** (Ready for Nuke)' : '❌ Inactive'} | 🔨 **D.A.D. Debuff**: ${boss.dad_debuff ? '✅ **ACTIVE**' : '❌ Inactive'}\n` +
       `⚔️ **Last Action**: ${boss.last_action || 'None'}\n\n` +
       `⚡ **Your AP Remaining**: \`${playerState.ap_remaining}/5 AP\` ${playerState.is_locked ? '*(Class locked for week)*' : '*(Can swap class)*'}\n` +
+      `📊 **Projected Slay Reward**: \`${projectedPoints} / ${maxSlayPoints} Points (₱${projectedPoints})\` *(Spend 5 AP for full reward!)*\n\n` +
       `⏱️ *Note: This private combat view will auto-expire in 5 minutes.*`
     )
     .setImage(`attachment://${filename}`)

@@ -528,7 +528,7 @@ async function executeCombatAction(guildId, userId, actionType) {
     return { success: false, message: 'Failed to process attack.' };
   }
 
-  // Update Player AP & Points
+  // Update Player AP & Damage
   const newAp = playerState.ap_remaining - actualApDeducted;
   await supabase
     .from('boss_player_states')
@@ -536,7 +536,6 @@ async function executeCombatAction(guildId, userId, actionType) {
       ap_remaining: newAp,
       is_locked: true,
       total_damage: playerState.total_damage + totalDmg,
-      weekly_points: playerState.weekly_points + pointsEarned,
       updated_at: new Date().toISOString(),
     })
     .eq('id', playerState.id);
@@ -572,9 +571,13 @@ async function executeCombatAction(guildId, userId, actionType) {
     ap_conserved: apConserved,
   });
 
-  // Check Boss Defeat & Spawn Overkill Mode
-  if (newHp <= 0 && !boss.is_overkill) {
-    await triggerOverkillRevival(guildId, boss);
+  // Check Boss Defeat & Spawn Overkill Mode or Resolve Overkill Defeat
+  if (newHp <= 0) {
+    if (!boss.is_overkill) {
+      await triggerOverkillRevival(guildId, boss);
+    } else {
+      await handleOverkillDefeat(guildId, boss);
+    }
   }
 
   return {
@@ -593,14 +596,40 @@ async function executeCombatAction(guildId, userId, actionType) {
 }
 
 /**
- * Triggers Overkill Mode when the main boss HP reaches 0 before Sunday.
+ * Triggers Overkill Mode when the main boss HP reaches 0, awarding 10 AP-scaled fixed points to participants.
  */
 async function triggerOverkillRevival(guildId, boss) {
   // Mark main boss as defeated
   await supabase
     .from('boss_seasons')
-    .update({ is_defeated: true })
+    .update({ is_defeated: true, current_hp: 0 })
     .eq('id', boss.id);
+
+  // Distribute 10 AP-Scaled Fixed Slay Points (₱ PHP / Vault Coins 1:1) to all active participants
+  try {
+    const { awardCoins } = require('./vault');
+    const { data: participants } = await supabase
+      .from('boss_player_states')
+      .select('*')
+      .eq('guild_id', guildId)
+      .eq('week_identifier', boss.week_identifier);
+
+    for (const p of participants || []) {
+      const apUsed = Math.max(0, 5 - (p.ap_remaining || 0));
+      if (apUsed > 0) {
+        const slayPoints = Math.round((apUsed / 5) * 10);
+        await supabase
+          .from('boss_player_states')
+          .update({ weekly_points: slayPoints })
+          .eq('id', p.id);
+
+        await awardCoins(p.user_id, guildId, slayPoints, 'boss_main_slay', null).catch(() => {});
+        logger.info(`[BOSS] Main Boss Defeated: Awarded ${slayPoints} points to ${p.user_id} (${apUsed}/5 AP used)`);
+      }
+    }
+  } catch (err) {
+    logger.error('[BOSS] Error distributing Main Boss slay points:', err.message);
+  }
 
   // Delete existing overkill boss season for this week before inserting new overkill spawn
   await supabase
@@ -619,7 +648,7 @@ async function triggerOverkillRevival(guildId, boss) {
       week_identifier: boss.week_identifier,
       boss_name: overkillName,
       boss_title: '🔥 OVERKILL RECOVERY PHASE (1.5x BONUS XP & POINTS)',
-      lore: 'Emergency backup matrix online! Defeat the Overkill Boss to earn 1.5x bonus points and XP for your server!',
+      lore: 'Emergency backup matrix online! Defeat the Overkill Boss to earn 1.5x bonus points for your server!',
       max_hp: boss.max_hp,
       current_hp: boss.max_hp,
       is_overkill: true,
@@ -630,6 +659,48 @@ async function triggerOverkillRevival(guildId, boss) {
     });
 
   await logBotEvent(guildId, 'boss_overkill_spawn', null, { week: boss.week_identifier });
+}
+
+/**
+ * Handles Overkill Boss defeat, updating participants' points to 15 AP-scaled fixed points (1.5x multiplier).
+ */
+async function handleOverkillDefeat(guildId, boss) {
+  await supabase
+    .from('boss_seasons')
+    .update({ is_defeated: true, current_hp: 0 })
+    .eq('id', boss.id);
+
+  try {
+    const { awardCoins } = require('./vault');
+    const { data: participants } = await supabase
+      .from('boss_player_states')
+      .select('*')
+      .eq('guild_id', guildId)
+      .eq('week_identifier', boss.week_identifier);
+
+    for (const p of participants || []) {
+      const apUsed = Math.max(0, 5 - (p.ap_remaining || 0));
+      if (apUsed > 0) {
+        const overkillPoints = Math.round((apUsed / 5) * 15);
+        const prevPoints = p.weekly_points || 0;
+        const delta = Math.max(0, overkillPoints - prevPoints);
+
+        await supabase
+          .from('boss_player_states')
+          .update({ weekly_points: overkillPoints })
+          .eq('id', p.id);
+
+        if (delta > 0) {
+          await awardCoins(p.user_id, guildId, delta, 'boss_overkill_slay', null).catch(() => {});
+        }
+        logger.info(`[BOSS] Overkill Boss Defeated: Updated ${p.user_id} to ${overkillPoints} points (1.5x multiplier)`);
+      }
+    }
+  } catch (err) {
+    logger.error('[BOSS] Error distributing Overkill Boss slay points:', err.message);
+  }
+
+  await logBotEvent(guildId, 'boss_overkill_defeated', null, { week: boss.week_identifier });
 }
 
 module.exports = {

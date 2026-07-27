@@ -15,19 +15,28 @@ const DEFAULT_TIERS = [
   { name: 'Opal', key: 'opal', threshold: 3000, emoji: '🔮', rarity: 'MYTHIC', color: 0xA855F7 },
 ];
 
-// Default coin rates (Calibrated for 500 Coins/Year max ~ ₱500 PHP)
+// Default coin rates (Integer Vault Coins per activity)
 const DEFAULT_RATES = {
-  message: 0.02,
-  voice_per_minute: 0.01,
-  daily_quest_bonus: 0.50,
+  message: 1,
+  voice_per_minute: 1,
+  daily_quest_bonus: 5,
+  daily_quest_chat_bonus: 1,
+  daily_quest_voice_bonus: 1,
+  daily_quest_trivia_bonus: 1,
+  daily_quest_reactions_bonus: 1,
+  daily_quest_voice_status_bonus: 1,
+  daily_quest_ai_chat_bonus: 1,
+  daily_quest_boss_bonus: 1,
   daily_quest_message_threshold: 10,
-  daily_cap: 1.50,
+  daily_cap: 50,
   message_rate_limit_seconds: 60,
 };
 
 /**
  * Get vault config for a guild
  */
+const lastUserMessageRAMMap = new Map();
+
 async function getVaultConfig(guildId) {
   const featureConfig = await getFeatureConfig(guildId, 'vault');
   return featureConfig?.config || {};
@@ -88,11 +97,13 @@ async function awardCoins(discordId, guildId, amount, reason, guild = null) {
     .select()
     .single();
 
-  await supabase.rpc('increment_coins', {
+  const { error: rpcErr } = await supabase.rpc('increment_coins', {
     p_discord_id: discordId,
     p_guild_id: guildId,
     p_delta: finalAmount,
-  }).catch(async () => {
+  });
+
+  if (rpcErr) {
     // Fallback if RPC not set up: manual update
     const current = await getOrCreateBalance(discordId, guildId);
     await supabase
@@ -104,7 +115,7 @@ async function awardCoins(discordId, guildId, amount, reason, guild = null) {
       })
       .eq('discord_id', discordId)
       .eq('guild_id', guildId);
-  });
+  }
 
   // Log transaction
   await supabase.from('vault_transactions').insert({
@@ -153,19 +164,14 @@ async function awardMessageCoins(discordId, guildId, guild) {
   // Update RAM timestamp
   lastUserMessageRAMMap.set(ramKey, Date.now());
 
-  if (!balance?.quest_started) {
-    await awardCoins(discordId, guildId, rates.message, 'message', guild);
-    return;
-  }
-
-  // Update last_message_at + messages_today
+  // Update last_message_at + messages_today (track daily messages continuously)
   const newMessagesToday = (balance?.messages_today || 0) + 1;
   const chatGoal = rates.daily_quest_chat_threshold || 5;
   let chatQuestCompleted = balance?.quest_chat_completed || false;
 
-  if (!chatQuestCompleted && newMessagesToday >= chatGoal) {
+  if (balance?.quest_started && !chatQuestCompleted && newMessagesToday >= chatGoal) {
     chatQuestCompleted = true;
-    await awardCoins(discordId, guildId, rates.daily_quest_chat_bonus || 0.10, 'chat_quest', guild);
+    await awardCoins(discordId, guildId, rates.daily_quest_chat_bonus || 1, 'chat_quest', guild);
   }
 
   await supabase
@@ -208,7 +214,7 @@ async function handleVoiceLeave(discordId, guildId, minutesSpent, guild) {
 
   if (balance?.quest_started && !voiceQuestCompleted && newVoiceToday >= voiceGoal) {
     voiceQuestCompleted = true;
-    await awardCoins(discordId, guildId, rates.daily_quest_voice_bonus || 0.15, 'voice_quest', guild);
+    await awardCoins(discordId, guildId, rates.daily_quest_voice_bonus || 1, 'voice_quest', guild);
   }
 
   await supabase
@@ -237,7 +243,7 @@ async function handleTriviaQuestCompletion(discordId, guildId, guild) {
       .eq('discord_id', discordId)
       .eq('guild_id', guildId);
 
-    await awardCoins(discordId, guildId, rates.daily_quest_trivia_bonus || 0.05, 'trivia_quest', guild);
+    await awardCoins(discordId, guildId, rates.daily_quest_trivia_bonus || 1, 'trivia_quest', guild);
     logger.info(`[VAULT] Trivia quest completed by ${discordId}`);
   }
 }
@@ -256,8 +262,45 @@ async function handleStartQuest(discordId, guildId) {
     assigned = shuffled.slice(0, 3);
   }
 
-  // AUTO-COMPLETE WEEKLY BOSS QUEST IF USER HAS SPENT AP EARLIER THIS WEEK
+  const vaultConfig = await getVaultConfig(guildId);
+  const rates = { ...DEFAULT_RATES, ...vaultConfig.rates };
+
+  // RETROACTIVE / PRE-COMPLETED QUEST EVALUATION
+  let chatDone = balance?.quest_chat_completed || false;
+  let voiceDone = balance?.quest_voice_completed || false;
+  let reactionDone = balance?.quest_claimed_reaction || false;
   let bossDone = balance?.quest_boss_done || false;
+
+  // 1. Chat Quest check: if user already chatted enough today
+  if (assigned.includes('chat') && !chatDone) {
+    const chatGoal = rates.daily_quest_chat_threshold || 5;
+    if ((balance?.messages_today || 0) >= chatGoal) {
+      chatDone = true;
+      await awardCoins(discordId, guildId, rates.daily_quest_chat_bonus || 1, 'chat_quest', null);
+      logger.info(`[VAULT] Chat quest retroactively completed for ${discordId}`);
+    }
+  }
+
+  // 2. Voice Quest check: if user already spent enough voice time today
+  if (assigned.includes('voice') && !voiceDone) {
+    const voiceGoal = rates.daily_quest_voice_threshold || 30;
+    if ((balance?.voice_minutes_today || 0) >= voiceGoal) {
+      voiceDone = true;
+      await awardCoins(discordId, guildId, rates.daily_quest_voice_bonus || 1, 'voice_quest', null);
+      logger.info(`[VAULT] Voice quest retroactively completed for ${discordId}`);
+    }
+  }
+
+  // 3. Reaction Quest check: if user already reacted 3+ times today
+  if (assigned.includes('reactions') && !reactionDone) {
+    if ((balance?.quest_reactions_count || 0) >= 3) {
+      reactionDone = true;
+      await awardCoins(discordId, guildId, rates.daily_quest_reactions_bonus || 1, 'reaction_quest', null);
+      logger.info(`[VAULT] Reaction quest retroactively completed for ${discordId}`);
+    }
+  }
+
+  // 4. Weekly Boss Quest check: if user has spent AP or dealt damage earlier this week
   if (assigned.includes('boss') && !bossDone) {
     try {
       const { getWeekIdentifier } = require('./boss');
@@ -272,9 +315,7 @@ async function handleStartQuest(discordId, guildId) {
 
       if (playerState && (playerState.ap_remaining < 5 || playerState.total_damage > 0)) {
         bossDone = true;
-        const vaultConfig = await getVaultConfig(guildId);
-        const rates = { ...DEFAULT_RATES, ...vaultConfig.rates };
-        await awardCoins(discordId, guildId, rates.daily_quest_boss_bonus || 0.10, 'boss_quest', null);
+        await awardCoins(discordId, guildId, rates.daily_quest_boss_bonus || 1, 'boss_quest', null);
         logger.info(`[VAULT] Weekly Boss quest auto-completed for ${discordId} (AP used previously)`);
       }
     } catch (e) {}
@@ -285,6 +326,9 @@ async function handleStartQuest(discordId, guildId) {
     .update({
       quest_started: true,
       assigned_quests: assigned,
+      quest_chat_completed: chatDone,
+      quest_voice_completed: voiceDone,
+      quest_claimed_reaction: reactionDone,
       quest_boss_done: bossDone,
     })
     .eq('discord_id', discordId)
@@ -298,22 +342,24 @@ async function handleStartQuest(discordId, guildId) {
  */
 async function handleReactionQuest(discordId, guildId, guild = null) {
   const balance = await getOrCreateBalance(discordId, guildId);
-  if (!balance?.quest_started) return;
-
-  const assigned = balance.assigned_quests || ['chat', 'voice', 'trivia'];
-  if (!assigned.includes('reactions')) return;
 
   const count = (balance.quest_reactions_count || 0) + 1;
   const vaultConfig = await getVaultConfig(guildId);
   const rates = { ...DEFAULT_RATES, ...vaultConfig.rates };
 
-  if (count >= 3 && !balance.quest_claimed_reaction) {
+  const assigned = balance?.assigned_quests || [];
+  const isAssigned = assigned.includes('reactions');
+
+  if (balance?.quest_started && isAssigned && count >= 3 && !balance.quest_claimed_reaction) {
     await supabase
       .from('vault_balances')
-      .update({ quest_reactions_count: count })
+      .update({
+        quest_reactions_count: count,
+        quest_claimed_reaction: true
+      })
       .eq('discord_id', discordId)
       .eq('guild_id', guildId);
-    await awardCoins(discordId, guildId, rates.daily_quest_reactions_bonus || 0.05, 'reaction_quest', guild);
+    await awardCoins(discordId, guildId, rates.daily_quest_reactions_bonus || 1, 'reaction_quest', guild);
   } else {
     await supabase
       .from('vault_balances')
@@ -342,7 +388,7 @@ async function handleVoiceStatusQuest(discordId, guildId, guild = null) {
     .eq('discord_id', discordId)
     .eq('guild_id', guildId);
 
-  await awardCoins(discordId, guildId, rates.daily_quest_voice_status_bonus || 0.02, 'voice_status_quest', guild);
+  await awardCoins(discordId, guildId, rates.daily_quest_voice_status_bonus || 1, 'voice_status_quest', guild);
 }
 
 /**
@@ -364,7 +410,7 @@ async function handleAIChatQuest(discordId, guildId, guild = null) {
     .eq('discord_id', discordId)
     .eq('guild_id', guildId);
 
-  await awardCoins(discordId, guildId, rates.daily_quest_ai_chat_bonus || 0.03, 'ai_chat_quest', guild);
+  await awardCoins(discordId, guildId, rates.daily_quest_ai_chat_bonus || 1, 'ai_chat_quest', guild);
 }
 
 /**
@@ -382,7 +428,7 @@ async function handleBossQuestCompletion(discordId, guildId, guild = null) {
       .eq('discord_id', discordId)
       .eq('guild_id', guildId);
 
-    await awardCoins(discordId, guildId, rates.daily_quest_boss_bonus || 0.10, 'boss_quest', guild);
+    await awardCoins(discordId, guildId, rates.daily_quest_boss_bonus || 1, 'boss_quest', guild);
   }
 }
 
@@ -408,8 +454,8 @@ async function build3QuestsEphemeralEmbed(discordId, guildId, guild) {
         const done = balance?.quest_chat_completed || balance?.quest_claimed || msgs >= goal;
         const bonus = (rates.daily_quest_chat_bonus || 0.10).toFixed(2);
         return done
-          ? `\`[██████████]\` **${goal}/${goal}** msgs (✅ +₱${bonus})`
-          : `\`[${'█'.repeat(Math.min(10, Math.round((msgs / goal) * 10)))}${'░'.repeat(Math.max(0, 10 - Math.round((msgs / goal) * 10)))}]\` **${msgs}/${goal}** msgs (+₱${bonus})`;
+          ? `\`[██████████]\` **${goal}/${goal}** msgs (✅ +${bonus} Coins)`
+          : `\`[${'█'.repeat(Math.min(10, Math.round((msgs / goal) * 10)))}${'░'.repeat(Math.max(0, 10 - Math.round((msgs / goal) * 10)))}]\` **${msgs}/${goal}** msgs (+${bonus} Coins)`;
       }
     },
     voice: {
@@ -420,8 +466,8 @@ async function build3QuestsEphemeralEmbed(discordId, guildId, guild) {
         const done = balance?.quest_voice_completed || mins >= goal;
         const bonus = (rates.daily_quest_voice_bonus || 0.15).toFixed(2);
         return done
-          ? `\`[██████████]\` **${goal}/${goal}** mins (✅ +₱${bonus})`
-          : `\`[${'█'.repeat(Math.min(10, Math.round((mins / goal) * 10)))}${'░'.repeat(Math.max(0, 10 - Math.round((mins / goal) * 10)))}]\` **${mins}/${goal}** mins (+₱${bonus})`;
+          ? `\`[██████████]\` **${goal}/${goal}** mins (✅ +${bonus} Coins)`
+          : `\`[${'█'.repeat(Math.min(10, Math.round((mins / goal) * 10)))}${'░'.repeat(Math.max(0, 10 - Math.round((mins / goal) * 10)))}]\` **${mins}/${goal}** mins (+${bonus} Coins)`;
       }
     },
     trivia: {
@@ -430,8 +476,8 @@ async function build3QuestsEphemeralEmbed(discordId, guildId, guild) {
         const done = balance?.quest_trivia_completed || false;
         const bonus = (rates.daily_quest_trivia_bonus || 0.05).toFixed(2);
         return done
-          ? `\`[██████████]\` **1/1** Trivia Drop (✅ +₱${bonus})`
-          : `\`[░░░░░░░░░░]\` **0/1** Trivia Drop (+₱${bonus})`;
+          ? `\`[██████████]\` **1/1** Trivia Drop (✅ +${bonus} Coins)`
+          : `\`[░░░░░░░░░░]\` **0/1** Trivia Drop (+${bonus} Coins)`;
       }
     },
     boss: {
@@ -440,8 +486,8 @@ async function build3QuestsEphemeralEmbed(discordId, guildId, guild) {
         const done = balance?.quest_boss_done || false;
         const bonus = (rates.daily_quest_boss_bonus || 0.10).toFixed(2);
         return done
-          ? `\`[██████████]\` **1/1** Boss Engagement (✅ +₱${bonus})`
-          : `\`[░░░░░░░░░░]\` **0/1** Boss Engagement (+₱${bonus})`;
+          ? `\`[██████████]\` **1/1** Boss Engagement (✅ +${bonus} Coins)`
+          : `\`[░░░░░░░░░░]\` **0/1** Boss Engagement (+${bonus} Coins)`;
       }
     },
     reactions: {
@@ -451,8 +497,8 @@ async function build3QuestsEphemeralEmbed(discordId, guildId, guild) {
         const done = count >= 3;
         const bonus = (rates.daily_quest_reactions_bonus || 0.05).toFixed(2);
         return done
-          ? `\`[██████████]\` **3/3** Reactions (✅ +₱${bonus})`
-          : `\`[${'█'.repeat(Math.min(10, Math.round((count / 3) * 10)))}${'░'.repeat(Math.max(0, 10 - Math.round((count / 3) * 10)))}]\` **${count}/3** Reactions (+₱${bonus})`;
+          ? `\`[██████████]\` **3/3** Reactions (✅ +${bonus} Coins)`
+          : `\`[${'█'.repeat(Math.min(10, Math.round((count / 3) * 10)))}${'░'.repeat(Math.max(0, 10 - Math.round((count / 3) * 10)))}]\` **${count}/3** Reactions (+${bonus} Coins)`;
       }
     },
     voice_status: {
@@ -461,8 +507,8 @@ async function build3QuestsEphemeralEmbed(discordId, guildId, guild) {
         const done = balance?.quest_voice_status_done || false;
         const bonus = (rates.daily_quest_voice_status_bonus || 0.02).toFixed(2);
         return done
-          ? `\`[██████████]\` **1/1** Status Changed (✅ +₱${bonus})`
-          : `\`[░░░░░░░░░░]\` **0/1** Status Changed (+₱${bonus})`;
+          ? `\`[██████████]\` **1/1** Status Changed (✅ +${bonus} Coins)`
+          : `\`[░░░░░░░░░░]\` **0/1** Status Changed (+${bonus} Coins)`;
       }
     },
     ai_chat: {
@@ -471,8 +517,8 @@ async function build3QuestsEphemeralEmbed(discordId, guildId, guild) {
         const done = balance?.quest_ai_chat_done || false;
         const bonus = (rates.daily_quest_ai_chat_bonus || 0.03).toFixed(2);
         return done
-          ? `\`[██████████]\` **1/1** AI Chat (✅ +₱${bonus})`
-          : `\`[░░░░░░░░░░]\` **0/1** AI Chat (+₱${bonus})`;
+          ? `\`[██████████]\` **1/1** AI Chat (✅ +${bonus} Coins)`
+          : `\`[░░░░░░░░░░]\` **0/1** AI Chat (+${bonus} Coins)`;
       }
     }
   };
@@ -488,7 +534,7 @@ async function build3QuestsEphemeralEmbed(discordId, guildId, guild) {
     .setDescription(
       `Welcome! Your 3 daily quests assigned from today's pool are **Active**:\n\n` +
       lines.join('\n\n') +
-      `\n\n🏆 **Total 3-Quest Daily Reward**: **+0.50 Vault Coins (₱0.50 PHP)**`
+      `\n\n🏆 **Total 3-Quest Daily Reward**: **+0.50 Vault Coins**`
     )
     .setFooter({ text: 'Every Nation Vault • 7-Quest Dynamic Pool' })
     .setTimestamp();
@@ -516,7 +562,7 @@ async function postOrUpdateQuestLauncherChannel(client, guildId, channelId) {
       `💬 **Chat Quest** — Send active messages in community channels.\n` +
       `🎙️ **Voice Quest** — Hang out in voice channels with friends.\n` +
       `🧠 **Trivia Quest** — Participate in daily AI trivia drops.\n\n` +
-      `🏆 Complete all 3 daily quests to earn bonus **Vault Coins (₱ PHP)**!`
+      `🏆 Complete all 3 daily quests to earn bonus **Vault Coins**!`
     )
     .setFooter({ text: 'Every Nation Vault • ENOS Quest Launcher' })
     .setTimestamp();
@@ -746,18 +792,18 @@ async function buildQuestEmbed(discordId, guildId, guild) {
   const displayName = member?.displayName || 'Member';
 
   let statusTitle = '⏸️ Daily Quest — Not Started';
-  let desc = `Click the **▶️ Start Daily Quest** button below to begin tracking chat messages today!\n\n**Goal**: Send **${questGoal} messages**\n**Reward**: **+${questBonus} coins (₱${questBonus} PHP)**`;
+  let desc = `Click the **▶️ Start Daily Quest** button below to begin tracking chat messages today!\n\n**Goal**: Send **${questGoal} messages**\n**Reward**: **+${questBonus} Vault Coins**`;
   let color = 0x3B82F6;
 
   if (balance?.quest_claimed) {
     statusTitle = '✅ Daily Quest — Completed!';
-    desc = `You have completed today's quest and claimed **+${questBonus} coins (₱${questBonus} PHP)**!\n\n*Resets daily at midnight.*`;
+    desc = `You have completed today's quest and claimed **+${questBonus} Vault Coins**!\n\n*Resets daily at midnight.*`;
     color = 0x10B981;
   } else if (balance?.quest_started) {
     const qProgress = Math.min(100, Math.round((msgs / questGoal) * 100));
     const qFilled = Math.max(0, Math.min(15, Math.round((qProgress / 100) * 15)));
     statusTitle = '▶️ Daily Quest — Active Progress';
-    desc = `\`[${'█'.repeat(qFilled)}${'░'.repeat(15 - qFilled)}]\` **${msgs}/${questGoal}** messages (${qProgress}%)\n\n*Send ${questGoal - msgs} more messages today to claim +${questBonus} coins (₱${questBonus} PHP)!*`;
+    desc = `\`[${'█'.repeat(qFilled)}${'░'.repeat(15 - qFilled)}]\` **${msgs}/${questGoal}** messages (${qProgress}%)\n\n*Send ${questGoal - msgs} more messages today to claim +${questBonus} Vault Coins!*`;
     color = 0xFACC15;
   }
 
@@ -800,9 +846,11 @@ async function resetDailyQuests() {
       quest_voice_status_done: false,
       quest_ai_chat_done: false,
       quest_boss_done: false,
+      quest_claimed_reaction: false,
       assigned_quests: null,
       coins_earned_today: 0,
-    });
+    })
+    .neq('discord_id', '');
 
   if (error) {
     logger.error('[VAULT] Failed to reset daily quests:', error.message);
