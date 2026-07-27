@@ -49,13 +49,71 @@ export async function GET(req: NextRequest) {
         .limit(10),
     ]);
 
+    const token = process.env.DISCORD_TOKEN || process.env.DISCORD_BOT_TOKEN;
+
+    const rawVault = vaultRes.data || [];
+    const rawBoss = bossRes.data || [];
+    const rawTrivia = triviaRes.data || [];
+
+    // Collect all unique Discord user IDs
+    const userIds = Array.from(
+      new Set([
+        ...rawVault.map((v) => v.discord_id),
+        ...rawBoss.map((b) => b.user_id),
+        ...rawTrivia.map((t) => t.discord_id),
+      ])
+    ).filter(Boolean);
+
+    // Fetch user profiles from Discord API (with caching / fallback)
+    const userProfiles: Record<string, { username: string; avatar_url: string }> = {};
+
+    if (token) {
+      await Promise.all(
+        userIds.map(async (id) => {
+          try {
+            const res = await fetch(`https://discord.com/api/v10/users/${id}`, {
+              headers: { Authorization: `Bot ${token}` },
+            });
+            if (res.ok) {
+              const u = await res.json();
+              const name = u.global_name || u.username || id;
+              const avatar_url = u.avatar
+                ? `https://cdn.discordapp.com/avatars/${id}/${u.avatar}.png?size=64`
+                : `https://cdn.discordapp.com/embed/avatars/0.png`;
+              userProfiles[id] = { username: name, avatar_url };
+              return;
+            }
+          } catch (e) {}
+          userProfiles[id] = { username: id, avatar_url: 'https://cdn.discordapp.com/embed/avatars/0.png' };
+        })
+      );
+    }
+
+    const vault = rawVault.map((v) => ({
+      ...v,
+      username: userProfiles[v.discord_id]?.username || v.discord_id,
+      avatar_url: userProfiles[v.discord_id]?.avatar_url || 'https://cdn.discordapp.com/embed/avatars/0.png',
+    }));
+
+    const boss = rawBoss.map((b) => ({
+      ...b,
+      username: userProfiles[b.user_id]?.username || b.user_id,
+      avatar_url: userProfiles[b.user_id]?.avatar_url || 'https://cdn.discordapp.com/embed/avatars/0.png',
+    }));
+
+    const trivia = rawTrivia.map((t) => ({
+      ...t,
+      username: userProfiles[t.discord_id]?.username || t.discord_id,
+      avatar_url: userProfiles[t.discord_id]?.avatar_url || 'https://cdn.discordapp.com/embed/avatars/0.png',
+    }));
+
     return NextResponse.json({
       success: true,
       guild_id: guildId,
       current_week: currentWeek,
-      vault: vaultRes.data || [],
-      boss: bossRes.data || [],
-      trivia: triviaRes.data || [],
+      vault,
+      boss,
+      trivia,
     });
   } catch (err: any) {
     console.error('[LEADERBOARD DATA ERROR]:', err);

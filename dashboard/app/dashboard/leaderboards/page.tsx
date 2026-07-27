@@ -54,7 +54,7 @@ export default function LeaderboardsDashboard() {
       const res = await fetch(`/api/social/birthday/channels${query}`);
       if (res.ok) {
         const json = await res.json();
-        const list = json.channels || [];
+        const list = Array.isArray(json) ? json : json.channels || [];
         setChannels(list);
         if (list.length > 0 && !selectedChannelId) {
           setSelectedChannelId(list[0].id);
@@ -108,7 +108,7 @@ export default function LeaderboardsDashboard() {
         const chName = channels.find((c) => c.id === selectedChannelId)?.name || selectedChannelId;
         setPostStatus({
           success: true,
-          message: `✓ Leaderboard card successfully force-posted to #${chName}!`,
+          message: `✓ Leaderboard card successfully force-posted to ${chName}!`,
         });
       } else {
         setPostStatus({
@@ -146,7 +146,8 @@ export default function LeaderboardsDashboard() {
     embedLines = list.map((e: any, i: number) => {
       const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `**${i + 1}.**`;
       const tier = e.tier === 'gold' ? '🟡' : e.tier === 'silver' ? '⚪' : '🟤';
-      return `${medal} ${tier} <@${e.discord_id}> — **${e.coins.toLocaleString()}** coins (₱${Number(e.coins).toFixed(2)})`;
+      const name = e.username ? `@${e.username}` : `<@${e.discord_id}>`;
+      return `${medal} ${tier} **${name}** — **${e.coins.toLocaleString()}** coins (₱${Number(e.coins).toFixed(2)})`;
     });
   } else if (activeTab === 'boss') {
     embedTitle = `🏆 Weekly Boss Leaderboard (${currentWeek})`;
@@ -156,7 +157,8 @@ export default function LeaderboardsDashboard() {
       const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `**${i + 1}.**`;
       const clsIcon = e.class_key === 'mom' ? '🛡️' : e.class_key === 'dad' ? '🔨' : e.class_key === 'kid' ? '⚡' : '👤';
       const apUsed = Math.max(0, 5 - (e.ap_remaining || 0));
-      return `${medal} ${clsIcon} <@${e.user_id}> — **${e.weekly_points} pts (₱${e.weekly_points})** | \`${apUsed}/5 AP\` (${Number(e.total_damage).toLocaleString()} DMG)`;
+      const name = e.username ? `@${e.username}` : `<@${e.user_id}>`;
+      return `${medal} ${clsIcon} **${name}** — **${e.weekly_points} pts (₱${e.weekly_points})** | \`${apUsed}/5 AP\` (${Number(e.total_damage).toLocaleString()} DMG)`;
     });
   } else if (activeTab === 'trivia') {
     embedTitle = '🧠 Trivia Champions Leaderboard — Every Nation';
@@ -165,7 +167,8 @@ export default function LeaderboardsDashboard() {
     const list = data?.trivia || [];
     embedLines = list.map((e: any, i: number) => {
       const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `**${i + 1}.**`;
-      return `${medal} 🧠 <@${e.discord_id}> — **${e.points.toLocaleString()} pts (₱${Number(e.points).toFixed(2)})**`;
+      const name = e.username ? `@${e.username}` : `<@${e.discord_id}>`;
+      return `${medal} 🧠 **${name}** — **${e.points.toLocaleString()} pts (₱${Number(e.points).toFixed(2)})**`;
     });
   }
 
@@ -313,7 +316,7 @@ export default function LeaderboardsDashboard() {
                         }}
                       >
                         <th style={{ padding: '0.5rem' }}>Rank</th>
-                        <th style={{ padding: '0.5rem' }}>User ID</th>
+                        <th style={{ padding: '0.5rem' }}>Member</th>
                         <th style={{ padding: '0.5rem' }}>Coins (₱ PHP)</th>
                         <th style={{ padding: '0.5rem' }}>Today Msgs</th>
                       </tr>
@@ -329,7 +332,19 @@ export default function LeaderboardsDashboard() {
                             }}
                           >
                             <td style={{ padding: '0.65rem 0.5rem', fontWeight: 700 }}>{medal}</td>
-                            <td style={{ padding: '0.65rem 0.5rem', fontFamily: 'monospace' }}>{row.discord_id}</td>
+                            <td style={{ padding: '0.65rem 0.5rem' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                <img
+                                  src={row.avatar_url}
+                                  alt={row.username}
+                                  style={{ width: 28, height: 28, borderRadius: '50%', objectFit: 'cover' }}
+                                />
+                                <div>
+                                  <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{row.username}</div>
+                                  <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontFamily: 'monospace' }}>{row.discord_id}</div>
+                                </div>
+                              </div>
+                            </td>
                             <td style={{ padding: '0.65rem 0.5rem', fontWeight: 700, color: 'var(--accent-primary)' }}>
                               {row.coins} Coins (₱{Number(row.coins).toFixed(2)})
                             </td>
@@ -354,7 +369,7 @@ export default function LeaderboardsDashboard() {
                         }}
                       >
                         <th style={{ padding: '0.5rem' }}>Order</th>
-                        <th style={{ padding: '0.5rem' }}>User ID</th>
+                        <th style={{ padding: '0.5rem' }}>Member</th>
                         <th style={{ padding: '0.5rem' }}>Class</th>
                         <th style={{ padding: '0.5rem' }}>AP Used</th>
                         <th style={{ padding: '0.5rem' }}>Points (₱ PHP)</th>
@@ -373,7 +388,19 @@ export default function LeaderboardsDashboard() {
                             }}
                           >
                             <td style={{ padding: '0.65rem 0.5rem', fontWeight: 700 }}>{medal}</td>
-                            <td style={{ padding: '0.65rem 0.5rem', fontFamily: 'monospace' }}>{row.user_id}</td>
+                            <td style={{ padding: '0.65rem 0.5rem' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                <img
+                                  src={row.avatar_url}
+                                  alt={row.username}
+                                  style={{ width: 28, height: 28, borderRadius: '50%', objectFit: 'cover' }}
+                                />
+                                <div>
+                                  <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{row.username}</div>
+                                  <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontFamily: 'monospace' }}>{row.user_id}</div>
+                                </div>
+                              </div>
+                            </td>
                             <td style={{ padding: '0.65rem 0.5rem' }}>{clsIcon}</td>
                             <td style={{ padding: '0.65rem 0.5rem', fontWeight: 600 }}>{apUsed}/5 AP</td>
                             <td style={{ padding: '0.65rem 0.5rem', fontWeight: 700, color: 'var(--accent-primary)' }}>
@@ -399,7 +426,7 @@ export default function LeaderboardsDashboard() {
                         }}
                       >
                         <th style={{ padding: '0.5rem' }}>Rank</th>
-                        <th style={{ padding: '0.5rem' }}>User ID</th>
+                        <th style={{ padding: '0.5rem' }}>Member</th>
                         <th style={{ padding: '0.5rem' }}>Trivia Points (₱ PHP)</th>
                       </tr>
                     </thead>
@@ -414,7 +441,19 @@ export default function LeaderboardsDashboard() {
                             }}
                           >
                             <td style={{ padding: '0.65rem 0.5rem', fontWeight: 700 }}>{medal}</td>
-                            <td style={{ padding: '0.65rem 0.5rem', fontFamily: 'monospace' }}>{row.discord_id}</td>
+                            <td style={{ padding: '0.65rem 0.5rem' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                <img
+                                  src={row.avatar_url}
+                                  alt={row.username}
+                                  style={{ width: 28, height: 28, borderRadius: '50%', objectFit: 'cover' }}
+                                />
+                                <div>
+                                  <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{row.username}</div>
+                                  <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontFamily: 'monospace' }}>{row.discord_id}</div>
+                                </div>
+                              </div>
+                            </td>
                             <td style={{ padding: '0.65rem 0.5rem', fontWeight: 700, color: 'var(--accent-primary)' }}>
                               {row.points} pts (₱{Number(row.points).toFixed(2)})
                             </td>
@@ -483,7 +522,7 @@ export default function LeaderboardsDashboard() {
                     ) : (
                       channels.map((ch) => (
                         <option key={ch.id} value={ch.id}>
-                          #{ch.name} (ID: {ch.id})
+                          {ch.name} (ID: {ch.id})
                         </option>
                       ))
                     )}
