@@ -483,7 +483,7 @@ async function build3QuestsEphemeralEmbed(discordId, guildId, guild) {
   const vaultConfig = await getVaultConfig(guildId);
   const rates = { ...DEFAULT_RATES, ...vaultConfig.rates };
 
-  const member = await guild.members.fetch(discordId).catch(() => null);
+  const member = guild?.members ? await guild.members.fetch(discordId).catch(() => null) : null;
   const displayName = member?.displayName || 'Member';
 
   const assigned = balance?.assigned_quests || ['chat', 'voice', 'trivia'];
