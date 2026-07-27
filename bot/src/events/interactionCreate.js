@@ -90,29 +90,48 @@ module.exports = {
         }
         if (interaction.customId === 'vault_get_daily_quests') {
           try {
+            if (!interaction.deferred && !interaction.replied) {
+              await interaction.deferReply({ flags: MessageFlags.Ephemeral }).catch(() => {});
+            }
             const { handleStartQuest, build3QuestsEphemeralEmbed } = require('../modules/gaming/vault');
-            await interaction.deferReply({ flags: MessageFlags.Ephemeral });
             await handleStartQuest(interaction.user.id, interaction.guild.id);
             const embed = await build3QuestsEphemeralEmbed(interaction.user.id, interaction.guild.id, interaction.guild);
-            const replyMsg = await interaction.editReply({ embeds: [embed] });
-            setTimeout(() => {
-              interaction.deleteReply().catch(() => {});
-            }, 120000);
-            return replyMsg;
+
+            if (interaction.deferred) {
+              const replyMsg = await interaction.editReply({ embeds: [embed] });
+              setTimeout(() => {
+                interaction.deleteReply().catch(() => {});
+              }, 120000);
+              return replyMsg;
+            } else if (!interaction.replied) {
+              return await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
+            } else {
+              return await interaction.followUp({ embeds: [embed], flags: MessageFlags.Ephemeral });
+            }
           } catch (err) {
             logger.error('[INTERACTION] Error in vault_get_daily_quests:', err.message);
-            if (interaction.deferred || interaction.replied) {
+            if (interaction.deferred) {
               return interaction.editReply({ content: '❌ Failed to load daily quests. Please try again.' }).catch(() => {});
-            } else {
+            } else if (!interaction.replied) {
               return interaction.reply({ content: '❌ Failed to load daily quests. Please try again.', flags: MessageFlags.Ephemeral }).catch(() => {});
             }
           }
         }
         if (interaction.customId === 'vault_start_quest') {
-          const { handleStartQuest } = require('../modules/gaming/vault');
-          await interaction.deferReply({ flags: MessageFlags.Ephemeral });
-          const res = await handleStartQuest(interaction.user.id, interaction.guild.id);
-          return interaction.editReply(res.message);
+          try {
+            if (!interaction.deferred && !interaction.replied) {
+              await interaction.deferReply({ flags: MessageFlags.Ephemeral }).catch(() => {});
+            }
+            const { handleStartQuest } = require('../modules/gaming/vault');
+            const res = await handleStartQuest(interaction.user.id, interaction.guild.id);
+            if (interaction.deferred) {
+              return interaction.editReply(res.message);
+            } else if (!interaction.replied) {
+              return interaction.reply({ content: res.message, flags: MessageFlags.Ephemeral });
+            }
+          } catch (err) {
+            logger.error('[INTERACTION] Error in vault_start_quest:', err.message);
+          }
         }
         if (interaction.customId.startsWith('showcase_claim_')) {
           const { handleShowcaseClaim } = require('../modules/moderation/showcase');
