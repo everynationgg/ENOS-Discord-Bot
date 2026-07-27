@@ -47,22 +47,37 @@ module.exports = {
         logger.info(`[INTERACTION] Button click: customId="${interaction.customId}" user=${interaction.user.id}`);
         if (interaction.customId === 'vault_get_daily_quests') {
           try {
-            await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+            await interaction.deferReply({ ephemeral: true }).catch((e) => {
+              logger.warn(`[INTERACTION] deferReply notice: ${e.message}`);
+            });
 
             const { handleStartQuest, build3QuestsEphemeralEmbed } = require('../modules/gaming/vault');
-            await handleStartQuest(interaction.user.id, interaction.guild.id);
-            const embed = await build3QuestsEphemeralEmbed(interaction.user.id, interaction.guild.id, interaction.guild);
+            await handleStartQuest(interaction.user.id, interaction.guild?.id);
+            const embed = await build3QuestsEphemeralEmbed(interaction.user.id, interaction.guild?.id, interaction.guild);
 
-            const replyMsg = await interaction.editReply({ embeds: [embed] });
-            if (replyMsg) {
-              setTimeout(() => {
-                interaction.deleteReply().catch(() => {});
-              }, 120000);
+            if (interaction.deferred || interaction.replied) {
+              const replyMsg = await interaction.editReply({ embeds: [embed] }).catch(async () => {
+                return await interaction.followUp({ embeds: [embed], ephemeral: true }).catch(() => null);
+              });
+              if (replyMsg) {
+                setTimeout(() => {
+                  interaction.deleteReply().catch(() => {});
+                }, 120000);
+              }
+            } else {
+              const replyMsg = await interaction.followUp({ embeds: [embed], ephemeral: true }).catch(() => null);
+              if (replyMsg) {
+                setTimeout(() => {
+                  interaction.deleteReply().catch(() => {});
+                }, 120000);
+              }
             }
           } catch (err) {
             logger.error('[INTERACTION] Error in vault_get_daily_quests:', err.message || err);
             if (interaction.deferred || interaction.replied) {
               await interaction.editReply({ content: '❌ Failed to load daily quests. Please try again.' }).catch(() => {});
+            } else {
+              await interaction.followUp({ content: '❌ Failed to load daily quests. Please try again.', ephemeral: true }).catch(() => {});
             }
           }
           return;
