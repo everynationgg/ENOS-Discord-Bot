@@ -113,7 +113,29 @@ function cleanTextForSpeech(text) {
 }
 
 /**
- * Translates input text using Gemini 2.0 / 1.5 Flash with fallback model chain & strict translation rules
+ * Fallback translation using Google Translate HTTP endpoint (Zero API key / limits)
+ */
+async function fallbackGoogleTranslate(text, targetLangCode) {
+  try {
+    const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=${targetLangCode}&dt=t&q=${encodeURIComponent(text)}`;
+    const res = await fetch(url);
+    if (!res.ok) return text;
+    const data = await res.json();
+    if (data && data[0] && Array.isArray(data[0])) {
+      const translated = data[0].map((item) => item[0]).filter(Boolean).join(' ').trim();
+      if (translated) {
+        logger.info(`[EN TTS] Translated via Google Translate Fallback: "${text}" -> "${translated}" (${targetLangCode})`);
+        return translated;
+      }
+    }
+  } catch (err) {
+    logger.warn('[EN TTS] Google Translate HTTP fallback error:', err.message);
+  }
+  return text;
+}
+
+/**
+ * Translates input text using Gemini 2.0 / 1.5 Flash with fallback model chain & Google Translate HTTP safety net
  */
 async function translateTextWithGemini(rawText, targetLangCode, persona) {
   const cleaned = cleanTextForSpeech(rawText);
@@ -145,7 +167,7 @@ async function translateTextWithGemini(rawText, targetLangCode, persona) {
     `Original Input Text: "${cleaned}"\n\n` +
     `Output: Return ONLY the translated spoken sentence in ${langName}. Do NOT include quotes, "Translation:", or "User said:".`;
 
-  const modelsToTry = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro'];
+  const modelsToTry = ['gemini-2.0-flash', 'gemini-1.5-flash-latest', 'gemini-1.5-pro-latest'];
 
   for (const modelName of modelsToTry) {
     try {
@@ -161,7 +183,8 @@ async function translateTextWithGemini(rawText, targetLangCode, persona) {
     }
   }
 
-  return cleaned;
+  // Final guaranteed fallback if all Gemini models hit 429 quota limits
+  return await fallbackGoogleTranslate(cleaned, targetLangCode);
 }
 
 /**
@@ -230,7 +253,7 @@ function applyAudioEffects(inputPath, voiceModel, persona) {
     if (persona === 'announcer') {
       filters.push('atempo=1.12,equalizer=f=3000:width_type=h:width=1000:g=5');
     } else if (persona === 'error_mod') {
-      filters.push('flanger=delay=8:depth=4:regen=60:speed=0.6,phaser=speed=0.5:decay=0.5');
+      filters.push('flanger=delay=8:depth=4:regen=60:speed=0.6,vibrato=f=8:d=0.5');
     } else if (persona === 'calm') {
       filters.push('lowpass=f=3200,atempo=0.92');
     }
