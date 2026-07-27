@@ -1,9 +1,7 @@
 /**
- * ENOS Retroactive Quest Healer
- * Automatically patches quest progress for all guild members based on existing DB data.
- * Run this once to fix all users whose quests didn't count during the schema-missing period.
- *
- * Usage: node supabase/migrations/heal_quests.js
+ * ENOS Retroactive Quest Healer v2
+ * Uses actual trivia_participants table to patch trivia quest completion.
+ * Run: node supabase/migrations/heal_quests.js
  */
 
 require('dotenv').config({ path: 'bot/.env' });
@@ -14,36 +12,44 @@ const GUILD_ID = '1111851611099254815';
 const TODAY = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
 
 async function healAllQuests() {
-  console.log('🔧 ENOS Retroactive Quest Healer — Starting...\n');
+  console.log('🔧 ENOS Retroactive Quest Healer v2 — Starting...\n');
 
   // 1. Get all vault balances for the guild
-  const { data: balances, error: balErr } = await db
+  const { data: balances } = await db
     .from('vault_balances')
     .select('*')
     .eq('guild_id', GUILD_ID);
 
-  if (balErr || !balances?.length) {
-    console.error('❌ Could not fetch vault balances:', balErr?.message);
-    return;
-  }
-  console.log(`📋 Found ${balances.length} users in vault_balances\n`);
+  console.log(`📋 Found ${balances?.length || 0} users in vault_balances\n`);
 
-  // 2. Get trivia results for today
-  const { data: triviaResults } = await db
-    .from('trivia_results')
-    .select('user_id, correct, created_at')
+  // 2. Get trivia participants who answered correctly today
+  //    Join through trivia_drops to filter by today's date
+  const { data: todayDrops } = await db
+    .from('trivia_drops')
+    .select('id')
     .eq('guild_id', GUILD_ID)
     .gte('created_at', `${TODAY}T00:00:00Z`);
 
-  const triviaWinners = new Set(
-    (triviaResults || []).filter(r => r.correct).map(r => r.user_id)
-  );
-  const triviaParticipants = new Set(
-    (triviaResults || []).map(r => r.user_id)
-  );
-  console.log(`🎯 Trivia participants today: ${triviaParticipants.size}, winners: ${triviaWinners.size}`);
+  const todayDropIds = (todayDrops || []).map(d => d.id);
+  console.log(`🎯 Today's trivia drops: ${todayDropIds.length}`);
 
-  // 3. Get boss attack data for current week (W31)
+  const triviaWinners = new Set();
+  const triviaParticipants = new Set();
+
+  if (todayDropIds.length > 0) {
+    const { data: participants } = await db
+      .from('trivia_participants')
+      .select('user_id, is_correct')
+      .in('drop_id', todayDropIds);
+
+    for (const p of participants || []) {
+      triviaParticipants.add(p.user_id);
+      if (p.is_correct) triviaWinners.add(p.user_id);
+    }
+  }
+  console.log(`   Participants: ${triviaParticipants.size}, Winners: ${triviaWinners.size}`);
+
+  // 3. Get boss attack data for current week
   const { data: bossStates } = await db
     .from('boss_player_states')
     .select('user_id, ap_remaining, total_damage, weekly_points')
@@ -54,14 +60,14 @@ async function healAllQuests() {
   for (const b of bossStates || []) {
     bossAttackers.set(b.user_id, b);
   }
-  console.log(`⚔️  Boss attackers this week: ${bossAttackers.size}`);
+  console.log(`⚔️  Boss attackers this week: ${bossAttackers.size}\n`);
 
-  // Fix Calcifer's corrupted weekly_points (reset to correct AP-scaled value)
+  // Fix any corrupted weekly_points (reset to correct AP-scaled value)
   for (const [userId, state] of bossAttackers) {
     const apUsed = Math.max(0, 5 - (state.ap_remaining || 0));
     const correctPoints = Math.round((apUsed / 5) * 10);
     if (state.weekly_points > 15) {
-      console.log(`\n🛠️  Fixing corrupted weekly_points for ${userId}: ${state.weekly_points} → ${correctPoints}`);
+      console.log(`🛠️  Fixing corrupted weekly_points for ${userId}: ${state.weekly_points} → ${correctPoints}`);
       await db.from('boss_player_states')
         .update({ weekly_points: correctPoints })
         .eq('user_id', userId)
@@ -72,36 +78,36 @@ async function healAllQuests() {
 
   // 4. Process each user
   let patchedCount = 0;
-  for (const bal of balances) {
+  for (const bal of balances || []) {
     const uid = bal.discord_id;
     const updates = {};
     const notes = [];
 
-    // Chat Quest: if messages_today >= 5, mark complete
+    // Chat Quest: messages_today >= 5
     if (!bal.quest_chat_completed && (bal.messages_today || 0) >= 5) {
       updates.quest_chat_completed = true;
       notes.push(`chat ✅ (${bal.messages_today} msgs)`);
     }
 
-    // Voice Quest: if voice_minutes_today >= 30, mark complete
+    // Voice Quest: voice_minutes_today >= 30
     if (!bal.quest_voice_completed && (bal.voice_minutes_today || 0) >= 30) {
       updates.quest_voice_completed = true;
       notes.push(`voice ✅ (${bal.voice_minutes_today} min)`);
     }
 
-    // Trivia Quest: if user answered trivia today, mark complete
+    // Trivia Quest: participated today (any attempt counts — being generous)
     if (!bal.quest_trivia_completed && triviaParticipants.has(uid)) {
       updates.quest_trivia_completed = true;
-      notes.push(`trivia ✅ (answered today)`);
+      const label = triviaWinners.has(uid) ? 'correct answer' : 'participated';
+      notes.push(`trivia ✅ (${label})`);
     }
 
-    // Boss Quest: if user attacked boss this week
+    // Boss Quest: attacked this week
     if (!bal.quest_boss_done && bossAttackers.has(uid)) {
       updates.quest_boss_done = true;
       notes.push(`boss ✅ (attacked this week)`);
     }
 
-    // If we have updates, apply them
     if (Object.keys(updates).length > 0) {
       const { error } = await db
         .from('vault_balances')
@@ -118,7 +124,7 @@ async function healAllQuests() {
     }
   }
 
-  console.log(`\n✅ Done! Patched ${patchedCount}/${balances.length} users.`);
+  console.log(`\n✅ Done! Patched ${patchedCount}/${balances?.length || 0} users.`);
 }
 
 healAllQuests().catch(console.error);

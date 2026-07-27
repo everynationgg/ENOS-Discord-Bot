@@ -156,6 +156,14 @@ async function awardMessageCoins(discordId, guildId, guild) {
   if (!chatQuestCompleted && newMessagesToday >= chatGoal) {
     chatQuestCompleted = true;
     await awardCoins(discordId, guildId, rates.daily_quest_chat_bonus || 1, 'chat_quest', guild);
+    // Log quest completion
+    await supabase.from('vault_quest_log').insert({
+      guild_id: guildId,
+      discord_id: discordId,
+      action: 'quest_complete',
+      quest_key: 'chat',
+      snapshot: { messages_today: newMessagesToday, goal: chatGoal },
+    }).catch(() => {});
   }
 
   await supabase
@@ -206,6 +214,13 @@ async function handleVoiceLeave(discordId, guildId, minutesSpent, guild) {
   if (!voiceQuestCompleted && newVoiceToday >= voiceGoal) {
     voiceQuestCompleted = true;
     await awardCoins(discordId, guildId, rates.daily_quest_voice_bonus || 1, 'voice_quest', guild);
+    await supabase.from('vault_quest_log').insert({
+      guild_id: guildId,
+      discord_id: discordId,
+      action: 'quest_complete',
+      quest_key: 'voice',
+      snapshot: { voice_minutes_today: newVoiceToday, goal: voiceGoal },
+    }).catch(() => {});
   }
 
   await supabase
@@ -235,8 +250,14 @@ async function handleTriviaQuestCompletion(discordId, guildId, guild) {
       .eq('guild_id', guildId);
 
     await awardCoins(discordId, guildId, rates.daily_quest_trivia_bonus || 1, 'trivia_quest', guild);
+    await supabase.from('vault_quest_log').insert({
+      guild_id: guildId,
+      discord_id: discordId,
+      action: 'quest_complete',
+      quest_key: 'trivia',
+      snapshot: { quest_trivia_completed: true },
+    }).catch(() => {});
     logger.info(`[VAULT] Trivia quest completed by ${discordId}`);
-  }
 }
 
 /**
@@ -324,6 +345,26 @@ async function handleStartQuest(discordId, guildId) {
     })
     .eq('discord_id', discordId)
     .eq('guild_id', guildId);
+
+
+  // Re-fetch final state to log accurate snapshot
+  const finalBalance = await getOrCreateBalance(discordId, guildId);
+  await supabase.from('vault_quest_log').insert({
+    guild_id: guildId,
+    discord_id: discordId,
+    action: 'view_quests',
+    snapshot: {
+      assigned_quests: assigned,
+      messages_today: finalBalance?.messages_today || 0,
+      voice_minutes_today: finalBalance?.voice_minutes_today || 0,
+      quest_chat_completed: chatDone,
+      quest_voice_completed: voiceDone,
+      quest_trivia_completed: finalBalance?.quest_trivia_completed || false,
+      quest_boss_done: bossDone,
+      quest_claimed_reaction: reactionDone,
+      quest_ai_chat_done: finalBalance?.quest_ai_chat_done || false,
+    },
+  }).catch(() => {});
 
   return { success: true, message: '▶️ **Daily Quests Activated!** Your 3 daily quests are live for today.' };
 }
