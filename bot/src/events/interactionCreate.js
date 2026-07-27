@@ -103,7 +103,7 @@ module.exports = {
                 return await interaction.followUp({ embeds: [embed], flags: MessageFlags.Ephemeral }).catch(() => null);
               });
             } else {
-              replyMsg = await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral, fetchReply: true }).catch(async () => {
+              replyMsg = await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral, withResponse: true }).then(res => res?.resource?.message).catch(async () => {
                 return await interaction.followUp({ embeds: [embed], flags: MessageFlags.Ephemeral }).catch(() => null);
               });
             }
