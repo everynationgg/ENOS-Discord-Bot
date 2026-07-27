@@ -1,12 +1,14 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 
 export default function SystemOpsPage() {
   const [health, setHealth] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [pruneStatus, setPruneStatus] = useState<'idle' | 'running' | 'done' | 'error'>('idle');
   const [activeTab, setActiveTab] = useState('overview');
+  const [copiedField, setCopiedField] = useState<string | null>(null);
 
   useEffect(() => {
     fetch('/api/system/health')
@@ -25,6 +27,12 @@ export default function SystemOpsPage() {
     setTimeout(() => setPruneStatus('idle'), 4000);
   };
 
+  const copyToClipboard = (text: string, fieldName: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedField(fieldName);
+    setTimeout(() => setCopiedField(null), 2500);
+  };
+
   const isOnline = health?.last_seen
     ? Date.now() - new Date(health.last_seen).getTime() < 10 * 60 * 1000
     : false;
@@ -36,6 +44,9 @@ export default function SystemOpsPage() {
   const lastHeartbeatDate = health?.last_seen
     ? new Date(health.last_seen).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila' })
     : 'Never connected';
+
+  const termsUrl = 'https://enos-discord-bot.vercel.app/terms';
+  const privacyUrl = 'https://enos-discord-bot.vercel.app/privacy';
 
   if (loading) {
     return (
@@ -49,7 +60,7 @@ export default function SystemOpsPage() {
     <div className="page-wrapper">
       <div className="page-header">
         <h1>⚙️ System Ops</h1>
-        <p>Monitor bot health, manage scheduled jobs, and configure the database cleanup pruner.</p>
+        <p>Monitor bot health, manage scheduled jobs, and configure Discord Developer Portal App Verification legal links.</p>
       </div>
 
       <div className="dashboard-layout" style={{ padding: 0 }}>
@@ -62,6 +73,13 @@ export default function SystemOpsPage() {
             id="sidebar-sys-overview"
           >
             📋 Overview
+          </button>
+          <button
+            className={`sidebar-item ${activeTab === 'verification' ? 'active' : ''}`}
+            onClick={() => setActiveTab('verification')}
+            id="sidebar-sys-verification"
+          >
+            📜 App Verification (ToS & Privacy)
           </button>
           <button
             className={`sidebar-item ${activeTab === 'health' ? 'active' : ''}`}
@@ -85,8 +103,13 @@ export default function SystemOpsPage() {
             <div className="overview-container">
               <h2>System Operations & Diagnostics</h2>
               <p style={{ marginTop: '0.5rem', marginBottom: '1.5rem' }}>
-                Monitor connection health status, trigger cleanups, and manage high-level operations.
+                Monitor connection health status, trigger cleanups, and manage Discord Developer Portal verification links.
               </p>
+
+              <div className="overview-item">
+                <h3>📜 App Verification Links (ToS & Privacy)</h3>
+                <p>Publicly hosted Terms of Service and Privacy Policy URLs configured for Discord Developer Portal verification.</p>
+              </div>
 
               <div className="overview-item">
                 <h3>⚡ Bot Health & Heartbeat</h3>
@@ -96,6 +119,78 @@ export default function SystemOpsPage() {
               <div className="overview-item">
                 <h3>🗑️ Pruner Operations</h3>
                 <p>Manually clean up database storage logs and delete message records older than 30 days.</p>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'verification' && (
+            <div className="split-layout-detail">
+              <div className="feature-instructions">
+                <h3>Discord Developer Portal App Verification</h3>
+                <p>These are the official live legal URLs required for Discord Developer Portal App Verification.</p>
+                <ul>
+                  <li><strong>Terms of Service URL</strong>: Paste into Discord Developer Portal under <code>Terms of Service URL</code>.</li>
+                  <li><strong>Privacy Policy URL</strong>: Paste into Discord Developer Portal under <code>Privacy Policy URL</code>.</li>
+                  <li><strong>Public Availability</strong>: Both pages are publicly accessible worldwide without authentication.</li>
+                </ul>
+              </div>
+
+              <div className="feature-form-card" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                <h3 style={{ margin: 0 }}>Public Legal Verification Links</h3>
+
+                {/* Terms of Service Card */}
+                <div className="stat-card" style={{ margin: 0, padding: '1.25rem' }}>
+                  <div className="stat-card-label" style={{ fontSize: '0.9rem', fontWeight: 700, color: '#facc15' }}>
+                    📜 Terms of Service URL
+                  </div>
+                  <div className="code-box" style={{ margin: '0.5rem 0', wordBreak: 'break-all', fontSize: '0.85rem' }}>
+                    {termsUrl}
+                  </div>
+                  <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.75rem' }}>
+                    <button
+                      className="btn btn-sm btn-primary"
+                      onClick={() => copyToClipboard(termsUrl, 'terms')}
+                    >
+                      {copiedField === 'terms' ? '✅ Copied!' : '📋 Copy URL'}
+                    </button>
+                    <a
+                      href="/terms"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="btn btn-sm btn-secondary"
+                      style={{ textDecoration: 'none' }}
+                    >
+                      🔗 Open Page
+                    </a>
+                  </div>
+                </div>
+
+                {/* Privacy Policy Card */}
+                <div className="stat-card" style={{ margin: 0, padding: '1.25rem' }}>
+                  <div className="stat-card-label" style={{ fontSize: '0.9rem', fontWeight: 700, color: '#facc15' }}>
+                    🔒 Privacy Policy URL
+                  </div>
+                  <div className="code-box" style={{ margin: '0.5rem 0', wordBreak: 'break-all', fontSize: '0.85rem' }}>
+                    {privacyUrl}
+                  </div>
+                  <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.75rem' }}>
+                    <button
+                      className="btn btn-sm btn-primary"
+                      onClick={() => copyToClipboard(privacyUrl, 'privacy')}
+                    >
+                      {copiedField === 'privacy' ? '✅ Copied!' : '📋 Copy URL'}
+                    </button>
+                    <a
+                      href="/privacy"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="btn btn-sm btn-secondary"
+                      style={{ textDecoration: 'none' }}
+                    >
+                      🔗 Open Page
+                    </a>
+                  </div>
+                </div>
               </div>
             </div>
           )}
