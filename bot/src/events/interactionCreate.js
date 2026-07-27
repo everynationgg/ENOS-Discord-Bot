@@ -47,28 +47,22 @@ module.exports = {
         logger.info(`[INTERACTION] Button click: customId="${interaction.customId}" user=${interaction.user.id}`);
         if (interaction.customId === 'vault_get_daily_quests') {
           try {
+            await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+
             const { handleStartQuest, build3QuestsEphemeralEmbed } = require('../modules/gaming/vault');
             await handleStartQuest(interaction.user.id, interaction.guild.id);
             const embed = await build3QuestsEphemeralEmbed(interaction.user.id, interaction.guild.id, interaction.guild);
 
-            if (!interaction.replied && !interaction.deferred) {
-              const replyMsg = await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral, withResponse: true }).then(r => r?.resource?.message).catch(async (e) => {
-                logger.warn(`[INTERACTION] Direct reply fallback notice: ${e.message}`);
-                return await interaction.followUp({ embeds: [embed], flags: MessageFlags.Ephemeral }).catch(() => null);
-              });
-              if (replyMsg) {
-                setTimeout(() => {
-                  interaction.deleteReply().catch(() => {});
-                }, 120000);
-              }
+            const replyMsg = await interaction.editReply({ embeds: [embed] });
+            if (replyMsg) {
+              setTimeout(() => {
+                interaction.deleteReply().catch(() => {});
+              }, 120000);
             }
           } catch (err) {
             logger.error('[INTERACTION] Error in vault_get_daily_quests:', err.message || err);
-            const errorMsg = '❌ Failed to load daily quests. Please try again.';
             if (interaction.deferred || interaction.replied) {
-              await interaction.editReply({ content: errorMsg }).catch(() => {});
-            } else {
-              await interaction.followUp({ content: errorMsg, flags: MessageFlags.Ephemeral }).catch(() => {});
+              await interaction.editReply({ content: '❌ Failed to load daily quests. Please try again.' }).catch(() => {});
             }
           }
           return;
