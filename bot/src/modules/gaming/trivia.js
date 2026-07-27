@@ -788,14 +788,15 @@ async function checkAndProcessTrivia(client) {
     for (const entry of configs || []) {
       const guildId = entry.guild_id;
       const config = entry.config || {};
-      const tz = config.timezone || 'Asia/Manila';
+      let tz = config.timezone || 'Asia/Manila';
+      if (tz === 'Manila') tz = 'Asia/Manila';
       const dropsPerDay = Math.min(3, Math.max(1, parseInt(config.drops_per_day, 10) || 1));
 
       let local;
       try {
         local = getLocalTimeInTimezone(tz);
       } catch (e) {
-        logger.error(`[TRIVIA CRON] Invalid timezone configured for guild ${guildId}: ${tz}. Defaulting to Asia/Manila.`);
+        tz = 'Asia/Manila';
         local = getLocalTimeInTimezone('Asia/Manila');
       }
 
