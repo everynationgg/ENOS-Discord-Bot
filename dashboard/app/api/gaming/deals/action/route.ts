@@ -265,7 +265,7 @@ export async function POST(req: NextRequest) {
               store: deal.storeName,
               message_id: sentMsg.id,
             },
-          }).catch(() => {});
+          });
 
           postedSet.add(deal.dealId);
           if (normTitle) postedNormSet.add(normTitle);

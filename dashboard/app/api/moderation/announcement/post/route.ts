@@ -71,7 +71,7 @@ export async function POST(req: NextRequest) {
           scheduled: false,
           created_by: session.user?.name || session.user?.email || 'Admin',
         },
-      }).catch((e) => console.warn('[LOG ANNOUNCEMENT ERROR]:', e?.message));
+      });
     }
 
     return NextResponse.json({

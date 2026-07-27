@@ -145,7 +145,7 @@ export async function POST(req: NextRequest) {
         message_id: sentData.id,
         posted_by: session.user?.name || session.user?.email || 'Admin',
       },
-    }).catch((e) => console.warn('[LOG ERROR]:', e?.message));
+    });
 
     return NextResponse.json({
       success: true,

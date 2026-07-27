@@ -43,6 +43,7 @@ export default function SocialPage() {
   const [newAlertHandle, setNewAlertHandle] = useState('');
   const [newAlertPlatform, setNewAlertPlatform] = useState<'twitch' | 'tiktok'>('twitch');
   const [newAlertChannelId, setNewAlertChannelId] = useState('');
+  const [loadingAlerts, setLoadingAlerts] = useState(false);
   // EN TTS System state
   const [ttsEnabled, setTtsEnabled] = useState(true);
   const [ttsLanguage, setTtsLanguage] = useState('en');
