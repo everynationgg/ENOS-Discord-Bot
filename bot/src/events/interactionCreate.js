@@ -14,6 +14,8 @@ const {
   handleIGNNext,
 } = require('../modules/moderation/verification');
 
+const userButtonCooldowns = new Map();
+
 module.exports = {
   name: Events.InteractionCreate,
   /**
@@ -44,6 +46,19 @@ module.exports = {
 
       // ─── Button Interactions ──────────────────────────────────────────────────
       if (interaction.isButton()) {
+        const cooldownKey = `${interaction.user.id}:${interaction.customId}`;
+        const now = Date.now();
+        const lastClick = userButtonCooldowns.get(cooldownKey) || 0;
+        if (now - lastClick < 1200) {
+          return interaction.reply({ content: '⏱️ Please wait a moment before clicking again.', flags: MessageFlags.Ephemeral }).catch(() => {});
+        }
+        userButtonCooldowns.set(cooldownKey, now);
+        if (userButtonCooldowns.size > 500) {
+          for (const [k, t] of userButtonCooldowns.entries()) {
+            if (now - t > 60000) userButtonCooldowns.delete(k);
+          }
+        }
+
         logger.info(`[INTERACTION] Button click: customId="${interaction.customId}" user=${interaction.user.id}`);
         if (interaction.customId === 'vault_get_daily_quests') {
           try {
