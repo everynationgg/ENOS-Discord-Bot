@@ -5,6 +5,8 @@ const gTTS = require('gtts');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
+const ffmpegPath = require('ffmpeg-static');
+const { execFile } = require('child_process');
 const logger = require('../../lib/logger');
 const { supabase } = require('../../lib/supabase');
 
@@ -111,7 +113,7 @@ function cleanTextForSpeech(text) {
 }
 
 /**
- * Translates input text using Gemini 2.0 Flash based on target language & persona
+ * Translates input text using Gemini 2.0 / 1.5 Flash with fallback model chain & strict translation rules
  */
 async function translateTextWithGemini(rawText, targetLangCode, persona) {
   const cleaned = cleanTextForSpeech(rawText);
@@ -127,7 +129,7 @@ async function translateTextWithGemini(rawText, targetLangCode, persona) {
   const targetLangNames = {
     en: 'English',
     ja: 'Japanese',
-    tl: 'Tagalog (Filipino language)',
+    tl: 'Tagalog (Filipino)',
     es: 'Spanish',
     fr: 'French',
     de: 'German',
@@ -136,27 +138,40 @@ async function translateTextWithGemini(rawText, targetLangCode, persona) {
   const langName = targetLangNames[targetLangCode] || 'English';
   const instruction = personaInstructions[persona] || personaInstructions.default;
 
-  try {
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
-    const prompt = `Task: ${instruction}\nTarget Spoken Language: ${langName}\n\nOriginal Text: "${cleaned}"\n\nInstructions: Provide the exact translation in ${langName}. Do NOT prefix with "User said:", "Translation:", or quotes. Return ONLY the translated spoken sentence.`;
+  const prompt = `You are a strict, high-precision voice translator.\n` +
+    `Task: ${instruction}\n` +
+    `Target Spoken Language: ${langName}\n\n` +
+    `CRITICAL RULE: If the original text is in Tagalog, Spanish, Japanese, or any other language, YOU MUST TRANSLATE IT FULLY into ${langName}. For example, if the input is "Ano nangyari?" and Target Language is English, return "What happened?". NEVER echo untranslated words.\n\n` +
+    `Original Input Text: "${cleaned}"\n\n` +
+    `Output: Return ONLY the translated spoken sentence in ${langName}. Do NOT include quotes, "Translation:", or "User said:".`;
 
-    const res = await model.generateContent(prompt);
-    const translation = res.response.text().trim();
-    return translation || cleaned;
-  } catch (err) {
-    logger.warn('[EN TTS] Gemini translation fallback:', err.message);
-    return cleaned;
+  const modelsToTry = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro'];
+
+  for (const modelName of modelsToTry) {
+    try {
+      const model = genAI.getGenerativeModel({ model: modelName });
+      const res = await model.generateContent(prompt);
+      const translation = res.response.text().trim();
+      if (translation) {
+        logger.info(`[EN TTS] Translated via ${modelName}: "${cleaned}" -> "${translation}" (${langName})`);
+        return translation;
+      }
+    } catch (err) {
+      logger.warn(`[EN TTS] Model ${modelName} error (${err.message}). Trying fallback...`);
+    }
   }
+
+  return cleaned;
 }
 
 /**
- * Synthesizes audio file for target translation using gTTS with automatic language fallbacks
+ * Synthesizes audio file for target translation using gTTS
  */
 function generateTtsAudioFile(text, langCode) {
   const gttsLangMap = {
     en: 'en',
     ja: 'ja',
-    tl: 'es', // gtts fallback for Tagalog phonetic rendering if 'tl' unsupported
+    tl: 'es',
     es: 'es',
     fr: 'fr',
     de: 'de',
@@ -172,7 +187,7 @@ function generateTtsAudioFile(text, langCode) {
         const gtts = new gTTS(text, langToUse);
         gtts.save(tempPath, (err) => {
           if (err && langToUse !== 'en') {
-            attemptSave('en'); // Retry with English fallback
+            attemptSave('en');
           } else {
             resolve(tempPath);
           }
@@ -191,7 +206,54 @@ function generateTtsAudioFile(text, langCode) {
 }
 
 /**
- * Process next audio item in queue for a session with failsafe error recovery
+ * Applies Voice Model pitch shifting & Character Persona audio filters via FFmpeg
+ */
+function applyAudioEffects(inputPath, voiceModel, persona) {
+  return new Promise((resolve) => {
+    if (!ffmpegPath) return resolve(inputPath);
+
+    const outputPath = path.join(os.tmpdir(), `tts_fx_${Date.now()}_${Math.random().toString(36).substring(7)}.mp3`);
+    let filters = [];
+
+    // 1. Voice Model Pitch Modulation
+    if (voiceModel === 'male') {
+      filters.push('asetrate=24000*0.82,atempo=1.22');
+    } else if (voiceModel === 'deep') {
+      filters.push('asetrate=24000*0.70,atempo=1.42,equalizer=f=100:width_type=h:width=200:g=10');
+    } else if (voiceModel === 'neutral') {
+      filters.push('asetrate=24000*0.92,atempo=1.08');
+    } else if (voiceModel === 'female') {
+      filters.push('asetrate=24000*1.08,atempo=0.92');
+    }
+
+    // 2. Character Persona Audio Effects
+    if (persona === 'announcer') {
+      filters.push('atempo=1.12,equalizer=f=3000:width_type=h:width=1000:g=5');
+    } else if (persona === 'error_mod') {
+      filters.push('flanger=delay=8:depth=4:regen=60:speed=0.6,phaser=speed=0.5:decay=0.5');
+    } else if (persona === 'calm') {
+      filters.push('lowpass=f=3200,atempo=0.92');
+    }
+
+    if (filters.length === 0) return resolve(inputPath);
+
+    const filterString = filters.join(',');
+    const args = ['-y', '-i', inputPath, '-af', filterString, outputPath];
+
+    execFile(ffmpegPath, args, (err) => {
+      if (err) {
+        logger.warn('[EN TTS] FFmpeg audio filter fallback:', err.message);
+        resolve(inputPath);
+      } else {
+        fs.unlink(inputPath, () => {});
+        resolve(outputPath);
+      }
+    });
+  });
+}
+
+/**
+ * Process next audio item in queue for a session with pitch shift & persona FX
  */
 async function processSpeechQueue(guildId) {
   const session = activeSessions.get(guildId);
@@ -207,14 +269,16 @@ async function processSpeechQueue(guildId) {
       return processSpeechQueue(guildId);
     }
 
-    const audioFilePath = await generateTtsAudioFile(translatedText, session.language);
-    const resource = createAudioResource(audioFilePath);
+    const rawAudioFile = await generateTtsAudioFile(translatedText, session.language);
+    const finalAudioFile = await applyAudioEffects(rawAudioFile, session.voiceModel, session.persona);
+
+    const resource = createAudioResource(finalAudioFile);
 
     session.player.play(resource);
 
     const onFinish = () => {
       session.isPlaying = false;
-      fs.unlink(audioFilePath, () => {}); // Clean up temp file
+      fs.unlink(finalAudioFile, () => {});
       processSpeechQueue(guildId);
     };
 
