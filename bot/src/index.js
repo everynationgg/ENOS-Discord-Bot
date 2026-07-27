@@ -60,8 +60,17 @@ process.on('SIGINT', () => {
   process.exit(0);
 });
 
+// ─── Global Error Handling & Safety ───────────────────────────────────────────
+client.on('error', (err) => {
+  logger.error('[DISCORD CLIENT ERROR]', err);
+});
+
+process.on('uncaughtException', (err) => {
+  logger.error('[UNCAUGHT EXCEPTION]', err);
+});
+
 process.on('unhandledRejection', (reason, promise) => {
-  logger.error('Unhandled Rejection at:', promise, 'reason:', reason);
+  logger.error('[UNHANDLED REJECTION] at:', promise, 'reason:', reason);
 });
 
 module.exports = client;
