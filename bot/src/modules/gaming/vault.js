@@ -132,44 +132,28 @@ async function awardCoins(discordId, guildId, amount, reason, guild = null) {
 }
 
 /**
- * Awards coins for sending a message (rate-limited: 1 per N seconds, capped at daily ceiling).
+ * Awards coins for sending a message and tracks daily chat quest progress.
  */
 async function awardMessageCoins(discordId, guildId, guild) {
   const vaultConfig = await getVaultConfig(guildId);
   const rates = { ...DEFAULT_RATES, ...vaultConfig.rates };
 
-  // Fast RAM Cooldown Check: avoid any DB queries if message sent within rate limit
   const ramKey = `${guildId}:${discordId}`;
-  const lastRAMTime = lastUserMessageRAMMap.get(ramKey);
-  if (lastRAMTime) {
-    const elapsedSeconds = (Date.now() - lastRAMTime) / 1000;
-    if (elapsedSeconds < rates.message_rate_limit_seconds) return;
-  }
+  const lastRAMTime = lastUserMessageRAMMap.get(ramKey) || 0;
+  const elapsedSeconds = (Date.now() - lastRAMTime) / 1000;
+
+  // Anti-spam 2-second check for counting messages toward daily quest
+  if (elapsedSeconds < 2) return;
+  lastUserMessageRAMMap.set(ramKey, Date.now());
 
   const balance = await getOrCreateBalance(discordId, guildId);
 
-  // Daily Earning Hard Cap Check (prevent exceeding daily 1.50 coins cap)
-  const maxDaily = rates.daily_cap || 1.50;
-  if ((balance?.coins_earned_today || 0) >= maxDaily) return;
-
-  // Rate limit check from DB timestamp
-  if (balance?.last_message_at) {
-    const secondsSinceLast = (Date.now() - new Date(balance.last_message_at).getTime()) / 1000;
-    if (secondsSinceLast < rates.message_rate_limit_seconds) {
-      lastUserMessageRAMMap.set(ramKey, new Date(balance.last_message_at).getTime());
-      return;
-    }
-  }
-
-  // Update RAM timestamp
-  lastUserMessageRAMMap.set(ramKey, Date.now());
-
-  // Update last_message_at + messages_today (track daily messages continuously)
+  // Always increment daily message counter
   const newMessagesToday = (balance?.messages_today || 0) + 1;
   const chatGoal = rates.daily_quest_chat_threshold || 5;
   let chatQuestCompleted = balance?.quest_chat_completed || false;
 
-  if (balance?.quest_started && !chatQuestCompleted && newMessagesToday >= chatGoal) {
+  if (!chatQuestCompleted && newMessagesToday >= chatGoal) {
     chatQuestCompleted = true;
     await awardCoins(discordId, guildId, rates.daily_quest_chat_bonus || 1, 'chat_quest', guild);
   }
@@ -180,11 +164,18 @@ async function awardMessageCoins(discordId, guildId, guild) {
       last_message_at: new Date().toISOString(),
       messages_today: newMessagesToday,
       quest_chat_completed: chatQuestCompleted,
+      quest_started: true, // Ensure quest state is marked active
     })
     .eq('discord_id', discordId)
     .eq('guild_id', guildId);
 
-  await awardCoins(discordId, guildId, rates.message, 'message', guild);
+  // Award coin reward if outside rate-limit window & below daily cap
+  if (elapsedSeconds >= (rates.message_rate_limit_seconds || 60)) {
+    const maxDaily = rates.daily_cap || 50;
+    if ((balance?.coins_earned_today || 0) < maxDaily) {
+      await awardCoins(discordId, guildId, rates.message || 1, 'message', guild);
+    }
+  }
 }
 
 /**
@@ -212,7 +203,7 @@ async function handleVoiceLeave(discordId, guildId, minutesSpent, guild) {
   const voiceGoal = rates.daily_quest_voice_threshold || 30;
   let voiceQuestCompleted = balance?.quest_voice_completed || false;
 
-  if (balance?.quest_started && !voiceQuestCompleted && newVoiceToday >= voiceGoal) {
+  if (!voiceQuestCompleted && newVoiceToday >= voiceGoal) {
     voiceQuestCompleted = true;
     await awardCoins(discordId, guildId, rates.daily_quest_voice_bonus || 1, 'voice_quest', guild);
   }
