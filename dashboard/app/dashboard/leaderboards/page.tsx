@@ -71,10 +71,10 @@ export default function LeaderboardsDashboard() {
     fetchChannels();
   }, [status, fetchLeaderboards, fetchChannels]);
 
-  // Live Auto-Update Polling (Every 5 Seconds)
+  // Live Auto-Update Polling (Every 5 Minutes / 300,000 ms)
   useEffect(() => {
     if (!autoUpdate || status !== 'authenticated') return;
-    const interval = setInterval(fetchLeaderboards, 5000);
+    const interval = setInterval(fetchLeaderboards, 300000);
     return () => clearInterval(interval);
   }, [autoUpdate, status, fetchLeaderboards]);
 
@@ -277,7 +277,7 @@ export default function LeaderboardsDashboard() {
                         display: 'inline-block',
                       }}
                     />
-                    {autoUpdate ? 'Auto-Update ON (5s)' : 'Auto-Update OFF'}
+                    {autoUpdate ? 'Auto-Update ON (5m)' : 'Auto-Update OFF'}
                   </button>
 
                   <button
