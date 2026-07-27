@@ -258,6 +258,7 @@ async function handleTriviaQuestCompletion(discordId, guildId, guild) {
       snapshot: { quest_trivia_completed: true },
     }).catch(() => {});
     logger.info(`[VAULT] Trivia quest completed by ${discordId}`);
+  }
 }
 
 /**
