@@ -69,7 +69,8 @@ function clearFeatureConfigCache(guildId = null, featureKey = null) {
  */
 async function isFeatureEnabled(guildId, featureKey) {
   const row = await getFeatureConfig(guildId, featureKey);
-  return row?.enabled ?? false;
+  if (!row) return true; // Default features to enabled unless explicitly disabled
+  return row.enabled ?? true;
 }
 
 /**
