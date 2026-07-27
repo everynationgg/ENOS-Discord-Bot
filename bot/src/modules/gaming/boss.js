@@ -623,7 +623,7 @@ async function triggerOverkillRevival(guildId, boss) {
     for (const p of participants || []) {
       const apUsed = Math.max(0, 5 - (p.ap_remaining || 0));
       if (apUsed > 0) {
-        const slayPoints = Math.round((apUsed / 5) * 10);
+        const slayPoints = Number(((apUsed / 5) * 1.5).toFixed(2));
         await supabase
           .from('boss_player_states')
           .update({ weekly_points: slayPoints })
@@ -669,7 +669,7 @@ async function triggerOverkillRevival(guildId, boss) {
 }
 
 /**
- * Handles Overkill Boss defeat, updating participants' points to 15 AP-scaled fixed points (1.5x multiplier).
+ * Handles Overkill Boss defeat, updating participants' points to 2.5 AP-scaled fixed points.
  */
 async function handleOverkillDefeat(guildId, boss) {
   await supabase
@@ -688,8 +688,8 @@ async function handleOverkillDefeat(guildId, boss) {
     for (const p of participants || []) {
       const apUsed = Math.max(0, 5 - (p.ap_remaining || 0));
       if (apUsed > 0) {
-        const overkillPoints = Math.round((apUsed / 5) * 15);
-        const prevPoints = p.weekly_points || 0;
+        const overkillPoints = Number(((apUsed / 5) * 2.5).toFixed(2));
+        const prevPoints = Number(p.weekly_points || 0);
         const delta = Math.max(0, overkillPoints - prevPoints);
 
         await supabase

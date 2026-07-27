@@ -427,7 +427,7 @@ export default function LeaderboardsDashboard() {
                       >
                         <th style={{ padding: '0.5rem' }}>Rank</th>
                         <th style={{ padding: '0.5rem' }}>Member</th>
-                        <th style={{ padding: '0.5rem' }}>Trivia Points (₱ PHP)</th>
+                        <th style={{ padding: '0.5rem' }}>Trivia Points (XP)</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -455,7 +455,7 @@ export default function LeaderboardsDashboard() {
                               </div>
                             </td>
                             <td style={{ padding: '0.65rem 0.5rem', fontWeight: 700, color: 'var(--accent-primary)' }}>
-                              {row.points} pts (₱{Number(row.points).toFixed(2)})
+                              {row.points} pts
                             </td>
                           </tr>
                         );

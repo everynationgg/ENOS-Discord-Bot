@@ -15,20 +15,20 @@ const DEFAULT_TIERS = [
   { name: 'Opal', key: 'opal', threshold: 3000, emoji: '🔮', rarity: 'MYTHIC', color: 0xA855F7 },
 ];
 
-// Default coin rates (Integer Vault Coins per activity)
+// Default coin rates (Vault Coins per activity)
 const DEFAULT_RATES = {
-  message: 1,
-  voice_per_minute: 1,
-  daily_quest_bonus: 5,
-  daily_quest_chat_bonus: 1,
-  daily_quest_voice_bonus: 1,
-  daily_quest_trivia_bonus: 1,
-  daily_quest_reactions_bonus: 1,
-  daily_quest_voice_status_bonus: 1,
-  daily_quest_ai_chat_bonus: 1,
-  daily_quest_boss_bonus: 1,
-  daily_quest_message_threshold: 10,
-  daily_cap: 50,
+  message: 0,                           // Passive message coins disabled (0)
+  voice_per_minute: 0,                  // Passive VC coins disabled (0)
+  daily_quest_bonus: 0.5,               // 0.5 Bonus for completing BOTH daily quests
+  daily_quest_chat_bonus: 1.0,         // 1.0 Coin per quest
+  daily_quest_voice_bonus: 1.0,
+  daily_quest_trivia_bonus: 1.0,
+  daily_quest_reactions_bonus: 1.0,
+  daily_quest_voice_status_bonus: 1.0,
+  daily_quest_ai_chat_bonus: 1.0,
+  daily_quest_boss_bonus: 1.0,
+  daily_quest_message_threshold: 5,
+  daily_cap: 2.5,                        // 2.5 Coins/day hard cap from daily quests
   message_rate_limit_seconds: 60,
 };
 
@@ -87,20 +87,38 @@ async function awardCoins(discordId, guildId, amount, reason, guild = null) {
     }
   }
 
-  // Update balance
-  const { data: balance } = await supabase
-    .from('vault_balances')
-    .upsert(
-      { discord_id: discordId, guild_id: guildId },
-      { onConflict: 'discord_id,guild_id', ignoreDuplicates: false }
-    )
-    .select()
-    .single();
+  // Enforce 2.5 Coins/day hard cap for Daily Quest rewards (Boss slay rewards are exempt)
+  const isBossReward = reason.startsWith('boss_main_slay') || reason.startsWith('boss_overkill_slay');
+  let allowedAmount = finalAmount;
 
+  if (!isBossReward) {
+    const current = await getOrCreateBalance(discordId, guildId);
+    const earnedToday = Number(current?.coins_earned_today || 0);
+    const maxDaily = 2.5;
+
+    if (earnedToday >= maxDaily) {
+      logger.info(`[VAULT] User ${discordId} already reached daily quest cap (${earnedToday}/${maxDaily} Coins). Skipping award.`);
+      return;
+    }
+
+    allowedAmount = Math.min(finalAmount, maxDaily - earnedToday);
+    if (allowedAmount <= 0) return;
+
+    // Track coins_earned_today
+    await supabase
+      .from('vault_balances')
+      .update({
+        coins_earned_today: earnedToday + allowedAmount,
+      })
+      .eq('discord_id', discordId)
+      .eq('guild_id', guildId);
+  }
+
+  // Update balance
   const { error: rpcErr } = await supabase.rpc('increment_coins', {
     p_discord_id: discordId,
     p_guild_id: guildId,
-    p_delta: finalAmount,
+    p_delta: allowedAmount,
   });
 
   if (rpcErr) {
@@ -109,7 +127,7 @@ async function awardCoins(discordId, guildId, amount, reason, guild = null) {
     await supabase
       .from('vault_balances')
       .update({
-        coins: (current?.coins || 0) + finalAmount,
+        coins: (Number(current?.coins) || 0) + allowedAmount,
         updated_at: new Date().toISOString(),
         last_active: new Date().toISOString(),
       })
@@ -121,7 +139,7 @@ async function awardCoins(discordId, guildId, amount, reason, guild = null) {
   await supabase.from('vault_transactions').insert({
     guild_id: guildId,
     discord_id: discordId,
-    delta: finalAmount,
+    delta: allowedAmount,
     reason,
   });
 
@@ -177,13 +195,7 @@ async function awardMessageCoins(discordId, guildId, guild) {
     .eq('discord_id', discordId)
     .eq('guild_id', guildId);
 
-  // Award coin reward if outside rate-limit window & below daily cap
-  if (elapsedSeconds >= (rates.message_rate_limit_seconds || 60)) {
-    const maxDaily = rates.daily_cap || 50;
-    if ((balance?.coins_earned_today || 0) < maxDaily) {
-      await awardCoins(discordId, guildId, rates.message || 1, 'message', guild);
-    }
-  }
+  // Passive coins disabled (Quests only)
 }
 
 /**
@@ -197,11 +209,7 @@ async function handleVoiceJoin(discordId, guildId) {
  * Called when user leaves voice — awards coins for time spent and updates voice quest
  */
 async function handleVoiceLeave(discordId, guildId, minutesSpent, guild) {
-  const vaultConfig = await getVaultConfig(guildId);
-  const rates = { ...DEFAULT_RATES, ...vaultConfig.rates };
-  const earned = minutesSpent * rates.voice_per_minute;
-
-  await awardCoins(discordId, guildId, earned, 'voice', guild);
+  // Passive VC coins disabled (Quests only)
 
   // Update total voice minutes & voice quest progress
   const balance = await getOrCreateBalance(discordId, guildId);
@@ -272,7 +280,7 @@ async function handleStartQuest(discordId, guildId) {
 
   if (!assigned || !Array.isArray(assigned) || assigned.length === 0) {
     const shuffled = [...ALL_QUESTS].sort(() => Math.random() - 0.5);
-    assigned = shuffled.slice(0, 3);
+    assigned = shuffled.slice(0, 2); // 2 Quests Per Day
   }
 
   const vaultConfig = await getVaultConfig(guildId);
