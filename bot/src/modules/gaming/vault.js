@@ -280,7 +280,7 @@ async function handleStartQuest(discordId, guildId) {
 
   if (!assigned || !Array.isArray(assigned) || assigned.length === 0) {
     const shuffled = [...ALL_QUESTS].sort(() => Math.random() - 0.5);
-    assigned = shuffled.slice(0, 2); // 2 Quests Per Day
+    assigned = shuffled.slice(0, 3); // 3 Quests Per Day
   }
 
   const vaultConfig = await getVaultConfig(guildId);

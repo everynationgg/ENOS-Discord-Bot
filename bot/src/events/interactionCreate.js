@@ -89,10 +89,15 @@ module.exports = {
           return handleBossButton(interaction);
         }
         if (interaction.customId === 'vault_get_daily_quests') {
-          try {
-            if (!interaction.deferred && !interaction.replied) {
-              await interaction.deferReply({ ephemeral: true }).catch(() => {});
+          if (!interaction.deferred && !interaction.replied) {
+            try {
+              await interaction.deferReply({ ephemeral: true });
+            } catch (e) {
+              logger.warn(`[INTERACTION] deferReply notice for vault_get_daily_quests: ${e.message}`);
             }
+          }
+
+          try {
             const { handleStartQuest, build3QuestsEphemeralEmbed } = require('../modules/gaming/vault');
             await handleStartQuest(interaction.user.id, interaction.guild.id);
             const embed = await build3QuestsEphemeralEmbed(interaction.user.id, interaction.guild.id, interaction.guild);
@@ -105,7 +110,7 @@ module.exports = {
                 }, 120000);
               }
             } else {
-              const replyMsg = await interaction.reply({ embeds: [embed], ephemeral: true }).catch(() => null);
+              const replyMsg = await interaction.followUp({ embeds: [embed], ephemeral: true }).catch(() => null);
               if (replyMsg) {
                 setTimeout(() => {
                   interaction.deleteReply().catch(() => {});
@@ -118,23 +123,28 @@ module.exports = {
             if (interaction.deferred || interaction.replied) {
               await interaction.editReply({ content: errorMsg }).catch(() => {});
             } else {
-              await interaction.reply({ content: errorMsg, ephemeral: true }).catch(() => {});
+              await interaction.followUp({ content: errorMsg, ephemeral: true }).catch(() => {});
             }
           }
           return;
         }
         if (interaction.customId === 'vault_start_quest') {
-          try {
-            if (!interaction.deferred && !interaction.replied) {
-              await interaction.deferReply({ ephemeral: true }).catch(() => {});
+          if (!interaction.deferred && !interaction.replied) {
+            try {
+              await interaction.deferReply({ ephemeral: true });
+            } catch (e) {
+              logger.warn(`[INTERACTION] deferReply notice for vault_start_quest: ${e.message}`);
             }
+          }
+
+          try {
             const { handleStartQuest } = require('../modules/gaming/vault');
             const res = await handleStartQuest(interaction.user.id, interaction.guild.id);
             const content = res.message || '▶️ **Daily Quests Activated!**';
             if (interaction.deferred || interaction.replied) {
               await interaction.editReply({ content }).catch(() => {});
             } else {
-              await interaction.reply({ content, ephemeral: true }).catch(() => {});
+              await interaction.followUp({ content, ephemeral: true }).catch(() => {});
             }
           } catch (err) {
             logger.error('[INTERACTION] Error in vault_start_quest:', err.message || err);
