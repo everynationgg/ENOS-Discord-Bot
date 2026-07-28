@@ -701,4 +701,5 @@ module.exports = {
       return;
     }
   },
+  buildPublicBossEmbedPayload,
 };
