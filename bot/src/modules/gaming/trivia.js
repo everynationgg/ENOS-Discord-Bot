@@ -275,6 +275,19 @@ async function handleTriviaStartClick(interaction) {
     }
 
     if (drop.status !== 'active') {
+      const { data: activeDrop } = await supabase
+        .from('trivia_drops')
+        .select('id, channel_id')
+        .eq('guild_id', guildId)
+        .eq('status', 'active')
+        .maybeSingle();
+
+      if (activeDrop && activeDrop.channel_id) {
+        return interaction.editReply({
+          content: `❌ This trivia session has already closed.\n\n📍 **An active Trivia Drop is live right now in <#${activeDrop.channel_id}>!** Head over to <#${activeDrop.channel_id}> to play! 🧠⚡`,
+        });
+      }
+
       return interaction.editReply({ content: '❌ This trivia session has already closed.' });
     }
 
