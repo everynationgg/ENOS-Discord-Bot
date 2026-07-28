@@ -43,13 +43,17 @@ export async function POST(req: NextRequest) {
 
     const targetGuildId = guild_id || process.env.DISCORD_GUILD_ID!;
 
+    const displayName = (body.display_name || cleanHandle).trim();
+    const targetChannelId = channel_id.trim();
+
     const { data, error } = await supabaseAdmin
       .from('live_alerts')
       .insert({
         guild_id: targetGuildId,
         platform,
         handle: cleanHandle,
-        channel_id: channel_id.trim(),
+        display_name: displayName,
+        alert_channel_id: targetChannelId,
         is_live: false,
       })
       .select()

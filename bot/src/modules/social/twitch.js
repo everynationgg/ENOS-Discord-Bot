@@ -74,9 +74,11 @@ function buildLiveEmbed(streamer, streamData, platform, guildName) {
     ? `https://twitch.tv/${streamer.handle}`
     : streamer.stream_url;
 
+  const displayName = streamer.display_name || streamer.handle || 'Streamer';
+
   return new EmbedBuilder()
     .setColor(platformColor)
-    .setTitle(`${platformEmoji} ${streamer.display_name} is LIVE!`)
+    .setTitle(`${platformEmoji} ${displayName} is LIVE!`)
     .setDescription(`**${streamData.title || 'No title'}**`)
     .setImage(streamData.thumbnailUrl || null)
     .addFields(
@@ -92,9 +94,10 @@ function buildLiveEmbed(streamer, streamData, platform, guildName) {
  * Builds a "Stream Ended" static embed.
  */
 function buildStreamEndedEmbed(streamer, platform, guildName) {
+  const displayName = streamer.display_name || streamer.handle || 'Streamer';
   return new EmbedBuilder()
     .setColor(0x6B7280)
-    .setTitle(`⬛ ${streamer.display_name} — Stream Ended`)
+    .setTitle(`⬛ ${displayName} — Stream Ended`)
     .setDescription('Thanks for watching! The stream has ended.')
     .setFooter({ text: `${guildName || 'Every Nation'} Social Sync` })
     .setTimestamp();
@@ -148,7 +151,10 @@ async function handleGoLive(client, streamer, streamData, platform) {
   const guild = client.guilds.cache.get(streamer.guild_id);
   if (!guild) return;
 
-  const channel = await guild.channels.fetch(streamer.alert_channel_id).catch(() => null);
+  const targetChannelId = streamer.alert_channel_id || streamer.channel_id;
+  if (!targetChannelId) return;
+
+  const channel = await guild.channels.fetch(targetChannelId).catch(() => null);
   if (!channel) return;
 
   const embed = buildLiveEmbed(streamer, streamData, platform, guild.name);
@@ -182,7 +188,7 @@ async function handleGoLive(client, streamer, streamData, platform) {
     })
     .eq('id', streamer.id);
 
-  logger.info(`[SOCIAL] ${streamer.display_name} went live on ${platform}`);
+  logger.info(`[SOCIAL] ${streamer.display_name || streamer.handle} went live on ${platform}`);
 }
 
 /**
@@ -192,9 +198,10 @@ async function handleGoOffline(client, streamer) {
   const guild = client.guilds.cache.get(streamer.guild_id);
   if (!guild) return;
 
-  if (streamer.alert_channel_id && streamer.last_message_id) {
+  const targetChannelId = streamer.alert_channel_id || streamer.channel_id;
+  if (targetChannelId && streamer.last_message_id) {
     try {
-      const channel = await guild.channels.fetch(streamer.alert_channel_id);
+      const channel = await guild.channels.fetch(targetChannelId);
       const message = await channel.messages.fetch(streamer.last_message_id);
       const endedEmbed = buildStreamEndedEmbed(streamer, streamer.platform, guild.name);
       await message.edit({ embeds: [endedEmbed], components: [] });
@@ -213,7 +220,7 @@ async function handleGoOffline(client, streamer) {
     })
     .eq('id', streamer.id);
 
-  logger.info(`[SOCIAL] ${streamer.display_name} went offline.`);
+  logger.info(`[SOCIAL] ${streamer.display_name || streamer.handle} went offline.`);
 }
 
 module.exports = { checkTwitchLive, handleGoLive, handleGoOffline };

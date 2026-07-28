@@ -111,7 +111,7 @@ async function triggerTriviaDrop(client, guildId) {
 
     const config = featureConfig.config || {};
     const allowedChannels = config.allowed_channels || [];
-    const closeTime = config.close_time || '22:00';
+    const closeTime = config.close_time || '23:59';
 
     const chosen = chooseWeightedChannel(allowedChannels);
     if (!chosen) {
@@ -803,17 +803,9 @@ function getLocalTimeInTimezone(timezone) {
  */
 function generateDropTimesForDay(dropsCount) {
   const count = Math.min(3, Math.max(1, dropsCount || 1));
-  const windows = count === 1
-    ? [[9, 20]]
-    : count === 2
-      ? [[9, 14], [15, 20]]
-      : [[9, 12], [13, 16], [17, 20]];
-
-  return windows.map(([startH, endH]) => {
-    const h = Math.floor(Math.random() * (endH - startH + 1)) + startH;
-    const m = Math.floor(Math.random() * 60);
-    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
-  });
+  if (count === 1) return ['00:01'];
+  if (count === 2) return ['00:01', '12:00'];
+  return ['00:01', '08:00', '16:00'];
 }
 
 /**
@@ -963,12 +955,19 @@ async function checkAndProcessTrivia(client) {
         local = getLocalTimeInTimezone('Asia/Manila');
       }
 
+      const today = local.dateStr;
       const currentTimeStr = local.timeStr;
-      const [currH, currM] = currentTimeStr.split(':').map(Number);
-      const [closeH, closeM] = drop.close_time.split(':').map(Number);
+      const dropDate = drop.created_at ? drop.created_at.split('T')[0] : today;
 
-      if (currH > closeH || (currH === closeH && currM >= closeM)) {
-        logger.info(`[TRIVIA CRON] Auto-closing drop ${drop.id} due to close time reached (${currentTimeStr} >= ${drop.close_time}).`);
+      const [currH, currM] = currentTimeStr.split(':').map(Number);
+      const closeTime = drop.close_time || '23:59';
+      const [closeH, closeM] = closeTime.split(':').map(Number);
+
+      const isPastCloseTime = currH > closeH || (currH === closeH && currM >= closeM);
+      const isPastDate = dropDate < today;
+
+      if (isPastDate || isPastCloseTime) {
+        logger.info(`[TRIVIA CRON] Auto-closing drop ${drop.id} (isPastDate=${isPastDate}, isPastCloseTime=${isPastCloseTime}, current=${currentTimeStr}, close=${closeTime}).`);
         await forceCloseDrop(client, drop.guild_id, drop.id, 'completed');
       }
     }

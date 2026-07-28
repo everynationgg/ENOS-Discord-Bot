@@ -115,11 +115,11 @@ OAuth2 Scopes: `bot applications.commands`
 
 ## Deployment
 
-### Bot → Railway
+### Bot → Fly.io
 1. Push code to GitHub
-2. Create a new Railway project → Deploy from GitHub → select `bot/` root
-3. Add all environment variables in Railway dashboard
-4. Service stays alive 24/7 on free tier
+2. Install Fly CLI and run `fly deploy` (uses root `Dockerfile` and `fly.toml`)
+3. Add environment variables via `fly secrets set`
+4. Runs single-instance continuous Discord bot worker on Fly.io
 
 ### Dashboard → Vercel
 1. Push code to GitHub

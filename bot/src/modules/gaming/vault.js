@@ -175,13 +175,15 @@ async function awardMessageCoins(discordId, guildId, guild) {
     chatQuestCompleted = true;
     await awardCoins(discordId, guildId, rates.daily_quest_chat_bonus || 1, 'chat_quest', guild);
     // Log quest completion
-    await supabase.from('vault_quest_log').insert({
-      guild_id: guildId,
-      discord_id: discordId,
-      action: 'quest_complete',
-      quest_key: 'chat',
-      snapshot: { messages_today: newMessagesToday, goal: chatGoal },
-    }).catch(() => {});
+    try {
+      await supabase.from('vault_quest_log').insert({
+        guild_id: guildId,
+        discord_id: discordId,
+        action: 'quest_complete',
+        quest_key: 'chat',
+        snapshot: { messages_today: newMessagesToday, goal: chatGoal },
+      });
+    } catch (e) {}
   }
 
   await supabase
@@ -225,13 +227,15 @@ async function handleVoiceLeave(discordId, guildId, minutesSpent, guild) {
   if (!voiceQuestCompleted && newVoiceToday >= voiceGoal) {
     voiceQuestCompleted = true;
     await awardCoins(discordId, guildId, rates.daily_quest_voice_bonus || 1, 'voice_quest', guild);
-    await supabase.from('vault_quest_log').insert({
-      guild_id: guildId,
-      discord_id: discordId,
-      action: 'quest_complete',
-      quest_key: 'voice',
-      snapshot: { voice_minutes_today: newVoiceToday, goal: voiceGoal },
-    }).catch(() => {});
+    try {
+      await supabase.from('vault_quest_log').insert({
+        guild_id: guildId,
+        discord_id: discordId,
+        action: 'quest_complete',
+        quest_key: 'voice',
+        snapshot: { voice_minutes_today: newVoiceToday, goal: voiceGoal },
+      });
+    } catch (e) {}
   }
 
   await supabase
@@ -261,13 +265,15 @@ async function handleTriviaQuestCompletion(discordId, guildId, guild) {
       .eq('guild_id', guildId);
 
     await awardCoins(discordId, guildId, rates.daily_quest_trivia_bonus || 1, 'trivia_quest', guild);
-    await supabase.from('vault_quest_log').insert({
-      guild_id: guildId,
-      discord_id: discordId,
-      action: 'quest_complete',
-      quest_key: 'trivia',
-      snapshot: { quest_trivia_completed: true },
-    }).catch(() => {});
+    try {
+      await supabase.from('vault_quest_log').insert({
+        guild_id: guildId,
+        discord_id: discordId,
+        action: 'quest_complete',
+        quest_key: 'trivia',
+        snapshot: { quest_trivia_completed: true },
+      });
+    } catch (e) {}
     logger.info(`[VAULT] Trivia quest completed by ${discordId}`);
   }
 }

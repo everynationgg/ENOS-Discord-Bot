@@ -228,7 +228,7 @@ export default function SystemOpsPage() {
                   <div className="stat-card" style={{ margin: 0 }}>
                     <div className="stat-card-label">Bot Version</div>
                     <div className="stat-card-value" style={{ fontSize: '1.25rem' }}>{health?.bot_version || '—'}</div>
-                    <div className="stat-card-sub" style={{ fontSize: '0.75rem' }}>Running on Railway</div>
+                    <div className="stat-card-sub" style={{ fontSize: '0.75rem' }}>Running on Fly.io</div>
                   </div>
 
                   <div className="stat-card" style={{ margin: 0 }}>
