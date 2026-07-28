@@ -283,12 +283,20 @@ async function renderBossImage(data) {
     ctx.fillRect(0, 0, width, height);
 
     ctx.fillStyle = isOverkill ? '#ef4444' : '#38bdf8';
-    ctx.font = 'bold 24px sans-serif';
-    ctx.fillText('SYSTEM ANOMALY DETECTED', 35, 60);
+    ctx.font = 'bold 22px sans-serif';
+    ctx.fillText('SYSTEM ANOMALY DETECTED', 35, 50);
 
-    ctx.fillStyle = '#f8fafc';
-    ctx.font = 'bold 30px sans-serif';
-    ctx.fillText(bossName.toUpperCase(), 35, 100);
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 26px sans-serif';
+    if (isOverkill) {
+      ctx.fillText('BOSS is in OVERKILL MODE', 35, 85);
+      ctx.fillStyle = '#facc15';
+      ctx.font = 'bold 20px sans-serif';
+      ctx.fillText('KEEP ATTACKING!', 35, 118);
+    } else {
+      const displayTitle = bossName.length > 30 ? bossName.substring(0, 28) + '…' : bossName;
+      ctx.fillText(displayTitle.toUpperCase(), 35, 85);
+    }
 
     ctx.restore();
     return canvas.toBuffer('image/png');
