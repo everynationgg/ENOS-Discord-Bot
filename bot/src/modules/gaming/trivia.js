@@ -729,8 +729,8 @@ async function forceCloseDrop(client, guildId, dropId, status = 'completed') {
     const channel = await guild.channels.fetch(drop.channel_id).catch(() => null);
     if (!channel) return;
 
-    const message = await channel.messages.fetch(drop.message_id).catch(() => null);
-    if (message) {
+    const message = drop.message_id ? await channel.messages.fetch(drop.message_id).catch(() => null) : null;
+    if (message && message.embeds?.length) {
       const currentEmbed = message.embeds[0];
       const disabledRow = new ActionRowBuilder().addComponents(
         new ButtonBuilder()
