@@ -189,6 +189,7 @@ async function renderBossImage(data) {
     bossName = 'ERROR-MOD: Corrupted Boss',
     customImageUrl = null,
     customBgUrl = null,
+    victoryImageUrl = null,
     userClassKey = null,
     classImageUrls = {},
     isOverkill = false,
@@ -199,10 +200,11 @@ async function renderBossImage(data) {
   const activeClass = userClassKey || 'mom';
   const targetClassUrl = classImageUrls[activeClass] || classImageUrls.mom || classImageUrls.dad || classImageUrls.kid;
 
-  const [bgBuf, bossBuf, classBuf] = await Promise.all([
+  const [bgBuf, bossBuf, classBuf, victoryBuf] = await Promise.all([
     fetchImageBuffer(customBgUrl),
     fetchImageBuffer(customImageUrl),
     fetchImageBuffer(targetClassUrl),
+    fetchImageBuffer(victoryImageUrl),
   ]);
 
   const normAction = (lastAction || '').toLowerCase();
@@ -260,6 +262,42 @@ async function renderBossImage(data) {
       ctx.lineTo(width, y);
       ctx.stroke();
     }
+  }
+
+  // ─── PHASE V: VICTORY CELEBRATION VIEW ────────────────────────────────────
+  if (viewMode === 'victory') {
+    const mainPicBuf = victoryBuf || bossBuf;
+    if (mainPicBuf) {
+      try {
+        const vicImg = await loadImage(mainPicBuf);
+        if (customBgLoaded) {
+          drawImageContain(ctx, vicImg, 380, 20, 380, 380, 0.5, 0.5);
+        } else {
+          drawImageContain(ctx, vicImg, 0, 0, width, height, 0.5, 0.5);
+        }
+      } catch (e) {}
+    }
+
+    const frameGrad = ctx.createRadialGradient(400, 210, 200, 400, 210, 420);
+    frameGrad.addColorStop(0, 'rgba(0,0,0,0)');
+    frameGrad.addColorStop(1, 'rgba(0,0,0,0.8)');
+    ctx.fillStyle = frameGrad;
+    ctx.fillRect(0, 0, width, height);
+
+    ctx.fillStyle = '#facc15';
+    ctx.font = 'bold 22px sans-serif';
+    ctx.fillText('SYSTEM ANOMALY NEUTRALIZED', 35, 50);
+
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 26px sans-serif';
+    ctx.fillText('VICTORY! ALL BOSSES DEFEATED', 35, 85);
+
+    ctx.fillStyle = '#4ade80';
+    ctx.font = 'bold 20px sans-serif';
+    ctx.fillText('SERVER SAVED & REWARDS AWARDED', 35, 118);
+
+    ctx.restore();
+    return canvas.toBuffer('image/png');
   }
 
   // ─── PHASE A: INITIAL BOSS SPAWN BANNER (Boss Upload Only) ─────────────────

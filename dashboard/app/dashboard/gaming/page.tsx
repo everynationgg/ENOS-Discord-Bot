@@ -1376,6 +1376,7 @@ export default function GamingPage() {
                     const baseHP = config.override_hp || '';
                     const imageUrl = config.custom_image_url || '';
                     const bgUrl = config.custom_bg_url || '';
+                    const victoryImageUrl = config.victory_image_url || '';
                     const momImageUrl = config.mom_image_url || '';
                     const dadImageUrl = config.dad_image_url || '';
                     const kidImageUrl = config.kid_image_url || '';
@@ -1489,6 +1490,15 @@ export default function GamingPage() {
                                 value={staged.custom_bg_url || ''}
                                 onChange={(url) => setConfig('staged_boss_config', { ...staged, custom_bg_url: url })}
                                 helpText="Custom background landscape/arena image for next week's boss."
+                              />
+
+                              <ImageUploader
+                                id="staged-boss-victory-url"
+                                label="🎉 Next Victory Celebration Image (Family Photo)"
+                                placeholder="https://.../victory_family_celebration.png"
+                                value={staged.victory_image_url || ''}
+                                onChange={(url) => setConfig('staged_boss_config', { ...staged, victory_image_url: url })}
+                                helpText="Family/celebration photo shown on Discord when the boss is defeated on Saturday."
                               />
                             </div>
 
@@ -1645,23 +1655,32 @@ export default function GamingPage() {
                           <div className="section-divider-line" />
                         </div>
 
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
                           <ImageUploader
                             id="boss-image-url"
-                            label="🧌 Boss Artwork Image (Displayed on Spawn & Combat)"
-                            placeholder="https://.../boss_environment_art.png"
+                            label="🧌 Boss Artwork Image"
+                            placeholder="https://.../boss_art.png"
                             value={imageUrl}
                             onChange={(url) => setConfig('custom_image_url', url)}
-                            helpText="Full boss artwork image. Displayed ONLY on initial spawn, and on the right side during combat."
+                            helpText="Full boss artwork image displayed during spawn & combat."
                           />
 
                           <ImageUploader
                             id="boss-bg-url"
-                            label="🌄 Arena Background Image (Optional 16:9)"
-                            placeholder="https://.../arena_background.png"
+                            label="🌄 Arena Background Image"
+                            placeholder="https://.../arena_bg.png"
                             value={bgUrl}
                             onChange={(url) => setConfig('custom_bg_url', url)}
-                            helpText="Optional custom background landscape/arena image"
+                            helpText="Optional custom background landscape image"
+                          />
+
+                          <ImageUploader
+                            id="boss-victory-url"
+                            label="🎉 Victory Celebration Image (Family Photo)"
+                            placeholder="https://.../victory_family_celebration.png"
+                            value={victoryImageUrl}
+                            onChange={(url) => setConfig('victory_image_url', url)}
+                            helpText="Family/celebration photo shown on Discord when the boss is defeated on Saturday."
                           />
                         </div>
 

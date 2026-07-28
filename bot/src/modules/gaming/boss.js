@@ -111,6 +111,7 @@ async function getOrCreateActiveBoss(guildId) {
     const updatedConfig = { ...(featureRow?.config || {}) };
     if (stagedConfig.custom_image_url) updatedConfig.custom_image_url = stagedConfig.custom_image_url;
     if (stagedConfig.custom_bg_url) updatedConfig.custom_bg_url = stagedConfig.custom_bg_url;
+    if (stagedConfig.victory_image_url) updatedConfig.victory_image_url = stagedConfig.victory_image_url;
     if (stagedConfig.mom_image_url) updatedConfig.mom_image_url = stagedConfig.mom_image_url;
     if (stagedConfig.dad_image_url) updatedConfig.dad_image_url = stagedConfig.dad_image_url;
     if (stagedConfig.kid_image_url) updatedConfig.kid_image_url = stagedConfig.kid_image_url;
@@ -710,6 +711,55 @@ async function handleOverkillDefeat(guildId, boss) {
   await logBotEvent(guildId, 'boss_overkill_defeated', null, { week: boss.week_identifier });
 }
 
+/**
+ * Concludes the Weekly Boss Battle on Saturday 23:59 GMT+8 and updates the public Victory Card on Discord.
+ */
+async function concludeWeeklyBossBattle(guildId, client = null) {
+  const boss = await getOrCreateActiveBoss(guildId);
+  if (!boss) return;
+
+  if (Number(boss.current_hp) <= 0 && !boss.is_defeated) {
+    await handleOverkillDefeat(guildId, boss);
+  }
+
+  try {
+    const { buildPublicBossEmbedPayload } = require('../../commands/boss');
+    const { data: featureRow } = await supabase
+      .from('guild_config')
+      .select('config')
+      .eq('guild_id', guildId)
+      .eq('feature_key', 'weekly_boss')
+      .maybeSingle();
+
+    const channelId = featureRow?.config?.last_channel_id || featureRow?.config?.channel_id;
+    const messageId = featureRow?.config?.last_message_id;
+
+    if (channelId && client) {
+      const channel = await client.channels.fetch(channelId).catch(() => null);
+      if (channel && channel.isTextBased()) {
+        let publicMsg = messageId ? await channel.messages.fetch(messageId).catch(() => null) : null;
+        if (!publicMsg) {
+          const recent = await channel.messages.fetch({ limit: 15 }).catch(() => null);
+          if (recent) {
+            publicMsg = recent.find(
+              (m) =>
+                m.author.id === client.user.id &&
+                m.embeds.some((e) => e.title?.includes('Weekly Boss') || e.title?.includes('OVERKILL') || e.title?.includes('VICTORY'))
+            );
+          }
+        }
+        if (publicMsg) {
+          const payload = await buildPublicBossEmbedPayload(guildId);
+          await publicMsg.edit(payload);
+          logger.info(`[BOSS CONCLUDE] Successfully updated Victory Card for guild ${guildId}`);
+        }
+      }
+    }
+  } catch (err) {
+    logger.error(`[BOSS CONCLUDE] Error updating Victory Card for guild ${guildId}:`, err.message);
+  }
+}
+
 module.exports = {
   getWeekIdentifier,
   getOrCreateActiveBoss,
@@ -719,4 +769,5 @@ module.exports = {
   allocateStatPoint,
   executeCombatAction,
   generateGlitchBossLore,
+  concludeWeeklyBossBattle,
 };

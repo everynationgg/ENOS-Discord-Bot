@@ -98,23 +98,27 @@ async function buildPublicBossEmbedPayload(guildId) {
     .eq('feature_key', 'weekly_boss')
     .maybeSingle();
 
-  const [momUrl, dadUrl, kidUrl] = await Promise.all([
+  const [momUrl, dadUrl, kidUrl, victoryUrl] = await Promise.all([
     resolveImageUrl(featureRow?.config?.mom_image_url || null),
     resolveImageUrl(featureRow?.config?.dad_image_url || null),
     resolveImageUrl(featureRow?.config?.kid_image_url || null),
+    resolveImageUrl(featureRow?.config?.victory_image_url || null),
   ]);
   const classImageUrls = { mom: momUrl, dad: dadUrl, kid: kidUrl };
+
+  const isVictorious = boss.is_defeated || Number(boss.current_hp) <= 0;
 
   const buffer = await renderBossImage({
     bossName: boss.boss_name,
     bossTitle: boss.boss_title,
     customImageUrl: boss.custom_image_url,
     customBgUrl: featureRow?.config?.custom_bg_url || null,
+    victoryImageUrl: victoryUrl,
     classImageUrls,
     currentHp: Number(boss.current_hp),
     maxHp: Number(boss.max_hp),
     isOverkill: boss.is_overkill,
-    viewMode: 'spawn',
+    viewMode: isVictorious ? 'victory' : 'spawn',
     momBuff: boss.mom_buff,
     dadDebuff: boss.dad_debuff,
     lastAction: boss.last_action,
@@ -129,27 +133,43 @@ async function buildPublicBossEmbedPayload(guildId) {
   const hpBar = '🟩'.repeat(filledBlocks) + '⬛'.repeat(10 - filledBlocks);
 
   const embed = new EmbedBuilder()
-    .setColor(boss.is_overkill ? 0xef4444 : 0x6366f1)
-    .setTitle(`${boss.is_overkill ? '🔥 OVERKILL MODE' : '⚔️ Weekly Boss Bounty'} — ${boss.boss_name}`)
+    .setColor(isVictorious ? 0xfacc15 : (boss.is_overkill ? 0xef4444 : 0x6366f1))
+    .setTitle(isVictorious ? `🏆 VICTORY! WEEKLY BOSS CLEARED — ${boss.boss_name}` : `${boss.is_overkill ? '🔥 OVERKILL MODE' : '⚔️ Weekly Boss Bounty'} — ${boss.boss_name}`)
     .setDescription(
-      `**Lore**: ${boss.lore}\n\n` +
-      `❤️ **HP Status**: ${hpBar} **${hpPct}%** (\`${Number(boss.current_hp).toLocaleString()} / ${Number(boss.max_hp).toLocaleString()} HP\`)\n` +
-      `⚡ **Last Action**: ${boss.last_action || 'None'}\n` +
-      `🛡️ **M.O.M. Buff**: ${boss.mom_buff ? '✅ **ACTIVE** (Ready for Nuke)' : '❌ Inactive'}\n` +
-      `🔨 **D.A.D. Debuff**: ${boss.dad_debuff ? '✅ **ACTIVE** (Ready for Nuke)' : '❌ Inactive'}\n\n` +
-      `👥 **Class Distribution**: 🛡️ \`${classCounts.mom}\` M.O.M. | 🔨 \`${classCounts.dad}\` D.A.D. | ⚡ \`${classCounts.kid}\` K.I.D. (*${totalParticipants} Active Combatants*)\n\n` +
-      `*Click a button below to join a class or engage the boss in your personal private combat panel!*`
+      isVictorious
+        ? `🎉 **CONGRATULATIONS! Server Threat Neutralized!**\n\n` +
+          `All active combatants earned **1.5x Overkill Bonus Points & Vault Coins**!\n\n` +
+          `❤️ **Final HP Status**: ${hpBar} **0%** (\`0 / ${Number(boss.max_hp).toLocaleString()} HP\`)\n` +
+          `⚡ **Final Killing Blow**: ${boss.last_action || 'Boss Slay'}\n` +
+          `👥 **Total Combatants**: 🛡️ \`${classCounts.mom}\` M.O.M. | 🔨 \`${classCounts.dad}\` D.A.D. | ⚡ \`${classCounts.kid}\` K.I.D. (*${totalParticipants} Total Combatants*)\n\n` +
+          `⏱️ *The next Weekly Boss bounty will spawn on Monday at 00:00 GMT+8.*`
+        : `**Lore**: ${boss.lore}\n\n` +
+          `❤️ **HP Status**: ${hpBar} **${hpPct}%** (\`${Number(boss.current_hp).toLocaleString()} / ${Number(boss.max_hp).toLocaleString()} HP\`)\n` +
+          `⚡ **Last Action**: ${boss.last_action || 'None'}\n` +
+          `🛡️ **M.O.M. Buff**: ${boss.mom_buff ? '✅ **ACTIVE** (Ready for Nuke)' : '❌ Inactive'}\n` +
+          `🔨 **D.A.D. Debuff**: ${boss.dad_debuff ? '✅ **ACTIVE** (Ready for Nuke)' : '❌ Inactive'}\n\n` +
+          `👥 **Class Distribution**: 🛡️ \`${classCounts.mom}\` M.O.M. | 🔨 \`${classCounts.dad}\` D.A.D. | ⚡ \`${classCounts.kid}\` K.I.D. (*${totalParticipants} Active Combatants*)\n\n` +
+          `*Click a button below to join a class or engage the boss in your personal private combat panel!*`
     )
     .setImage(`attachment://${filename}`)
     .setFooter({ text: `ENOS Weekly RPG System • Week ${currentWeek}` })
     .setTimestamp();
 
-  const publicRow = new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId('boss_join:mom').setLabel('Join M.O.M.').setStyle(ButtonStyle.Primary).setEmoji('🛡️'),
-    new ButtonBuilder().setCustomId('boss_join:dad').setLabel('Join D.A.D.').setStyle(ButtonStyle.Success).setEmoji('🔨'),
-    new ButtonBuilder().setCustomId('boss_join:kid').setLabel('Join K.I.D.').setStyle(ButtonStyle.Danger).setEmoji('⚡'),
-    new ButtonBuilder().setCustomId('boss_leaderboard').setLabel('Leaderboard').setStyle(ButtonStyle.Secondary).setEmoji('📊')
-  );
+  const publicRow = new ActionRowBuilder();
+  if (isVictorious) {
+    publicRow.addComponents(
+      new ButtonBuilder().setCustomId('boss_leaderboard').setLabel('View Final Leaderboard').setStyle(ButtonStyle.Success).setEmoji('🏆')
+    );
+  } else {
+    publicRow.addComponents(
+      new ButtonBuilder().setCustomId('boss_join:mom').setLabel('Join M.O.M.').setStyle(ButtonStyle.Primary).setEmoji('🛡️'),
+      new ButtonBuilder().setCustomId('boss_join:dad').setLabel('Join D.A.D.').setStyle(ButtonStyle.Success).setEmoji('🔨'),
+      new ButtonBuilder().setCustomId('boss_join:kid').setLabel('Join K.I.D.').setStyle(ButtonStyle.Danger).setEmoji('⚡'),
+      new ButtonBuilder().setCustomId('boss_leaderboard').setLabel('Leaderboard').setStyle(ButtonStyle.Secondary).setEmoji('📊')
+    );
+  }
+
+  return { embeds: [embed], files: [attachment], components: [publicRow] };
 
   return { embeds: [embed], files: [attachment], components: [publicRow] };
 }

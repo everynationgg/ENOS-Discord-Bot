@@ -110,6 +110,32 @@ function initCrons(client) {
     { timezone: tz }
   );
 
+  // ─── Saturday 23:59 GMT+8: Weekly Boss Conclude & Victory Banner Cron ──────
+  cron.schedule(
+    '59 23 * * 6',
+    async () => {
+      logger.info('[CRON] Concluding Weekly Boss battle & updating Victory/Final card for week...');
+      try {
+        const { concludeWeeklyBossBattle } = require('../modules/gaming/boss');
+        const { data: configs } = await supabase
+          .from('guild_config')
+          .select('guild_id')
+          .eq('enabled', true);
+
+        for (const c of configs || []) {
+          try {
+            await concludeWeeklyBossBattle(c.guild_id, client);
+          } catch (err) {
+            logger.error(`[CRON] Weekly Boss conclude failed for guild ${c.guild_id}:`, err.message);
+          }
+        }
+      } catch (err) {
+        logger.error('[CRON] Weekly Boss conclude cron failed:', err.message);
+      }
+    },
+    { timezone: tz }
+  );
+
   // ─── Weekly Boss Reset & AI Lore Generation: Every Monday at 00:00 ─────────────
   cron.schedule(
     '0 0 * * 1',
