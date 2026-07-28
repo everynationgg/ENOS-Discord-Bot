@@ -193,7 +193,19 @@ async function triggerTriviaDrop(client, guildId) {
         .setEmoji('🧠')
     );
 
-    const sentMessage = await channel.send({ embeds: [embed], components: [row] });
+    let sentMessage = null;
+    try {
+      sentMessage = await channel.send({ embeds: [embed], components: [row] });
+    } catch (sendErr) {
+      logger.error(`[TRIVIA] Failed to send trivia drop message in channel ${channel.id}:`, sendErr.message);
+      await supabase.from('trivia_drops').delete().eq('id', drop.id);
+      return false;
+    }
+
+    if (!sentMessage) {
+      await supabase.from('trivia_drops').delete().eq('id', drop.id);
+      return false;
+    }
 
     // Save message reference
     await supabase
