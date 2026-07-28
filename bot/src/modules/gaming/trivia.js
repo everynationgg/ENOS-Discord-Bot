@@ -50,7 +50,7 @@ Respond ONLY with a raw JSON object containing these keys:
 }
 Do not wrap in markdown, backticks, or write any extra text.`;
 
-  const modelsToTry = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-flash-latest'];
+  const modelsToTry = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-2.0-flash-lite', 'gemini-1.5-pro'];
   let lastError;
 
   for (const modelName of modelsToTry) {
@@ -845,13 +845,17 @@ async function checkAndProcessTrivia(client) {
       const today = local.dateStr;
       const currentTimeStr = local.timeStr;
 
-      // Query actual drops from database created today
-      const todayStartIso = `${today}T00:00:00.000Z`;
+      // Query actual drops from database created today (using exact timezone offset)
+      const tzOffsetStr = tz === 'Asia/Manila' || tz === 'Manila' ? '+08:00' : '+08:00';
+      const startOfDayUtc = new Date(`${today}T00:00:00${tzOffsetStr}`).toISOString();
+      const endOfDayUtc = new Date(`${today}T23:59:59${tzOffsetStr}`).toISOString();
+
       const { data: dropsToday } = await supabase
         .from('trivia_drops')
         .select('id, status')
         .eq('guild_id', guildId)
-        .gte('created_at', todayStartIso);
+        .gte('created_at', startOfDayUtc)
+        .lte('created_at', endOfDayUtc);
 
       const actualDropsToday = dropsToday?.length || 0;
       const hasActiveDrop = dropsToday?.some((d) => d.status === 'active');
