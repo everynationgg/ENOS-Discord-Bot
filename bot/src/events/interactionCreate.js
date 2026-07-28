@@ -212,6 +212,9 @@ module.exports = {
         if (interaction.customId === 'verify_discovery') {
           return handleDiscoverySelect(interaction);
         }
+        if (interaction.customId === 'verify_game_branch') {
+          return handleGameBranchSelect(interaction);
+        }
         if (interaction.customId.startsWith('tts_select:')) {
           const { handleTtsComponent } = require('../commands/tts');
           return handleTtsComponent(interaction);

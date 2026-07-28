@@ -249,6 +249,7 @@ async function triggerTriviaDrop(client, guildId) {
  */
 async function handleTriviaStartClick(interaction) {
   try {
+    // Acknowledge immediately — must happen within 3s or Discord shows 'interaction failed'
     if (!interaction.deferred && !interaction.replied) {
       await interaction.deferReply({ ephemeral: true });
     }
@@ -258,13 +259,16 @@ async function handleTriviaStartClick(interaction) {
 
     const parts = interaction.customId.split(':');
     const dropId = parts[1];
+    const guildId = interaction.guildId || interaction.guild?.id;
 
-    // Fetch drop
-    const { data: drop, error } = await supabase
-      .from('trivia_drops')
-      .select('*')
-      .eq('id', dropId)
-      .maybeSingle();
+    // Parallelize all initial DB reads to minimize time-to-reply
+    const [dropRes, participantRes, featureConfig] = await Promise.all([
+      supabase.from('trivia_drops').select('*').eq('id', dropId).maybeSingle(),
+      supabase.from('trivia_participants').select('*').eq('drop_id', dropId).eq('user_id', interaction.user.id).maybeSingle(),
+      guildId ? getFeatureConfig(guildId, 'trivia') : Promise.resolve(null),
+    ]);
+
+    const { data: drop, error } = dropRes;
 
     if (error || !drop) {
       return interaction.editReply({ content: '❌ Trivia session not found.' });
@@ -275,9 +279,7 @@ async function handleTriviaStartClick(interaction) {
     }
 
     // Check roles safely
-    const guildId = interaction.guildId || interaction.guild?.id;
     if (guildId) {
-      const featureConfig = await getFeatureConfig(guildId, 'trivia');
       const config = featureConfig?.config || {};
       const allowedRoles = config.allowed_roles || []; // Array of role IDs/names
 
@@ -299,13 +301,7 @@ async function handleTriviaStartClick(interaction) {
       }
     }
 
-    // Check if already participated
-    const { data: participant } = await supabase
-      .from('trivia_participants')
-      .select('*')
-      .eq('drop_id', dropId)
-      .eq('user_id', interaction.user.id)
-      .maybeSingle();
+    const { data: participant } = participantRes;
 
     if (participant) {
       const cmdMention = await getLeaderboardCommandMention(interaction.client);
