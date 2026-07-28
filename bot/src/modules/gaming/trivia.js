@@ -588,10 +588,37 @@ async function handleTriviaAnswerClick(interaction) {
   // Update Live Point Tracker Leaderboard if configured
   await updateLiveLeaderboard(interaction.client, interaction.guild.id);
 
-  return interaction.editReply({
-    content: `✅ **Correct!** You came in **${placeName}**!\n⏱️ Response time: **${(speedMs / 1000).toFixed(6)}s**\n💰 Awarded **${winnerPoints}** trivia points!\n\n🏆 View standings with ${cmdMention} or click below:`,
-    components: [leaderboardBtnRow],
+  // Build inline leaderboard embed for the winner's ephemeral reply
+  const { data: topPoints } = await supabase
+    .from('trivia_points')
+    .select('discord_id, points')
+    .eq('guild_id', interaction.guild.id)
+    .order('points', { ascending: false })
+    .limit(5);
+
+  const lbLines = (topPoints || []).map((entry, index) => {
+    const medal = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `**${index + 1}.**`;
+    return `${medal} <@${entry.discord_id}> — **${entry.points.toLocaleString()}** points`;
   });
+  if (lbLines.length === 0) lbLines.push('*No points yet.*');
+
+  const lbEmbed = new EmbedBuilder()
+    .setColor(0xFACC15)
+    .setTitle('🏆 Server Trivia Leaderboard (Top 5)')
+    .setDescription(lbLines.join('\n'))
+    .setFooter({ text: 'Every Nation • This message will disappear in 30s' })
+    .setTimestamp();
+
+  await interaction.editReply({
+    content: `✅ **Correct!** You came in **${placeName}**!\n⏱️ Response time: **${(speedMs / 1000).toFixed(6)}s**\n💰 Awarded **${winnerPoints}** trivia points!`,
+    embeds: [lbEmbed],
+    components: [],
+  });
+
+  // Auto-delete winner's ephemeral reply after 30 seconds
+  setTimeout(() => {
+    interaction.deleteReply().catch(() => {});
+  }, 30000);
 }
 
 /**
@@ -653,7 +680,7 @@ async function updateLiveLeaderboard(client, guildId) {
     if (message) {
       await message.edit({ embeds: [embed] });
     } else {
-      // Send new message
+      // Send new message and auto-delete after 30 seconds to keep channel clean
       const sent = await channel.send({ embeds: [embed] });
       leaderboardMessageId = sent.id;
       // Update config with new message ID
@@ -663,6 +690,10 @@ async function updateLiveLeaderboard(client, guildId) {
         .update({ config: updatedConfig })
         .eq('guild_id', guildId)
         .eq('feature_key', 'trivia');
+      // Auto-delete after 30 seconds so it doesn't permanently clutter the channel
+      setTimeout(() => {
+        sent.delete().catch(() => {});
+      }, 30000);
     }
   } catch (err) {
     logger.error('[TRIVIA] updateLiveLeaderboard error:', err.message);
