@@ -148,7 +148,6 @@ async function buildPublicBossEmbedPayload(guildId) {
     new ButtonBuilder().setCustomId('boss_join:mom').setLabel('Join M.O.M.').setStyle(ButtonStyle.Primary).setEmoji('🛡️'),
     new ButtonBuilder().setCustomId('boss_join:dad').setLabel('Join D.A.D.').setStyle(ButtonStyle.Success).setEmoji('🔨'),
     new ButtonBuilder().setCustomId('boss_join:kid').setLabel('Join K.I.D.').setStyle(ButtonStyle.Danger).setEmoji('⚡'),
-    new ButtonBuilder().setCustomId('boss_engage').setLabel('Engage Boss').setStyle(ButtonStyle.Secondary).setEmoji('⚔️'),
     new ButtonBuilder().setCustomId('boss_leaderboard').setLabel('Leaderboard').setStyle(ButtonStyle.Secondary).setEmoji('📊')
   );
 
@@ -244,7 +243,7 @@ async function buildPersonalCombatPayload(guildId, userId, combatResult = null) 
       `⚔️ **Last Action**: ${boss.last_action || 'None'}\n\n` +
       `⚡ **Your AP Remaining**: \`${playerState.ap_remaining}/5 AP\` ${playerState.is_locked ? '*(Class locked for week)*' : '*(Can swap class)*'}\n` +
       `📊 **Projected Slay Reward**: \`${projectedPoints} / ${maxSlayPoints} Points (₱${projectedPoints})\` *(Spend 5 AP for full reward!)*\n\n` +
-      `⏱️ *Note: This private combat view will auto-expire in 5 minutes.*`
+      `⏱️ *Note: This combat view will stay active for 60 seconds after your last action.*`
     )
     .setImage(`attachment://${filename}`)
     .setFooter({ text: `ENOS Personal Combat Panel • ${currentWeek}` });
@@ -269,12 +268,23 @@ async function buildPersonalCombatPayload(guildId, userId, combatResult = null) 
 }
 
 /**
- * Schedules auto-expiry for an ephemeral reply.
+ * Tracks and clears active ephemeral timers per user to restart countdowns on interactive clicks.
  */
-function scheduleEphemeralExpiry(interaction, ms = 5 * 60 * 1000) {
-  setTimeout(() => {
+const activeEphemeralTimers = new Map();
+
+function scheduleEphemeralExpiry(interaction, ms = 60000) {
+  const key = `${interaction.guildId || interaction.guild?.id || 'dm'}:${interaction.user.id}`;
+  if (activeEphemeralTimers.has(key)) {
+    clearTimeout(activeEphemeralTimers.get(key));
+    activeEphemeralTimers.delete(key);
+  }
+
+  const timerId = setTimeout(() => {
+    activeEphemeralTimers.delete(key);
     interaction.deleteReply().catch(() => {});
   }, ms);
+
+  activeEphemeralTimers.set(key, timerId);
 }
 
 module.exports = {
@@ -369,12 +379,12 @@ module.exports = {
           new ButtonBuilder().setCustomId('boss_stat_add:loot_boost').setLabel('+1% Loot').setStyle(ButtonStyle.Secondary).setEmoji('💰')
         );
         const reply = await interaction.editReply({ embeds: [embed], components: [row] });
-        scheduleEphemeralExpiry(interaction, 15000);
+        scheduleEphemeralExpiry(interaction, 60000);
         return reply;
       }
 
       const reply = await interaction.editReply({ embeds: [embed], components: [] });
-      scheduleEphemeralExpiry(interaction, 5000);
+      scheduleEphemeralExpiry(interaction, 10000);
       return reply;
     }
 
@@ -609,10 +619,10 @@ module.exports = {
           new ButtonBuilder().setCustomId('boss_stat_add:loot_boost').setLabel('+1% Loot').setStyle(ButtonStyle.Secondary).setEmoji('💰')
         );
         await interaction.editReply({ embeds: [embed], components: [row] });
+        scheduleEphemeralExpiry(interaction, 60000);
       } else {
         await interaction.editReply({ embeds: [embed], components: [] });
-        // Schedule auto-expiry in 5 seconds now that all stat points are spent
-        scheduleEphemeralExpiry(interaction, 5000);
+        scheduleEphemeralExpiry(interaction, 10000);
       }
       return;
     }
@@ -640,7 +650,7 @@ module.exports = {
         );
 
       const row = new ActionRowBuilder();
-      const timeoutMs = profile.unallocated_stats > 0 ? 15000 : 5000;
+      const timeoutMs = profile.unallocated_stats > 0 ? 60000 : 10000;
 
       if (profile.unallocated_stats > 0) {
         row.addComponents(
