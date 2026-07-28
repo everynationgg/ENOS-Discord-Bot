@@ -770,9 +770,10 @@ async function forceCloseDrop(client, guildId, dropId, status = 'completed') {
 /**
  * Helper to get local date and time values in a specific timezone
  * @param {string} timezone
+ * @param {Date|string|number} [dateInput]
  * @returns {{ dateStr: string, timeStr: string, hour: number, minute: number }}
  */
-function getLocalTimeInTimezone(timezone) {
+function getLocalTimeInTimezone(timezone, dateInput = new Date()) {
   const options = {
     timeZone: timezone,
     year: 'numeric', month: '2-digit', day: '2-digit',
@@ -780,7 +781,7 @@ function getLocalTimeInTimezone(timezone) {
     hour12: false
   };
   const formatter = new Intl.DateTimeFormat('en-US', options);
-  const parts = formatter.formatToParts(new Date());
+  const parts = formatter.formatToParts(new Date(dateInput));
   const map = parts.reduce((acc, p) => ({ ...acc, [p.type]: p.value }), {});
 
   // Format as YYYY-MM-DD
@@ -961,14 +962,14 @@ async function checkAndProcessTrivia(client) {
 
       const today = local.dateStr;
       const currentTimeStr = local.timeStr;
-      const dropDate = drop.created_at ? drop.created_at.split('T')[0] : today;
+      const dropLocalDate = drop.created_at ? getLocalTimeInTimezone(tz, drop.created_at).dateStr : today;
 
       const [currH, currM] = currentTimeStr.split(':').map(Number);
       const closeTime = drop.close_time || '23:59';
       const [closeH, closeM] = closeTime.split(':').map(Number);
 
       const isPastCloseTime = currH > closeH || (currH === closeH && currM >= closeM);
-      const isPastDate = dropDate < today;
+      const isPastDate = dropLocalDate < today;
 
       if (isPastDate || isPastCloseTime) {
         logger.info(`[TRIVIA CRON] Auto-closing drop ${drop.id} (isPastDate=${isPastDate}, isPastCloseTime=${isPastCloseTime}, current=${currentTimeStr}, close=${closeTime}).`);
