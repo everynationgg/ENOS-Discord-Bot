@@ -743,29 +743,29 @@ async function forceCloseDrop(client, guildId, dropId, status = 'completed') {
     if (!channel) return;
 
     const message = drop.message_id ? await channel.messages.fetch(drop.message_id).catch(() => null) : null;
-    if (message && message.embeds?.length) {
-      const currentEmbed = message.embeds[0];
-      const disabledRow = new ActionRowBuilder().addComponents(
-        new ButtonBuilder()
-          .setCustomId('trivia_disabled')
-          .setLabel(status === 'skipped' ? 'Session Cancelled' : 'Session Closed')
-          .setStyle(ButtonStyle.Secondary)
-          .setDisabled(true)
-      );
-
-      const winners = drop.winners || [];
-      const podiumLines = winners.map((w, index) => {
-        const medal = index === 0 ? '🥇' : index === 1 ? '🥈' : '🥉';
-        return `${medal} <@${w.user_id}> — **${(w.speed_ms / 1000).toFixed(6)}s** (+${w.points} pts)`;
-      });
-      let podiumText = podiumLines.length > 0 ? podiumLines.join('\n') : '*No winners.*';
-      if (status === 'skipped') {
-        podiumText += '\n\n❌ **Trivia Session was Cancelled/Skipped by Admin.**';
-      } else if (status === 'superseded') {
-        podiumText += '\n\n🏁 **Trivia Session closed (superseded by new drop).**';
-      } else {
-        podiumText += '\n\n🏁 **Trivia Session is now Closed!**';
+    if (message) {
+      if (status === 'superseded' || status === 'skipped') {
+        await message.delete().catch(() => {});
+        return;
       }
+
+      if (message.embeds?.length) {
+        const currentEmbed = message.embeds[0];
+        const disabledRow = new ActionRowBuilder().addComponents(
+          new ButtonBuilder()
+            .setCustomId('trivia_disabled')
+            .setLabel('Session Closed')
+            .setStyle(ButtonStyle.Secondary)
+            .setDisabled(true)
+        );
+
+        const winners = drop.winners || [];
+        const podiumLines = winners.map((w, index) => {
+          const medal = index === 0 ? '🥇' : index === 1 ? '🥈' : '🥉';
+          return `${medal} <@${w.user_id}> — **${(w.speed_ms / 1000).toFixed(6)}s** (+${w.points} pts)`;
+        });
+        let podiumText = podiumLines.length > 0 ? podiumLines.join('\n') : '*No winners.*';
+        podiumText += '\n\n🏁 **Trivia Session is now Closed!**';
 
       const updatedEmbed = EmbedBuilder.from(currentEmbed)
         .setFields(
@@ -775,9 +775,10 @@ async function forceCloseDrop(client, guildId, dropId, status = 'completed') {
 
       await message.edit({ embeds: [updatedEmbed], components: [disabledRow] }).catch(() => { });
     }
-  } catch (err) {
-    logger.error('[TRIVIA] forceCloseDrop error:', err.message);
   }
+} catch (err) {
+  logger.error('[TRIVIA] forceCloseDrop error:', err.message);
+}
 }
 
 /**
