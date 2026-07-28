@@ -209,7 +209,10 @@ async function handleVoiceJoin(discordId, guildId) {
  * Called when user leaves voice — awards coins for time spent and updates voice quest
  */
 async function handleVoiceLeave(discordId, guildId, minutesSpent, guild) {
-  // Passive VC coins disabled (Quests only)
+  if (minutesSpent <= 0) return;
+
+  const vaultConfig = await getVaultConfig(guildId);
+  const rates = { ...DEFAULT_RATES, ...vaultConfig.rates };
 
   // Update total voice minutes & voice quest progress
   const balance = await getOrCreateBalance(discordId, guildId);

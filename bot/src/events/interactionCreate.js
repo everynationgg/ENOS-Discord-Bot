@@ -222,7 +222,7 @@ module.exports = {
       logger.error('[INTERACTION] Handler error:', err);
       const content = '❌ An error occurred while processing this interaction.';
       if (interaction.replied || interaction.deferred) {
-        await interaction.followUp({ content, flags: MessageFlags.Ephemeral }).catch(() => {});
+        await interaction.editReply({ content }).catch(() => {});
       } else {
         await interaction.reply({ content, flags: MessageFlags.Ephemeral }).catch(() => {});
       }

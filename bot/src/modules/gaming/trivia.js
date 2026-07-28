@@ -248,112 +248,132 @@ async function triggerTriviaDrop(client, guildId) {
  * @param {import('discord.js').ButtonInteraction} interaction
  */
 async function handleTriviaStartClick(interaction) {
-  await interaction.deferReply({ ephemeral: true });
-  setTimeout(() => {
-    interaction.deleteReply().catch(() => {});
-  }, 60000);
+  try {
+    if (!interaction.deferred && !interaction.replied) {
+      await interaction.deferReply({ ephemeral: true });
+    }
+    setTimeout(() => {
+      interaction.deleteReply().catch(() => {});
+    }, 60000);
 
-  const parts = interaction.customId.split(':');
-  const dropId = parts[1];
+    const parts = interaction.customId.split(':');
+    const dropId = parts[1];
 
-  // Fetch drop
-  const { data: drop, error } = await supabase
-    .from('trivia_drops')
-    .select('*')
-    .eq('id', dropId)
-    .maybeSingle();
+    // Fetch drop
+    const { data: drop, error } = await supabase
+      .from('trivia_drops')
+      .select('*')
+      .eq('id', dropId)
+      .maybeSingle();
 
-  if (error || !drop) {
-    return interaction.editReply({ content: '❌ Trivia session not found.' });
-  }
+    if (error || !drop) {
+      return interaction.editReply({ content: '❌ Trivia session not found.' });
+    }
 
-  if (drop.status !== 'active') {
-    return interaction.editReply({ content: '❌ This trivia session has already closed.' });
-  }
+    if (drop.status !== 'active') {
+      return interaction.editReply({ content: '❌ This trivia session has already closed.' });
+    }
 
-  // Check roles
-  const featureConfig = await getFeatureConfig(interaction.guild.id, 'trivia');
-  const config = featureConfig?.config || {};
-  const allowedRoles = config.allowed_roles || []; // Array of role IDs/names
+    // Check roles safely
+    const guildId = interaction.guildId || interaction.guild?.id;
+    if (guildId) {
+      const featureConfig = await getFeatureConfig(guildId, 'trivia');
+      const config = featureConfig?.config || {};
+      const allowedRoles = config.allowed_roles || []; // Array of role IDs/names
 
-  if (allowedRoles.length > 0) {
-    const hasRole = interaction.member.roles.cache.some(r =>
-      allowedRoles.includes(r.id) || allowedRoles.includes(r.name)
-    );
-    if (!hasRole) {
+      if (allowedRoles.length > 0) {
+        let hasRole = false;
+        const memberRoles = interaction.member?.roles;
+        if (memberRoles) {
+          if (Array.isArray(memberRoles)) {
+            hasRole = memberRoles.some(rId => allowedRoles.includes(rId));
+          } else if (memberRoles.cache) {
+            hasRole = memberRoles.cache.some(r => allowedRoles.includes(r.id) || allowedRoles.includes(r.name));
+          }
+        }
+        if (!hasRole) {
+          return interaction.editReply({
+            content: '❌ You do not have the required roles to participate in this trivia.',
+          });
+        }
+      }
+    }
+
+    // Check if already participated
+    const { data: participant } = await supabase
+      .from('trivia_participants')
+      .select('*')
+      .eq('drop_id', dropId)
+      .eq('user_id', interaction.user.id)
+      .maybeSingle();
+
+    if (participant) {
+      const cmdMention = await getLeaderboardCommandMention(interaction.client);
+      const row = new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+          .setCustomId('trivia_leaderboard')
+          .setLabel('View Leaderboard')
+          .setEmoji('📊')
+          .setStyle(ButtonStyle.Secondary)
+      );
       return interaction.editReply({
-        content: '❌ You do not have the required roles to participate in this trivia.',
+        content: `❌ You have already participated in this trivia session.\n\n🏆 View standings with ${cmdMention} or click below:`,
+        components: [row],
       });
     }
+
+    // Shuffle answers specifically for this participant
+    const shuffledOptions = shuffleArray(drop.shuffled_answers);
+    const startTime = getPreciseTime();
+
+    // Save start time and shuffled options in DB
+    const { error: insertErr } = await supabase
+      .from('trivia_participants')
+      .insert({
+        drop_id: dropId,
+        user_id: interaction.user.id,
+        started_at: new Date().toISOString(),
+        started_at_ms: startTime,
+        shuffled_options: shuffledOptions,
+      });
+
+    if (insertErr) {
+      logger.error('[TRIVIA] Failed to insert participant:', insertErr.message);
+      return interaction.editReply({ content: '❌ Failed to start trivia. Please try again.' });
+    }
+
+    // Render ephemeral view
+    const letters = ['🇦', '🇧', '🇨', '🇩'];
+    let description = `**Question:**\n${drop.question}\n\n`;
+    const buttons = [];
+
+    for (let i = 0; i < shuffledOptions.length; i++) {
+      description += `${letters[i]} ${shuffledOptions[i]}\n`;
+      buttons.push(
+        new ButtonBuilder()
+          .setCustomId(`trivia_answer:${dropId}:${i}`)
+          .setLabel(letters[i])
+          .setStyle(ButtonStyle.Secondary)
+      );
+    }
+
+    const embed = new EmbedBuilder()
+      .setColor(0xFACC15)
+      .setTitle('🧠 Daily Trivia Question')
+      .setDescription(description)
+      .setFooter({ text: '⏱️ You have 60 seconds to answer! Sub-millisecond speed is tracked.' });
+
+    const row = new ActionRowBuilder().addComponents(buttons);
+
+    await interaction.editReply({ embeds: [embed], components: [row] });
+  } catch (err) {
+    logger.error('[TRIVIA] Error in handleTriviaStartClick:', err.message || err);
+    if (interaction.deferred || interaction.replied) {
+      await interaction.editReply({ content: '❌ An error occurred while starting trivia. Please try again.' }).catch(() => {});
+    } else {
+      await interaction.reply({ content: '❌ An error occurred while starting trivia. Please try again.', ephemeral: true }).catch(() => {});
+    }
   }
-
-  // Check if already participated
-  const { data: participant } = await supabase
-    .from('trivia_participants')
-    .select('*')
-    .eq('drop_id', dropId)
-    .eq('user_id', interaction.user.id)
-    .maybeSingle();
-
-  if (participant) {
-    const cmdMention = await getLeaderboardCommandMention(interaction.client);
-    const row = new ActionRowBuilder().addComponents(
-      new ButtonBuilder()
-        .setCustomId('trivia_leaderboard')
-        .setLabel('View Leaderboard')
-        .setEmoji('📊')
-        .setStyle(ButtonStyle.Secondary)
-    );
-    return interaction.editReply({
-      content: `❌ You have already participated in this trivia session.\n\n🏆 View standings with ${cmdMention} or click below:`,
-      components: [row],
-    });
-  }
-
-  // Shuffle answers specifically for this participant
-  const shuffledOptions = shuffleArray(drop.shuffled_answers);
-  const startTime = getPreciseTime();
-
-  // Save start time and shuffled options in DB
-  const { error: insertErr } = await supabase
-    .from('trivia_participants')
-    .insert({
-      drop_id: dropId,
-      user_id: interaction.user.id,
-      started_at: new Date().toISOString(),
-      started_at_ms: startTime,
-      shuffled_options: shuffledOptions,
-    });
-
-  if (insertErr) {
-    logger.error('[TRIVIA] Failed to insert participant:', insertErr.message);
-    return interaction.editReply({ content: '❌ Failed to start trivia. Please try again.' });
-  }
-
-  // Render ephemeral view
-  const letters = ['🇦', '🇧', '🇨', '🇩'];
-  let description = `**Question:**\n${drop.question}\n\n`;
-  const buttons = [];
-
-  for (let i = 0; i < shuffledOptions.length; i++) {
-    description += `${letters[i]} ${shuffledOptions[i]}\n`;
-    buttons.push(
-      new ButtonBuilder()
-        .setCustomId(`trivia_answer:${dropId}:${i}`)
-        .setLabel(letters[i])
-        .setStyle(ButtonStyle.Secondary)
-    );
-  }
-
-  const embed = new EmbedBuilder()
-    .setColor(0xFACC15)
-    .setTitle('🧠 Daily Trivia Question')
-    .setDescription(description)
-    .setFooter({ text: '⏱️ You have 60 seconds to answer! Sub-millisecond speed is tracked.' });
-
-  const row = new ActionRowBuilder().addComponents(buttons);
-
-  await interaction.editReply({ embeds: [embed], components: [row] });
 }
 
 /**
@@ -413,7 +433,10 @@ async function handleTriviaAnswerClick(interaction) {
 
   // Trigger Daily Trivia Quest Completion in Vault
   const { handleTriviaQuestCompletion } = require('./vault');
-  await handleTriviaQuestCompletion(interaction.user.id, interaction.guild.id, interaction.guild).catch(() => {});
+  const targetGuildId = interaction.guildId || interaction.guild?.id;
+  if (targetGuildId) {
+    await handleTriviaQuestCompletion(interaction.user.id, targetGuildId, interaction.guild).catch(() => {});
+  }
 
   const cmdMention = await getLeaderboardCommandMention(interaction.client);
   const leaderboardBtnRow = new ActionRowBuilder().addComponents(

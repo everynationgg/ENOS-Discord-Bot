@@ -39,5 +39,14 @@ module.exports = {
       activities: [{ name: 'Every Nation 🏰', type: 0 }],
       status: 'online',
     });
+
+    // Initialize voice tracking scan & heartbeat ticker
+    try {
+      const { initVoiceTracking } = require('./voiceStateUpdate');
+      await initVoiceTracking(client);
+      logger.info('[READY] Voice tracking scan & 1-min heartbeat initialized.');
+    } catch (vErr) {
+      logger.error('[READY] Failed to initialize voice tracking:', vErr.message);
+    }
   },
 };
