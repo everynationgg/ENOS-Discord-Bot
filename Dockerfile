@@ -4,6 +4,9 @@ FROM node:22-alpine
 # Create app directory
 WORKDIR /app
 
+# Install system fonts for @napi-rs/canvas text rendering
+RUN apk add --no-cache fontconfig font-dejavu ttf-dejavu
+
 # Copy root package files
 COPY package*.json ./
 
