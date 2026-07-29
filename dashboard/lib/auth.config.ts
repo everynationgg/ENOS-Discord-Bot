@@ -19,18 +19,26 @@ export default {
 
   callbacks: {
     async jwt({ token, account, profile }): Promise<JWT> {
-      if (account?.access_token) {
-        token.accessToken = account.access_token;
-        token.discordId = (profile as any)?.id;
+      try {
+        if (account?.access_token) {
+          token.accessToken = account.access_token;
+          token.discordId = (profile as any)?.id;
+        }
+      } catch (e) {
+        // Fallback for corrupt token properties
       }
       return token;
     },
 
     async session({ session, token }): Promise<Session> {
-      if (session.user) {
-        session.user.discordId = token.discordId;
+      try {
+        if (session && session.user && token) {
+          session.user.discordId = token.discordId;
+          session.accessToken = token.accessToken;
+        }
+      } catch (e) {
+        // Fallback for corrupt session properties
       }
-      session.accessToken = token.accessToken;
       return session;
     },
 
