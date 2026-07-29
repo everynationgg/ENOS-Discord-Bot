@@ -1,4 +1,11 @@
-import { createCanvas, loadImage } from '@napi-rs/canvas';
+// @napi-rs/canvas is a native binary — lazy-load it to prevent Vercel Lambda
+// from crashing during cold start when it can't find the .node binary at module init.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let _canvas: any = null;
+async function getCanvas() {
+  if (!_canvas) _canvas = await import('@napi-rs/canvas');
+  return _canvas as typeof import('@napi-rs/canvas');
+}
 
 const imageBufferCache = new Map<string, { buffer: Buffer; timestamp: number }>();
 const CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutes cache
@@ -185,6 +192,7 @@ function drawAttackFX(ctx: any, lastAction: string, isOverkill: boolean) {
 }
 
 export async function renderBossImage(data: any): Promise<Buffer> {
+  const { createCanvas, loadImage } = await getCanvas();
   const width = 800;
   const height = 420;
   const canvas = createCanvas(width, height);
