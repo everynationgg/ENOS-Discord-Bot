@@ -1049,6 +1049,9 @@ export default function SocialPage() {
                           style={{ background: 'var(--bg-input)', border: '1px solid var(--border-subtle)', padding: '0.5rem 0.75rem', borderRadius: 'var(--radius-sm)', width: '100%', color: 'var(--text-primary)' }}
                         >
                           <option value="">-- Select Channel --</option>
+                          {birthdayChannelId && !channels.some((c) => c.id === birthdayChannelId) && (
+                            <option value={birthdayChannelId}># birthday-announcements ({birthdayChannelId})</option>
+                          )}
                           {channels.map((c) => (
                             <option key={c.id} value={c.id}>{c.name}</option>
                           ))}
@@ -1066,6 +1069,9 @@ export default function SocialPage() {
                           style={{ background: 'var(--bg-input)', border: '1px solid var(--border-subtle)', padding: '0.5rem 0.75rem', borderRadius: 'var(--radius-sm)', width: '100%', color: 'var(--text-primary)' }}
                         >
                           <option value="">-- Disabled --</option>
+                          {logChannelId && !channels.some((c) => c.id === logChannelId) && (
+                            <option value={logChannelId}># member-logs ({logChannelId})</option>
+                          )}
                           {channels.map((c) => (
                             <option key={c.id} value={c.id}>{c.name}</option>
                           ))}
