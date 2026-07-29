@@ -1,33 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { renderBossImage } from '@/lib/bossCanvas';
 
 // POST /api/gaming/boss/render-preview — Generate live composite canvas PNG preview for Weekly Boss setup
-export async function POST(req: NextRequest) {
-  try {
-    const body = await req.json();
-
-    const buffer = await renderBossImage({
-      bossName: body.bossName || 'WEEKLY BOSS',
-      customImageUrl: body.imageUrl || null,
-      customBgUrl: body.bgUrl || null,
-      userClassKey: body.userClassKey || 'mom',
-      classImageUrls: {
-        mom: body.momImageUrl || null,
-        dad: body.dadImageUrl || null,
-        kid: body.kidImageUrl || null,
-      },
-      isOverkill: body.isOverkill ?? false,
-      viewMode: body.viewMode || 'spawn',
-      lastAction: body.lastAction || '',
-    });
-
-    return new NextResponse(new Uint8Array(buffer), {
-      headers: {
-        'Content-Type': 'image/png',
-        'Cache-Control': 'no-store, max-age=0',
-      },
-    });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message || 'Failed to render preview' }, { status: 500 });
-  }
+// NOTE: @napi-rs/canvas uses native .node binaries that are not supported in Vercel Serverless.
+// This route returns a 501 so the dashboard can show a placeholder instead of crashing the Lambda.
+export async function POST(_req: NextRequest) {
+  return NextResponse.json(
+    { error: 'Canvas preview is not available in the serverless environment. The bot generates the actual card image.' },
+    { status: 501 }
+  );
 }

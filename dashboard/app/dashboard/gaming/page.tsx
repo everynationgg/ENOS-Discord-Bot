@@ -300,6 +300,12 @@ function BossPreviewCard({
         }),
       });
 
+      // 501 = canvas not available in serverless environment — show info, not error
+      if (res.status === 501) {
+        setError('Live preview is not available here — the bot generates the actual card when you post the boss.');
+        return;
+      }
+
       if (!res.ok) {
         throw new Error('Failed to render preview');
       }
