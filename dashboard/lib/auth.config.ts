@@ -58,16 +58,16 @@ export default {
           }
         );
 
-        if (!res.ok) return '/login?error=not_in_guild';
+        if (!res.ok) return false;
 
         const member = await res.json();
         const hasAdminRole = member.roles?.includes(process.env.DISCORD_ADMIN_ROLE_ID);
 
-        if (!hasAdminRole) return '/login?error=insufficient_permissions';
+        if (!hasAdminRole) return false;
 
         return true;
       } catch {
-        return '/login?error=auth_failed';
+        return false;
       }
     },
   },
