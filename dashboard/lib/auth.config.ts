@@ -4,11 +4,10 @@ import type { JWT } from 'next-auth/jwt';
 import DiscordProvider from 'next-auth/providers/discord';
 
 export default {
-  secret: process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET || 'enos_dashboard_default_auth_secret_2026_key',
   providers: [
     DiscordProvider({
-      clientId: process.env.DISCORD_CLIENT_ID || 'missing_client_id',
-      clientSecret: process.env.DISCORD_CLIENT_SECRET || 'missing_client_secret',
+      clientId: process.env.DISCORD_CLIENT_ID!,
+      clientSecret: process.env.DISCORD_CLIENT_SECRET!,
       authorization: {
         params: {
           scope: 'identify guilds guilds.members.read',
@@ -19,26 +18,18 @@ export default {
 
   callbacks: {
     async jwt({ token, account, profile }): Promise<JWT> {
-      try {
-        if (account?.access_token) {
-          token.accessToken = account.access_token;
-          token.discordId = (profile as any)?.id;
-        }
-      } catch (e) {
-        // Fallback for corrupt token properties
+      if (account?.access_token) {
+        token.accessToken = account.access_token;
+        token.discordId = (profile as any)?.id;
       }
       return token;
     },
 
     async session({ session, token }): Promise<Session> {
-      try {
-        if (session && session.user && token) {
-          session.user.discordId = token.discordId;
-          session.accessToken = token.accessToken;
-        }
-      } catch (e) {
-        // Fallback for corrupt session properties
+      if (session.user) {
+        session.user.discordId = token.discordId;
       }
+      session.accessToken = token.accessToken;
       return session;
     },
 
@@ -58,16 +49,16 @@ export default {
           }
         );
 
-        if (!res.ok) return false;
+        if (!res.ok) return '/login?error=not_in_guild';
 
         const member = await res.json();
         const hasAdminRole = member.roles?.includes(process.env.DISCORD_ADMIN_ROLE_ID);
 
-        if (!hasAdminRole) return false;
+        if (!hasAdminRole) return '/login?error=insufficient_permissions';
 
         return true;
       } catch {
-        return false;
+        return '/login?error=auth_failed';
       }
     },
   },
