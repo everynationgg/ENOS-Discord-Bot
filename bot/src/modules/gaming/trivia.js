@@ -847,9 +847,9 @@ function getLocalTimeInTimezone(timezone, dateInput = new Date()) {
  */
 function generateDropTimesForDay(dropsCount) {
   const count = Math.min(3, Math.max(1, dropsCount || 1));
-  if (count === 1) return ['12:00'];
-  if (count === 2) return ['11:00', '17:00'];
-  return ['10:00', '15:00', '20:00'];
+  if (count === 1) return ['00:01'];
+  if (count === 2) return ['00:01', '12:00'];
+  return ['00:01', '12:00', '18:00'];
 }
 
 /**
