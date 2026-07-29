@@ -22,10 +22,12 @@ async function replyEphemeralAndAutoDelete(interaction, options) {
 }
 
 async function editEphemeralAndAutoDelete(interaction, contentOrOptions) {
-  const reply = await interaction.editReply(contentOrOptions);
-  setTimeout(() => {
-    interaction.deleteReply().catch(() => {});
-  }, 15000);
+  const reply = await interaction.editReply(contentOrOptions).catch(() => null);
+  if (reply) {
+    setTimeout(() => {
+      interaction.deleteReply().catch(() => {});
+    }, 15000);
+  }
   return reply;
 }
 
@@ -159,7 +161,18 @@ async function handleLFGCreate(interaction) {
  * @param {import('discord.js').ModalSubmitInteraction} interaction
  */
 async function handleLFGModalSubmit(interaction) {
-  await interaction.deferReply({ ephemeral: true });
+  try {
+    if (!interaction.deferred && !interaction.replied) {
+      await interaction.deferReply({ ephemeral: true });
+    }
+  } catch (err) {
+    if (err.code === 10062) {
+      logger.warn('[LFG] Modal submit interaction expired before deferral (Unknown interaction code 10062).');
+      return;
+    }
+    logger.error('[LFG] Error deferring modal submit reply:', err);
+    return;
+  }
 
   const guildId = interaction.guild.id;
   const gameInput = interaction.fields.getTextInputValue('lfg_game').trim();
