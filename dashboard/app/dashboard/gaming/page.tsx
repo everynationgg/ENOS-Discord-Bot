@@ -2,7 +2,7 @@
 
 import FeatureCard from '@/components/FeatureCard';
 import ImageUploader from '@/components/ImageUploader';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 
 const GAME_BRANCHES = [
   'Where Winds Meet', 'Palworld', 'Wuwa', 'Hoyoverse', 'Enfi',

@@ -91,22 +91,31 @@ export async function GET(req: NextRequest) {
       );
     }
 
+    function getDiscordAvatar(id: string) {
+      try {
+        const idx = (BigInt(id) >> 22n) % 6n;
+        return `https://cdn.discordapp.com/embed/avatars/${idx}.png`;
+      } catch (e) {
+        return 'https://cdn.discordapp.com/embed/avatars/0.png';
+      }
+    }
+
     const vault = rawVault.map((v) => ({
       ...v,
-      username: userProfiles[v.discord_id]?.username || v.discord_id,
-      avatar_url: userProfiles[v.discord_id]?.avatar_url || 'https://cdn.discordapp.com/embed/avatars/0.png',
+      username: userProfiles[v.discord_id]?.username || `Member (${v.discord_id.slice(-4)})`,
+      avatar_url: userProfiles[v.discord_id]?.avatar_url || getDiscordAvatar(v.discord_id),
     }));
 
     const boss = rawBoss.map((b) => ({
       ...b,
-      username: userProfiles[b.user_id]?.username || b.user_id,
-      avatar_url: userProfiles[b.user_id]?.avatar_url || 'https://cdn.discordapp.com/embed/avatars/0.png',
+      username: userProfiles[b.user_id]?.username || `Member (${b.user_id.slice(-4)})`,
+      avatar_url: userProfiles[b.user_id]?.avatar_url || getDiscordAvatar(b.user_id),
     }));
 
     const trivia = rawTrivia.map((t) => ({
       ...t,
-      username: userProfiles[t.discord_id]?.username || t.discord_id,
-      avatar_url: userProfiles[t.discord_id]?.avatar_url || 'https://cdn.discordapp.com/embed/avatars/0.png',
+      username: userProfiles[t.discord_id]?.username || `Member (${t.discord_id.slice(-4)})`,
+      avatar_url: userProfiles[t.discord_id]?.avatar_url || getDiscordAvatar(t.discord_id),
     }));
 
     return NextResponse.json({
