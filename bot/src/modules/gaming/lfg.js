@@ -143,11 +143,11 @@ async function handleLFGCreate(interaction) {
     new ActionRowBuilder().addComponents(
       new TextInputBuilder()
         .setCustomId('lfg_invite')
-        .setLabel('Invite Friends (Username or ID)')
+        .setLabel('Invite Friends (Username, Mention, or ID)')
         .setStyle(TextInputStyle.Short)
-        .setPlaceholder('Optional friend to invite')
+        .setPlaceholder('e.g. @user1, @user2 or usernames separated by commas')
         .setRequired(false)
-        .setMaxLength(100)
+        .setMaxLength(300)
     )
   );
 
@@ -231,24 +231,47 @@ async function handleLFGModalSubmit(interaction) {
   }
 
   // 3. Friend Invitation Resolution
-  let resolvedInvitedUser = null;
+  const resolvedInvitedUsers = [];
+  const notFoundUsers = [];
   if (inviteInput) {
-    const userMentionMatch = inviteInput.match(/^<@!?(\d+)>$/);
-    if (userMentionMatch) {
-      resolvedInvitedUser = await interaction.guild.members.fetch(userMentionMatch[1]).catch(() => null);
-    } else if (/^\d+$/.test(inviteInput)) {
-      resolvedInvitedUser = await interaction.guild.members.fetch(inviteInput).catch(() => null);
-    } else {
-      const cleanUsername = inviteInput.startsWith('@') ? inviteInput.slice(1) : inviteInput;
-      // Search by username or display name
-      const searchRes = await interaction.guild.members.search({ query: cleanUsername, limit: 1 }).catch(() => null);
-      if (searchRes && searchRes.size > 0) {
-        resolvedInvitedUser = searchRes.first();
+    const rawTokens = inviteInput.includes(',')
+      ? inviteInput.split(',')
+      : inviteInput.trim().split(/\s+/);
+
+    for (const rawToken of rawTokens) {
+      const token = rawToken.trim();
+      if (!token) continue;
+
+      let member = null;
+      const userMentionMatch = token.match(/^<@!?(\d+)>$/);
+      if (userMentionMatch) {
+        member = await interaction.guild.members.fetch(userMentionMatch[1]).catch(() => null);
+      } else if (/^\d+$/.test(token)) {
+        member = await interaction.guild.members.fetch(token).catch(() => null);
+      } else {
+        const cleanUsername = token.startsWith('@') ? token.slice(1) : token;
+        if (cleanUsername) {
+          const searchRes = await interaction.guild.members.search({ query: cleanUsername, limit: 1 }).catch(() => null);
+          if (searchRes && searchRes.size > 0) {
+            member = searchRes.first();
+          }
+        }
+      }
+
+      if (member) {
+        if (!resolvedInvitedUsers.some(u => u.id === member.id)) {
+          resolvedInvitedUsers.push(member);
+        }
+      } else {
+        notFoundUsers.push(token);
       }
     }
 
-    if (!resolvedInvitedUser) {
-      return editEphemeralAndAutoDelete(interaction, `❌ User **"${inviteInput}"** not found on this server. Please enter a valid username, user mention, or user ID.`);
+    if (notFoundUsers.length > 0) {
+      return editEphemeralAndAutoDelete(
+        interaction,
+        `❌ The following user(s) were not found on this server: **"${notFoundUsers.join('", "')}"**. Please enter valid usernames, mentions, or user IDs.`
+      );
     }
   }
 
@@ -304,7 +327,10 @@ async function handleLFGModalSubmit(interaction) {
   // Build mentions
   const contentParts = [];
   if (resolvedRole) contentParts.push(`<@&${resolvedRole.id}>`);
-  if (resolvedInvitedUser) contentParts.push(`<@${resolvedInvitedUser.id}>, you've been invited by <@${interaction.user.id}> to join this party!`);
+  if (resolvedInvitedUsers.length > 0) {
+    const userMentions = resolvedInvitedUsers.map(u => `<@${u.id}>`).join(' ');
+    contentParts.push(`${userMentions}, you've been invited by <@${interaction.user.id}> to join this party!`);
+  }
   const mentionContent = contentParts.length > 0 ? contentParts.join(' ') : undefined;
 
   const sentMessage = await targetChannel.send({
