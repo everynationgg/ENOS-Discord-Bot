@@ -33,7 +33,8 @@ async function handleHelpDeskStart(interaction) {
 
     // Check if user already has an active support thread open in this channel
     const activeThreads = await interaction.channel.threads.fetchActive().catch(() => null);
-    const existingThread = activeThreads?.threads?.find(t => t.name === `💬-${interaction.user.username}`);
+    const userThreadName = `💬-${interaction.user.username}`.toLowerCase();
+    const existingThread = activeThreads?.threads?.find(t => t.name.toLowerCase() === userThreadName);
     if (existingThread) {
       await interaction.editReply({ content: `➡️ **You already have an active support room open: <#${existingThread.id}>**` });
       setTimeout(() => {
