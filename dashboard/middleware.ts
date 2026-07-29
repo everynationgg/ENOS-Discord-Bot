@@ -21,7 +21,7 @@ export default auth((req) => {
     // Require auth for all /dashboard routes and root
     if (pathname.startsWith('/dashboard') || pathname === '/') {
       if (!req.auth) {
-        return NextResponse.redirect(new URL('/login', req.url));
+        return NextResponse.redirect(new URL('/login', req.nextUrl));
       }
     }
 
