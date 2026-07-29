@@ -595,8 +595,9 @@ module.exports = {
                     m.author.id === interaction.client.user.id &&
                     m.embeds.some(
                       (e) =>
-                        e.title?.includes('Weekly Boss Bounty') ||
-                        e.title?.includes('OVERKILL MODE')
+                        e.title?.includes('Weekly Boss') ||
+                        e.title?.includes('OVERKILL') ||
+                        e.title?.includes('VICTORY')
                     )
                 );
               }
