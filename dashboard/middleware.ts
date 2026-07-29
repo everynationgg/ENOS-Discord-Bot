@@ -2,22 +2,34 @@ import NextAuth from 'next-auth';
 import authConfig from './lib/auth.config';
 import { NextResponse } from 'next/server';
 
-export default NextAuth(authConfig).auth((req) => {
-  const { pathname } = req.nextUrl;
+const { auth } = NextAuth(authConfig);
 
-  // Allow public paths
-  if (pathname.startsWith('/login') || pathname.startsWith('/api/auth')) {
+export default auth((req) => {
+  try {
+    const { pathname } = req.nextUrl;
+
+    // Allow public paths
+    if (
+      pathname.startsWith('/login') ||
+      pathname.startsWith('/api/auth') ||
+      pathname.startsWith('/terms') ||
+      pathname.startsWith('/privacy')
+    ) {
+      return NextResponse.next();
+    }
+
+    // Require auth for all /dashboard routes and root
+    if (pathname.startsWith('/dashboard') || pathname === '/') {
+      if (!req.auth) {
+        return NextResponse.redirect(new URL('/login', req.url));
+      }
+    }
+
+    return NextResponse.next();
+  } catch (err) {
+    console.error('[MIDDLEWARE ERROR]', err);
     return NextResponse.next();
   }
-
-  // Require auth for all /dashboard routes
-  if (pathname.startsWith('/dashboard') || pathname === '/') {
-    if (!req.auth) {
-      return NextResponse.redirect(new URL('/login', req.url));
-    }
-  }
-
-  return NextResponse.next();
 });
 
 export const config = {
