@@ -718,6 +718,11 @@ async function concludeWeeklyBossBattle(guildId, client = null) {
   const boss = await getOrCreateActiveBoss(guildId);
   if (!boss) return;
 
+  await supabase
+    .from('boss_seasons')
+    .update({ is_concluded: true, is_defeated: true, updated_at: new Date().toISOString() })
+    .eq('id', boss.id);
+
   if (Number(boss.current_hp) <= 0 && !boss.is_defeated) {
     await handleOverkillDefeat(guildId, boss);
   }

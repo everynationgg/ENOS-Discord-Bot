@@ -62,6 +62,28 @@ async function resolveImageUrl(url) {
 }
 
 /**
+ * Determines whether the Weekly Boss battle is officially concluded.
+ * Victory Mode is ONLY displayed on/after Saturday 23:59 GMT+8 or if explicitly concluded.
+ * Until then, Overkill Mode remains active allowing players to spend their AP.
+ */
+function isWeeklyBossConcluded(boss) {
+  if (!boss) return false;
+  if (boss.is_concluded) return true;
+
+  const now = new Date();
+  const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
+  const gmt8 = new Date(utc + (3600000 * 8));
+  const day = gmt8.getDay(); // 0 = Sun, 1 = Mon, ..., 6 = Sat
+  const hour = gmt8.getHours();
+  const min = gmt8.getMinutes();
+
+  if (day === 0) return true;
+  if (day === 6 && (hour > 23 || (hour === 23 && min >= 59))) return true;
+
+  return false;
+}
+
+/**
  * Builds the Public Channel Server Overview Card.
  */
 async function buildPublicBossEmbedPayload(guildId) {
@@ -106,7 +128,7 @@ async function buildPublicBossEmbedPayload(guildId) {
   ]);
   const classImageUrls = { mom: momUrl, dad: dadUrl, kid: kidUrl };
 
-  const isVictorious = boss.is_defeated || Number(boss.current_hp) <= 0;
+  const isVictorious = isWeeklyBossConcluded(boss);
 
   const buffer = await renderBossImage({
     bossName: boss.boss_name,
