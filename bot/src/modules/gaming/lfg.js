@@ -264,9 +264,18 @@ async function handleLFGModalSubmit(interaction) {
       } else {
         const cleanUsername = token.startsWith('@') ? token.slice(1) : token;
         if (cleanUsername) {
-          const searchRes = await interaction.guild.members.search({ query: cleanUsername, limit: 1 }).catch(() => null);
-          if (searchRes && searchRes.size > 0) {
-            member = searchRes.first();
+          const lowerName = cleanUsername.toLowerCase();
+          member = interaction.guild.members.cache.find(m =>
+            m.user.username.toLowerCase() === lowerName ||
+            m.displayName.toLowerCase() === lowerName ||
+            (m.user.globalName && m.user.globalName.toLowerCase() === lowerName)
+          );
+
+          if (!member) {
+            const searchRes = await interaction.guild.members.search({ query: cleanUsername, limit: 1 }).catch(() => null);
+            if (searchRes && searchRes.size > 0) {
+              member = searchRes.first();
+            }
           }
         }
       }
