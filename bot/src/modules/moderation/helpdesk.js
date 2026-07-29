@@ -3,7 +3,8 @@ const {
   ActionRowBuilder, 
   ButtonBuilder, 
   ButtonStyle, 
-  AttachmentBuilder 
+  AttachmentBuilder,
+  MessageFlags
 } = require('discord.js');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const { getFeatureConfig } = require('../../lib/supabase');
@@ -18,7 +19,11 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 async function handleHelpDeskStart(interaction) {
   try {
     if (!interaction.deferred && !interaction.replied) {
-      await interaction.deferReply({ ephemeral: true }).catch(() => {});
+      try {
+        await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+      } catch (e) {
+        return; // Interaction expired or already handled
+      }
     }
 
     const guild = interaction.guild;
@@ -81,8 +86,11 @@ async function handleHelpDeskStart(interaction) {
     }, 15000);
 
   } catch (err) {
+    if (err.code === 10062 || err.message?.includes('Unknown interaction')) return;
     logger.error('[HELPDESK] Failed to start session:', err.message);
-    await interaction.editReply({ content: '❌ Failed to open a private support thread. Please contact an admin.' });
+    if (interaction.deferred || interaction.replied) {
+      await interaction.editReply({ content: '❌ Failed to open a private support thread. Please contact an admin.' }).catch(() => {});
+    }
   }
 }
 
