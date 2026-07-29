@@ -4,10 +4,11 @@ import type { JWT } from 'next-auth/jwt';
 import DiscordProvider from 'next-auth/providers/discord';
 
 export default {
+  secret: process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET || 'enos_dashboard_default_auth_secret_2026_key',
   providers: [
     DiscordProvider({
-      clientId: process.env.DISCORD_CLIENT_ID!,
-      clientSecret: process.env.DISCORD_CLIENT_SECRET!,
+      clientId: process.env.DISCORD_CLIENT_ID || 'missing_client_id',
+      clientSecret: process.env.DISCORD_CLIENT_SECRET || 'missing_client_secret',
       authorization: {
         params: {
           scope: 'identify guilds guilds.members.read',
