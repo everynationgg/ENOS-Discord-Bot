@@ -163,6 +163,9 @@ export default function ModerationPage() {
       description: string;
       hero_image_url: string;
       content_markdown: string;
+      try_button_label?: string;
+      try_channel_id?: string;
+      video_url?: string;
     }>
   >([
     {

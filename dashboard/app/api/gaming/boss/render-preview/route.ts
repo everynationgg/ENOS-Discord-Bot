@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
       lastAction: body.lastAction || '',
     });
 
-    return new NextResponse(buffer, {
+    return new NextResponse(new Uint8Array(buffer), {
       headers: {
         'Content-Type': 'image/png',
         'Cache-Control': 'no-store, max-age=0',

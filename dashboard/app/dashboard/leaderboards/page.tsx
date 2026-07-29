@@ -587,12 +587,9 @@ export default function LeaderboardsDashboard() {
                 </div>
 
                 <DiscordEmbedPreview
+                  presetType="showcase"
                   title={embedTitle}
-                  description={embedDescription}
-                  color={embedColor}
-                  footerText={embedFooter}
-                  botName="ENOS Bot"
-                  timestamp="Today at 4:00 PM"
+                  bodyMarkdown={embedDescription}
                 />
               </div>
             </div>

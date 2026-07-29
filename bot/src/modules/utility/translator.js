@@ -48,8 +48,10 @@ ${text}
  * @param {import('discord.js').StringSelectMenuInteraction} interaction
  */
 async function handleTranslationSelection(interaction) {
-  // 1. Defer the interaction immediately to prevent timeouts
-  await interaction.deferUpdate();
+  // 1. Defer the interaction safely to prevent timeouts
+  if (!interaction.deferred && !interaction.replied) {
+    await interaction.deferUpdate().catch(() => {});
+  }
 
   // Custom ID format: translate_select_<originalMessageId>
   const parts = interaction.customId.split('_');

@@ -1,7 +1,7 @@
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const { supabase, getFeatureConfig, logBotEvent } = require('../../lib/supabase');
 const logger = require('../../lib/logger');
-const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlags } = require('discord.js');
 const { performance } = require('perf_hooks');
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
@@ -263,7 +263,11 @@ async function handleTriviaStartClick(interaction) {
   try {
     // Acknowledge immediately — must happen within 3s or Discord shows 'interaction failed'
     if (!interaction.deferred && !interaction.replied) {
-      await interaction.deferReply({ ephemeral: true });
+      try {
+        await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+      } catch (e) {
+        return; // Interaction expired or already handled
+      }
     }
     setTimeout(() => {
       interaction.deleteReply().catch(() => {});
@@ -287,17 +291,27 @@ async function handleTriviaStartClick(interaction) {
     }
 
     if (drop.status !== 'active') {
-      const { data: activeDrop } = await supabase
+      const { data: activeDrops } = await supabase
         .from('trivia_drops')
         .select('id, channel_id')
         .eq('guild_id', guildId)
         .eq('status', 'active')
-        .maybeSingle();
+        .neq('id', dropId)
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      const activeDrop = activeDrops && activeDrops.length > 0 ? activeDrops[0] : null;
 
       if (activeDrop && activeDrop.channel_id) {
-        return interaction.editReply({
-          content: `❌ This trivia session has already closed.\n\n📍 **An active Trivia Drop is live right now in <#${activeDrop.channel_id}>!** Head over to <#${activeDrop.channel_id}> to play! 🧠⚡`,
-        });
+        if (activeDrop.channel_id === interaction.channelId) {
+          return interaction.editReply({
+            content: `❌ This trivia session has already closed.\n\n📍 **An active Trivia Drop is live right now in this channel!** Scroll down to the newest trivia message to play! 🧠⚡`,
+          });
+        } else {
+          return interaction.editReply({
+            content: `❌ This trivia session has already closed.\n\n📍 **An active Trivia Drop is live right now in <#${activeDrop.channel_id}>!** Head over to <#${activeDrop.channel_id}> to play! 🧠⚡`,
+          });
+        }
       }
 
       return interaction.editReply({ content: '❌ This trivia session has already closed.' });
@@ -800,8 +814,11 @@ async function forceCloseDrop(client, guildId, dropId, status = 'completed') {
  * @returns {{ dateStr: string, timeStr: string, hour: number, minute: number }}
  */
 function getLocalTimeInTimezone(timezone, dateInput = new Date()) {
+  let tz = timezone || 'Asia/Manila';
+  if (tz === 'Manila' || tz === 'manila' || !tz) tz = 'Asia/Manila';
+
   const options = {
-    timeZone: timezone,
+    timeZone: tz,
     year: 'numeric', month: '2-digit', day: '2-digit',
     hour: '2-digit', minute: '2-digit',
     hour12: false
@@ -830,9 +847,9 @@ function getLocalTimeInTimezone(timezone, dateInput = new Date()) {
  */
 function generateDropTimesForDay(dropsCount) {
   const count = Math.min(3, Math.max(1, dropsCount || 1));
-  if (count === 1) return ['00:01'];
-  if (count === 2) return ['00:01', '12:00'];
-  return ['00:01', '08:00', '16:00'];
+  if (count === 1) return ['12:00'];
+  if (count === 2) return ['11:00', '17:00'];
+  return ['10:00', '15:00', '20:00'];
 }
 
 /**
@@ -1030,9 +1047,16 @@ async function getLeaderboardCommandMention(client) {
  * @param {import('discord.js').ButtonInteraction} interaction
  */
 async function handleTriviaLeaderboardButton(interaction) {
-  await interaction.deferReply({ ephemeral: true });
+  try {
+    if (!interaction.deferred && !interaction.replied) {
+      try {
+        await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+      } catch (e) {
+        return; // Interaction expired or already handled
+      }
+    }
 
-  const { data: topPoints, error } = await supabase
+    const { data: topPoints, error } = await supabase
     .from('trivia_points')
     .select('discord_id, points')
     .eq('guild_id', interaction.guild.id)
@@ -1060,6 +1084,9 @@ async function handleTriviaLeaderboardButton(interaction) {
     .setTimestamp();
 
   return interaction.editReply({ embeds: [embed] });
+  } catch (err) {
+    logger.error('[TRIVIA] Error in handleTriviaLeaderboardButton:', err.message || err);
+  }
 }
 
 /**

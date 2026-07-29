@@ -76,6 +76,7 @@ module.exports = {
               }, 120000);
             }
           } catch (err) {
+            if (err.code === 10062 || err.message?.includes('Unknown interaction')) return;
             logger.error('[INTERACTION] Error in vault_get_daily_quests:', err.message || err);
             if (interaction.deferred || interaction.replied) {
               await interaction.editReply({ content: '❌ Failed to load daily quests. Please try again.' }).catch(() => {});

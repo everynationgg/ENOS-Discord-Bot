@@ -123,7 +123,7 @@ export default function TermsPage() {
           borderTop: '1px solid #1e2330',
           paddingTop: '1.5rem',
           display: 'flex',
-          justify: 'space-between',
+          justifyContent: 'space-between',
           fontSize: '0.875rem',
           color: '#64748b',
         }}>

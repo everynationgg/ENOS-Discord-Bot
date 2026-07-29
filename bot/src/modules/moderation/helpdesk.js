@@ -16,17 +16,29 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
  * @param {import('discord.js').ButtonInteraction} interaction
  */
 async function handleHelpDeskStart(interaction) {
-  await interaction.deferReply({ ephemeral: true });
-
-  const guild = interaction.guild;
-  if (!guild) return;
-
   try {
+    if (!interaction.deferred && !interaction.replied) {
+      await interaction.deferReply({ ephemeral: true }).catch(() => {});
+    }
+
+    const guild = interaction.guild;
+    if (!guild) return;
     const featureConfig = await getFeatureConfig(guild.id, 'help_desk');
     const isEnabled = featureConfig?.enabled || false;
 
     if (!isEnabled) {
       await interaction.editReply({ content: '❌ The AI Help Desk is currently disabled for this server.' });
+      return;
+    }
+
+    // Check if user already has an active support thread open in this channel
+    const activeThreads = await interaction.channel.threads.fetchActive().catch(() => null);
+    const existingThread = activeThreads?.threads?.find(t => t.name === `💬-${interaction.user.username}`);
+    if (existingThread) {
+      await interaction.editReply({ content: `➡️ **You already have an active support room open: <#${existingThread.id}>**` });
+      setTimeout(() => {
+        interaction.deleteReply().catch(() => {});
+      }, 15000);
       return;
     }
 
@@ -215,7 +227,8 @@ async function handleHelpDeskChatMessage(message) {
     }
 
     // Construct system instructions with FAQ cards and live context
-    let systemPrompt = config.ai_system_prompt || 'You are a helpful customer support bot.';
+    let systemPrompt = config.ai_system_prompt || 'You are a helpful, courteous, and professional community support assistant for the Every Nation server.';
+    systemPrompt += '\n\nIMPORTANT BEHAVIORAL RULES:\n- Always be polite, welcoming, helpful, and respectful to all users.\n- Keep answers concise, clear, and direct.\n- NEVER use sarcasm, snark, arrogance, or condescending language under any circumstances.\n';
     systemPrompt += guildContext;
 
     const faqList = config.faq_list || [];
@@ -227,17 +240,39 @@ async function handleHelpDeskChatMessage(message) {
     }
 
     // Format historical messages for Gemini chat structure
-    const formattedHistory = [];
+    const rawHistory = [];
     const historyPool = sorted.slice(0, -1);
 
     for (const msg of historyPool) {
       if (msg.system || (msg.author.bot && (msg.embeds.length > 0 || msg.components.length > 0))) continue;
       if (!msg.content || !msg.content.trim()) continue;
 
-      formattedHistory.push({
+      rawHistory.push({
         role: msg.author.bot ? 'model' : 'user',
-        parts: [{ text: msg.content }]
+        parts: [{ text: msg.content.trim() }]
       });
+    }
+
+    // Sanitize history to guarantee strict role alternation starting with 'user'
+    const formattedHistory = [];
+    for (const entry of rawHistory) {
+      if (formattedHistory.length === 0) {
+        if (entry.role === 'user') {
+          formattedHistory.push({ role: entry.role, parts: [{ text: entry.parts[0].text }] });
+        }
+      } else {
+        const lastEntry = formattedHistory[formattedHistory.length - 1];
+        if (lastEntry.role === entry.role) {
+          lastEntry.parts[0].text += `\n${entry.parts[0].text}`;
+        } else {
+          formattedHistory.push({ role: entry.role, parts: [{ text: entry.parts[0].text }] });
+        }
+      }
+    }
+
+    // Trailing check: Gemini expect history before sendMessage() to end with 'model' if present
+    if (formattedHistory.length > 0 && formattedHistory[formattedHistory.length - 1].role === 'user') {
+      formattedHistory.pop();
     }
 
     let modelName = 'gemini-2.5-flash';
