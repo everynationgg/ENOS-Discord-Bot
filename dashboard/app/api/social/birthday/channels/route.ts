@@ -8,10 +8,12 @@ export async function GET(req: NextRequest) {
 
   const guildId = req.nextUrl.searchParams.get('guild_id') || process.env.DISCORD_GUILD_ID!;
   const token = process.env.DISCORD_TOKEN || process.env.DISCORD_BOT_TOKEN;
+  const userToken = (session as any)?.accessToken;
 
-  if (!token) {
-    // If bot token is not configured on the dashboard, return a helpful fallback message
-    logger.warn('[BIRTHDAYS] DISCORD_TOKEN is missing in dashboard environment variables.');
+  const authHeader = token ? `Bot ${token}` : userToken ? `Bearer ${userToken}` : null;
+
+  if (!authHeader) {
+    logger.warn('[BIRTHDAYS] Neither DISCORD_TOKEN nor user accessToken is available.');
     return NextResponse.json([
       { id: 'fallback-text', name: '⚠️ Set DISCORD_TOKEN in env to load channels' }
     ]);
@@ -20,7 +22,7 @@ export async function GET(req: NextRequest) {
   try {
     const res = await fetch(`https://discord.com/api/v10/guilds/${guildId}/channels`, {
       headers: {
-        Authorization: `Bot ${token}`,
+        Authorization: authHeader,
       },
     });
 

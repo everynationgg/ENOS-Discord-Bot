@@ -50,6 +50,8 @@ export async function GET(req: NextRequest) {
     ]);
 
     const token = process.env.DISCORD_TOKEN || process.env.DISCORD_BOT_TOKEN;
+    const userToken = (session as any)?.accessToken;
+    const authHeader = token ? `Bot ${token}` : userToken ? `Bearer ${userToken}` : null;
 
     const rawVault = vaultRes.data || [];
     const rawBoss = bossRes.data || [];
@@ -67,12 +69,12 @@ export async function GET(req: NextRequest) {
     // Fetch user profiles from Discord API (with caching / fallback)
     const userProfiles: Record<string, { username: string; avatar_url: string }> = {};
 
-    if (token) {
+    if (authHeader) {
       await Promise.all(
         userIds.map(async (id) => {
           try {
             const res = await fetch(`https://discord.com/api/v10/users/${id}`, {
-              headers: { Authorization: `Bot ${token}` },
+              headers: { Authorization: authHeader },
             });
             if (res.ok) {
               const u = await res.json();

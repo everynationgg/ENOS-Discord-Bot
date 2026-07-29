@@ -15,7 +15,6 @@ export default function LeaderboardsDashboard() {
   const [activeTab, setActiveTab] = useState<'vault' | 'boss' | 'trivia'>('vault');
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<any>(null);
-  const [autoUpdate, setAutoUpdate] = useState(true);
   const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
 
   // Dispatch Controls
@@ -70,13 +69,6 @@ export default function LeaderboardsDashboard() {
     fetchLeaderboards();
     fetchChannels();
   }, [status, fetchLeaderboards, fetchChannels]);
-
-  // Live Auto-Update Polling (Every 5 Minutes / 300,000 ms)
-  useEffect(() => {
-    if (!autoUpdate || status !== 'authenticated') return;
-    const interval = setInterval(fetchLeaderboards, 300000);
-    return () => clearInterval(interval);
-  }, [autoUpdate, status, fetchLeaderboards]);
 
   const handleForcePost = async () => {
     if (!selectedChannelId) {
@@ -259,34 +251,12 @@ export default function LeaderboardsDashboard() {
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                   <button
-                    className={`btn btn-sm ${autoUpdate ? 'btn-success' : 'btn-secondary'}`}
-                    onClick={() => setAutoUpdate(!autoUpdate)}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.35rem',
-                      fontSize: '0.75rem',
-                    }}
-                  >
-                    <span
-                      style={{
-                        width: 8,
-                        height: 8,
-                        borderRadius: '50%',
-                        background: autoUpdate ? '#22c55e' : '#6b7280',
-                        display: 'inline-block',
-                      }}
-                    />
-                    {autoUpdate ? 'Auto-Update ON (5m)' : 'Auto-Update OFF'}
-                  </button>
-
-                  <button
                     className="btn btn-secondary btn-sm"
                     onClick={fetchLeaderboards}
                     title="Manual Refresh"
-                    style={{ fontSize: '0.75rem' }}
+                    style={{ fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}
                   >
-                    🔄
+                    🔄 Refresh Standings
                   </button>
                 </div>
               </div>

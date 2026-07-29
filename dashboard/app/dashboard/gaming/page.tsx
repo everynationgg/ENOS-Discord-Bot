@@ -277,55 +277,119 @@ function BossPreviewCard({
 }) {
   const [viewMode, setViewMode] = useState<'spawn' | 'combat'>('spawn');
   const [activeClass, setActiveClass] = useState<'mom' | 'dad' | 'kid'>('mom');
-  const [previewSrc, setPreviewSrc] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
-  const fetchPreview = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await fetch('/api/gaming/boss/render-preview', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          bossName: bossName || 'WEEKLY BOSS',
-          imageUrl,
-          bgUrl,
-          userClassKey: activeClass,
-          momImageUrl,
-          dadImageUrl,
-          kidImageUrl,
-          viewMode,
-        }),
-      });
+  const drawCanvas = useCallback(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
 
-      // 501 = canvas not available in serverless environment — show info, not error
-      if (res.status === 501) {
-        setError('Live preview is not available here — the bot generates the actual card when you post the boss.');
-        return;
+    const width = 800;
+    const height = 420;
+    canvas.width = width;
+    canvas.height = height;
+
+    ctx.clearRect(0, 0, width, height);
+
+    // 1. Draw Background
+    const drawOverlay = () => {
+      // 2. Draw Boss Image
+      const targetClassUrl = activeClass === 'mom' ? momImageUrl : activeClass === 'dad' ? dadImageUrl : kidImageUrl;
+
+      const drawBossAndUI = () => {
+        if (imageUrl) {
+          const bossImg = new Image();
+          bossImg.crossOrigin = 'anonymous';
+          bossImg.src = imageUrl;
+          bossImg.onload = () => {
+            ctx.drawImage(bossImg, 420, 40, 340, 340);
+            drawUI();
+          };
+          bossImg.onerror = () => drawUI();
+        } else {
+          drawUI();
+        }
+      };
+
+      if (viewMode === 'combat' && targetClassUrl) {
+        const heroImg = new Image();
+        heroImg.crossOrigin = 'anonymous';
+        heroImg.src = targetClassUrl;
+        heroImg.onload = () => {
+          ctx.drawImage(heroImg, 40, 100, 260, 260);
+          drawBossAndUI();
+        };
+        heroImg.onerror = () => drawBossAndUI();
+      } else {
+        drawBossAndUI();
       }
+    };
 
-      if (!res.ok) {
-        throw new Error('Failed to render preview');
-      }
+    const drawUI = () => {
+      // Dark gradient overlay for readability
+      const grad = ctx.createLinearGradient(0, height - 120, 0, height);
+      grad.addColorStop(0, 'rgba(2, 6, 23, 0)');
+      grad.addColorStop(1, 'rgba(2, 6, 23, 0.95)');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, height - 120, width, 120);
 
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      setPreviewSrc(url);
-    } catch (e: any) {
-      setError(e.message || 'Error rendering preview');
-    } finally {
-      setLoading(false);
+      // Header Banner Box
+      ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
+      ctx.fillRect(20, 20, 380, 75);
+      ctx.strokeStyle = 'rgba(99, 102, 241, 0.5)';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(20, 20, 380, 75);
+
+      ctx.fillStyle = '#facc15';
+      ctx.font = 'bold 12px Inter, sans-serif';
+      ctx.fillText('⚔️ WEEKLY BOSS BOUNTY RPG', 32, 40);
+
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 18px Inter, sans-serif';
+      ctx.fillText((bossName || 'WEEKLY BOSS').toUpperCase(), 32, 65);
+
+      // Status Badge
+      ctx.fillStyle = viewMode === 'spawn' ? 'rgba(34, 197, 94, 0.2)' : 'rgba(245, 158, 11, 0.2)';
+      ctx.fillRect(20, 370, 240, 30);
+      ctx.fillStyle = viewMode === 'spawn' ? '#22c55e' : '#f59e0b';
+      ctx.font = '600 13px Inter, sans-serif';
+      ctx.fillText(
+        viewMode === 'spawn' ? '⚡ SPAWN CARD PREVIEW' : `⚔️ ${activeClass.toUpperCase()} COMBAT VIEW`,
+        32,
+        390
+      );
+    };
+
+    if (bgUrl) {
+      const bgImg = new Image();
+      bgImg.crossOrigin = 'anonymous';
+      bgImg.src = bgUrl;
+      bgImg.onload = () => {
+        ctx.drawImage(bgImg, 0, 0, width, height);
+        drawOverlay();
+      };
+      bgImg.onerror = () => {
+        const bgGrad = ctx.createLinearGradient(0, 0, width, height);
+        bgGrad.addColorStop(0, '#0f172a');
+        bgGrad.addColorStop(1, '#020617');
+        ctx.fillStyle = bgGrad;
+        ctx.fillRect(0, 0, width, height);
+        drawOverlay();
+      };
+    } else {
+      const bgGrad = ctx.createLinearGradient(0, 0, width, height);
+      bgGrad.addColorStop(0, '#0f172a');
+      bgGrad.addColorStop(1, '#020617');
+      ctx.fillStyle = bgGrad;
+      ctx.fillRect(0, 0, width, height);
+      drawOverlay();
     }
-  };
+  }, [bossName, imageUrl, bgUrl, momImageUrl, dadImageUrl, kidImageUrl, viewMode, activeClass]);
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      fetchPreview();
-    }, 400);
-    return () => clearTimeout(timer);
-  }, [bossName, imageUrl, bgUrl, momImageUrl, dadImageUrl, kidImageUrl, viewMode, activeClass]);
+    drawCanvas();
+  }, [drawCanvas]);
 
   const hasIbbLinks = [imageUrl, bgUrl, momImageUrl, dadImageUrl, kidImageUrl].some(
     (u) => u && u.includes('ibb.co/') && !u.includes('i.ibb.co/')
@@ -389,7 +453,7 @@ function BossPreviewCard({
             type="button"
             className="btn btn-secondary btn-sm"
             style={{ padding: '0.2rem 0.5rem', fontSize: '0.75rem' }}
-            onClick={fetchPreview}
+            onClick={drawCanvas}
             title="Re-render Canvas Preview"
           >
             🔄 Refresh
@@ -400,7 +464,7 @@ function BossPreviewCard({
       {hasIbbLinks && (
         <div style={{ fontSize: '0.75rem', color: '#facc15', background: 'rgba(250, 204, 21, 0.1)', padding: '0.5rem 0.75rem', borderRadius: '4px', border: '1px solid rgba(250, 204, 21, 0.3)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
           <div>
-            ⚠️ <strong>ImgBB Webpage Link Detected (`ibb.co/`)</strong>: Serverless host (Vercel) prefers <strong>Direct Links</strong> (`https://i.ibb.co/.../image.png`).
+            ⚠️ <strong>ImgBB Webpage Link Detected (`ibb.co/`)</strong>: Direct links (`https://i.ibb.co/.../image.png`) recommended.
           </div>
           {onFixIbbLinks && (
             <button
@@ -429,31 +493,16 @@ function BossPreviewCard({
           justifyContent: 'center',
         }}
       >
-        {loading && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-muted)', fontSize: '0.8125rem' }}>
-            <div className="spinner" style={{ width: 16, height: 16 }} /> Rendering Canvas Composite Preview...
-          </div>
-        )}
-
-        {!loading && previewSrc && (
-          <img
-            src={previewSrc}
-            alt="Boss Canvas Preview"
-            style={{
-              width: '100%',
-              height: 'auto',
-              maxHeight: '360px',
-              objectFit: 'contain',
-              display: 'block',
-            }}
-          />
-        )}
-
-        {!loading && !previewSrc && error && (
-          <div style={{ fontSize: '0.8125rem', color: '#ef4444' }}>
-            ❌ {error}
-          </div>
-        )}
+        <canvas
+          ref={canvasRef}
+          style={{
+            width: '100%',
+            height: 'auto',
+            maxHeight: '360px',
+            objectFit: 'contain',
+            display: 'block',
+          }}
+        />
       </div>
     </div>
   );
