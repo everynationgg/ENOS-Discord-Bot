@@ -37,12 +37,42 @@ async function checkTikTokChannel(handle) {
           const avatar = userObj.avatarMedium || userObj.avatarLarger || userObj.avatarThumb;
           const category = userObj.commerceUserInfo?.category;
 
+          let title = isLive ? `${nickname} is LIVE on TikTok!` : undefined;
+          let thumbnailUrl = avatar || undefined;
+          let viewerCount = 0;
+
+          if (isLive && roomId) {
+            try {
+              const roomRes = await fetch(`https://webcast.tiktok.com/webcast/room/info/?room_id=${roomId}&aid=1988`, {
+                headers: {
+                  'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1',
+                },
+              });
+
+              if (roomRes.ok) {
+                const roomJson = await roomRes.json();
+                const room = roomJson.data;
+                if (room) {
+                  if (room.title) title = room.title;
+                  if (room.square_cover_img?.url_list?.[0]) {
+                    thumbnailUrl = room.square_cover_img.url_list[0];
+                  } else if (room.cover?.url_list?.[0]) {
+                    thumbnailUrl = room.cover.url_list[0];
+                  }
+                  if (room.user_count) viewerCount = room.user_count;
+                }
+              }
+            } catch (rErr) {
+              logger.warn(`[TIKTOK] Room webcast details failed for @${cleanHandle}: ${rErr.message}`);
+            }
+          }
+
           return {
             isLive,
-            title: isLive ? `${nickname} is LIVE on TikTok!` : undefined,
-            thumbnailUrl: avatar || undefined,
+            title,
+            thumbnailUrl,
             gameName: category || 'TikTok Live',
-            viewerCount: 0,
+            viewerCount,
             stream_url: defaultStreamUrl,
           };
         }
