@@ -96,6 +96,10 @@ function initCrons(client) {
     }
   });
 
+  // ─── Initial Live Alert Checks on Startup ──────────────────────────────────────
+  checkTwitchLive(client).catch((err) => logger.error('[CRON] Initial Twitch check failed:', err.message));
+  checkTikTokLive(client).catch((err) => logger.error('[CRON] Initial TikTok check failed:', err.message));
+
   // ─── Daily Quest Reset: Every day at midnight ─────────────────────────────────
   cron.schedule(
     '0 0 * * *',
