@@ -31,37 +31,104 @@ async function getTwitchToken() {
   return twitchAccessToken;
 }
 
-/**
- * Checks Twitch stream status for a given login name.
- * @returns {Promise<{ isLive: boolean, title: string, thumbnailUrl: string } | null>}
- */
-async function checkTwitchStream(login) {
+async function checkTwitchStreamGql(login) {
+  const cleanLogin = login.replace(/^@/, '').trim();
+  const query = [
+    {
+      operationName: 'StreamMetadata',
+      variables: { channelLogin: cleanLogin },
+      query: `query StreamMetadata($channelLogin: String!) {
+        user(login: $channelLogin) {
+          id
+          login
+          displayName
+          profileImageURL(width: 300)
+          stream {
+            id
+            title
+            type
+            viewersCount
+            previewImageURL(width: 1280, height: 720)
+            game {
+              name
+            }
+          }
+        }
+      }`
+    }
+  ];
+
   try {
-    const token = await getTwitchToken();
-    const res = await fetch(`${TWITCH_API_BASE}/streams?user_login=${login}`, {
+    const res = await fetch('https://gql.twitch.tv/gql', {
+      method: 'POST',
       headers: {
-        'Client-ID': process.env.TWITCH_CLIENT_ID,
-        Authorization: `Bearer ${token}`,
+        'Client-ID': 'kimne78kx3ncx6brgo4mv6wki5h1ko',
+        'Content-Type': 'application/json',
       },
+      body: JSON.stringify(query),
     });
 
     if (!res.ok) return null;
     const data = await res.json();
-    const stream = data.data?.[0];
+    const user = data?.[0]?.data?.user;
+    if (!user) return { isLive: false };
 
-    if (!stream) return { isLive: false };
+    const stream = user.stream;
+    const isLive = Boolean(stream && stream.type === 'live');
 
     return {
-      isLive: true,
-      title: stream.title,
-      thumbnailUrl: stream.thumbnail_url.replace('{width}', '1280').replace('{height}', '720'),
-      viewerCount: stream.viewer_count,
-      gameName: stream.game_name,
+      isLive,
+      title: stream?.title || `${user.displayName || cleanLogin} is LIVE on Twitch!`,
+      thumbnailUrl: stream?.previewImageURL || user.profileImageURL || undefined,
+      viewerCount: stream?.viewersCount || 0,
+      gameName: stream?.game?.name || 'Twitch Stream',
     };
   } catch (err) {
-    logger.error(`[TWITCH] Error checking ${login}:`, err.message);
+    logger.warn(`[TWITCH] GQL query failed for @${cleanLogin}: ${err.message}`);
     return null;
   }
+}
+
+/**
+ * Checks Twitch stream status for a given login name.
+ * @returns {Promise<{ isLive: boolean, title?: string, thumbnailUrl?: string, gameName?: string, viewerCount?: number } | null>}
+ */
+async function checkTwitchStream(login) {
+  const cleanLogin = login.replace(/^@/, '').trim();
+  if (!cleanLogin) return null;
+
+  if (process.env.TWITCH_CLIENT_ID && process.env.TWITCH_CLIENT_SECRET) {
+    try {
+      const token = await getTwitchToken();
+      const res = await fetch(`${TWITCH_API_BASE}/streams?user_login=${cleanLogin}`, {
+        headers: {
+          'Client-ID': process.env.TWITCH_CLIENT_ID,
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        const stream = data.data?.[0];
+        if (stream) {
+          return {
+            isLive: true,
+            title: stream.title,
+            thumbnailUrl: stream.thumbnail_url.replace('{width}', '1280').replace('{height}', '720'),
+            viewerCount: stream.viewer_count,
+            gameName: stream.game_name,
+          };
+        } else {
+          return { isLive: false };
+        }
+      }
+    } catch (err) {
+      logger.warn(`[TWITCH] Helix API check failed for ${cleanLogin}: ${err.message}`);
+    }
+  }
+
+  // Fallback to GQL query (no API keys required)
+  return checkTwitchStreamGql(cleanLogin);
 }
 
 /**
@@ -72,7 +139,7 @@ function buildLiveEmbed(streamer, streamData, platform, guildName) {
   const platformEmoji = platform === 'twitch' ? '👾' : '▶️';
   const watchUrl = platform === 'twitch'
     ? `https://twitch.tv/${streamer.handle}`
-    : streamer.stream_url;
+    : (streamer.stream_url || streamData.stream_url || `https://www.tiktok.com/@${streamer.handle?.replace(/^@/, '')}/live`);
 
   const displayName = streamer.display_name || streamer.handle || 'Streamer';
 
@@ -108,8 +175,6 @@ function buildStreamEndedEmbed(streamer, platform, guildName) {
  * @param {import('discord.js').Client} client
  */
 async function checkTwitchLive(client) {
-  if (!process.env.TWITCH_CLIENT_ID || !process.env.TWITCH_CLIENT_SECRET) return;
-
   const { data: streamers, error } = await supabase
     .from('live_alerts')
     .select('*')
