@@ -1,5 +1,5 @@
 require('dotenv').config();
-const { Client, GatewayIntentBits, Partials, Collection } = require('discord.js');
+const { Client, GatewayIntentBits, Partials, Collection, Events } = require('discord.js');
 const { loadEvents } = require('./lib/loader');
 const { loadCommands } = require('./lib/loader');
 /**
@@ -46,7 +46,7 @@ client.cooldowns = new Collection();
 })();
 
 // ─── Initialize Cron Jobs & Voice Herald Sub-Bot after ready ─────────────────
-client.once('ready', async () => {
+client.once(Events.ClientReady, async () => {
   initCrons(client);
   const { initVoiceBot } = require('./modules/social/tts');
   initVoiceBot(client);
