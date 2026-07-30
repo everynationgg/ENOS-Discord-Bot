@@ -148,7 +148,7 @@ async function checkTwitchLive(client) {
  * Posts a live alert embed and stores the message ID for later editing.
  */
 async function handleGoLive(client, streamer, streamData, platform) {
-  const guild = client.guilds.cache.get(streamer.guild_id);
+  const guild = client.guilds.cache.get(streamer.guild_id) || await client.guilds.fetch(streamer.guild_id).catch(() => null);
   if (!guild) return;
 
   const targetChannelId = streamer.alert_channel_id || streamer.channel_id;
@@ -160,7 +160,7 @@ async function handleGoLive(client, streamer, streamData, platform) {
   const embed = buildLiveEmbed(streamer, streamData, platform, guild.name);
   const watchUrl = platform === 'twitch'
     ? `https://twitch.tv/${streamer.handle}`
-    : streamer.stream_url;
+    : (streamer.stream_url || streamData.stream_url || `https://www.tiktok.com/@${streamer.handle?.replace(/^@/, '')}/live`);
 
   const row = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
@@ -195,7 +195,7 @@ async function handleGoLive(client, streamer, streamData, platform) {
  * Edits the live embed to a "Stream Ended" state.
  */
 async function handleGoOffline(client, streamer) {
-  const guild = client.guilds.cache.get(streamer.guild_id);
+  const guild = client.guilds.cache.get(streamer.guild_id) || await client.guilds.fetch(streamer.guild_id).catch(() => null);
   if (!guild) return;
 
   const targetChannelId = streamer.alert_channel_id || streamer.channel_id;
