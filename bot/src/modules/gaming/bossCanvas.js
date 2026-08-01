@@ -270,11 +270,7 @@ async function renderBossImage(data) {
     if (mainPicBuf) {
       try {
         const vicImg = await loadImage(mainPicBuf);
-        if (customBgLoaded) {
-          drawImageContain(ctx, vicImg, 380, 20, 380, 380, 0.5, 0.5);
-        } else {
-          drawImageContain(ctx, vicImg, 0, 0, width, height, 0.5, 0.5);
-        }
+        drawImageContain(ctx, vicImg, 0, 0, width, height, 0.5, 0.5);
       } catch (e) {}
     }
 
