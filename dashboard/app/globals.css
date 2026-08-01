@@ -219,7 +219,6 @@ p  { color: var(--text-secondary); }
   background: var(--bg-card);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
-  overflow: hidden;
   transition: var(--transition);
   box-shadow: var(--shadow-card);
 }
