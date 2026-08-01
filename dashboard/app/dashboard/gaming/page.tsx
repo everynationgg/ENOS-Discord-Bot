@@ -1400,8 +1400,8 @@ export default function GamingPage() {
         )}
 
           {activeTab === 'boss' && (
-            <div className="split-layout-detail">
-              <div className="feature-instructions">
+            <div>
+              <div className="feature-instructions" style={{ marginBottom: '1.5rem' }}>
                 <h3>Weekly Boss Bounty RPG Guide</h3>
                 <p>
                   A self-balancing, zero-cost Discord RPG system where players choose a class and coordinate 3-class synergy loops to defeat a corrupted glitch boss.
@@ -1414,144 +1414,144 @@ export default function GamingPage() {
                 </ol>
               </div>
 
-              <div className="feature-form-card">
-                <FeatureCard
-                  id="weekly-boss"
-                  icon="🐉"
-                  title="Weekly Boss Bounty RPG"
-                  description="Self-balancing weekly boss RPG with M.O.M., D.A.D., and K.I.D. combat triad synergy, 5 AP weekly budgets, dynamic participant scaling, and Overkill Mode."
-                  featureKey="weekly_boss"
-                  initialEnabled={configs['weekly_boss']?.enabled ?? true}
-                  initialConfig={configs['weekly_boss']?.config ?? {}}
-                >
-                  {(config, setConfig) => {
-                    const [bossSubTab, setBossSubTab] = useState<'active' | 'staging'>('active');
-                    const gameName = config.game_name || '';
-                    const bossName = config.override_name || '';
-                    const baseHP = config.override_hp || '';
-                    const imageUrl = config.custom_image_url || '';
-                    const bgUrl = config.custom_bg_url || '';
-                    const victoryImageUrl = config.victory_image_url || '';
-                    const momImageUrl = config.mom_image_url || '';
-                    const dadImageUrl = config.dad_image_url || '';
-                    const kidImageUrl = config.kid_image_url || '';
+              <FeatureCard
+                id="weekly-boss"
+                icon="🐉"
+                title="Weekly Boss Bounty RPG"
+                description="Self-balancing weekly boss RPG with M.O.M., D.A.D., and K.I.D. combat triad synergy, 5 AP weekly budgets, dynamic participant scaling, and Overkill Mode."
+                featureKey="weekly_boss"
+                initialEnabled={configs['weekly_boss']?.enabled ?? true}
+                initialConfig={configs['weekly_boss']?.config ?? {}}
+              >
+                {(config, setConfig) => {
+                  const [bossSubTab, setBossSubTab] = useState<'active' | 'staging'>('active');
+                  const gameName = config.game_name || '';
+                  const bossName = config.override_name || '';
+                  const baseHP = config.override_hp || '';
+                  const imageUrl = config.custom_image_url || '';
+                  const bgUrl = config.custom_bg_url || '';
+                  const victoryImageUrl = config.victory_image_url || '';
+                  const momImageUrl = config.mom_image_url || '';
+                  const dadImageUrl = config.dad_image_url || '';
+                  const kidImageUrl = config.kid_image_url || '';
 
-                    const staged = config.staged_boss_config || {};
+                  const staged = config.staged_boss_config || {};
 
-                    return (
-                      <>
-                        <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '0.75rem' }}>
-                          <button
-                            type="button"
-                            className={`btn btn-sm ${bossSubTab === 'active' ? 'btn-primary' : 'btn-secondary'}`}
-                            onClick={() => setBossSubTab('active')}
-                          >
-                            ⚔️ Active Boss & Live Config
-                          </button>
-                          <button
-                            type="button"
-                            className={`btn btn-sm ${bossSubTab === 'staging' ? 'btn-primary' : 'btn-secondary'}`}
-                            onClick={() => setBossSubTab('staging')}
-                          >
-                            🗓️ Next Week's Boss Stager
-                          </button>
-                        </div>
+                  return (
+                    <>
+                      <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '0.75rem' }}>
+                        <button
+                          type="button"
+                          className={`btn btn-sm ${bossSubTab === 'active' ? 'btn-primary' : 'btn-secondary'}`}
+                          onClick={() => setBossSubTab('active')}
+                        >
+                          ⚔️ Active Boss & Live Config
+                        </button>
+                        <button
+                          type="button"
+                          className={`btn btn-sm ${bossSubTab === 'staging' ? 'btn-primary' : 'btn-secondary'}`}
+                          onClick={() => setBossSubTab('staging')}
+                        >
+                          🗓️ Next Week&apos;s Boss Stager
+                        </button>
+                      </div>
 
-                        {/* Admin Quick Action Controls — Fixed at top */}
-                        <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.25rem', flexWrap: 'wrap', alignItems: 'center', background: 'rgba(139, 92, 246, 0.08)', padding: '0.75rem 1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)' }}>
-                          <button
-                            id="boss-force-spawn"
-                            className="btn btn-primary btn-sm"
-                            disabled={config.boss_status === 'loading'}
-                            onClick={async () => {
-                              setConfig('boss_status', 'loading');
-                              try {
-                                const res = await fetch('/api/gaming/boss/action', {
-                                  method: 'POST',
-                                  headers: { 'Content-Type': 'application/json' },
-                                  body: JSON.stringify({
-                                    action: 'spawn',
-                                    gameName,
-                                    customName: bossName,
-                                    customHp: baseHP,
-                                    customImageUrl: imageUrl,
-                                    customBgUrl: bgUrl,
-                                  }),
-                                });
-                                const data = await res.json();
-                                setConfig('boss_status', data.error ? `error: ${data.error}` : 'spawned');
-                              } catch {
-                                setConfig('boss_status', 'error: request failed');
-                              }
-                              setTimeout(() => setConfig('boss_status', ''), 4000);
-                            }}
-                          >
-                            🚀 Spawn Boss & Post Card to Discord
-                          </button>
+                      {/* Admin Quick Action Controls — Fixed at top */}
+                      <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.25rem', flexWrap: 'wrap', alignItems: 'center', background: 'rgba(139, 92, 246, 0.08)', padding: '0.75rem 1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)' }}>
+                        <button
+                          id="boss-force-spawn"
+                          className="btn btn-primary btn-sm"
+                          disabled={config.boss_status === 'loading'}
+                          onClick={async () => {
+                            setConfig('boss_status', 'loading');
+                            try {
+                              const res = await fetch('/api/gaming/boss/action', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                  action: 'spawn',
+                                  gameName,
+                                  customName: bossName,
+                                  customHp: baseHP,
+                                  customImageUrl: imageUrl,
+                                  customBgUrl: bgUrl,
+                                }),
+                              });
+                              const data = await res.json();
+                              setConfig('boss_status', data.error ? `error: ${data.error}` : 'spawned');
+                            } catch {
+                              setConfig('boss_status', 'error: request failed');
+                            }
+                            setTimeout(() => setConfig('boss_status', ''), 4000);
+                          }}
+                        >
+                          🚀 Spawn Boss & Post Card to Discord
+                        </button>
 
-                          <button
-                            id="boss-force-end"
-                            className="btn btn-secondary btn-sm"
-                            disabled={config.boss_status === 'loading'}
-                            onClick={async () => {
-                              setConfig('boss_status', 'loading');
-                              try {
-                                const res = await fetch('/api/gaming/boss/action', {
-                                  method: 'POST',
-                                  headers: { 'Content-Type': 'application/json' },
-                                  body: JSON.stringify({ action: 'end' }),
-                                });
-                                const data = await res.json();
-                                setConfig('boss_status', data.error ? `error: ${data.error}` : 'ended');
-                              } catch {
-                                setConfig('boss_status', 'error: request failed');
-                              }
-                              setTimeout(() => setConfig('boss_status', ''), 4000);
-                            }}
-                          >
-                            ⏹️ Force End / Reset AP
-                          </button>
+                        <button
+                          id="boss-force-end"
+                          className="btn btn-secondary btn-sm"
+                          disabled={config.boss_status === 'loading'}
+                          onClick={async () => {
+                            setConfig('boss_status', 'loading');
+                            try {
+                              const res = await fetch('/api/gaming/boss/action', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ action: 'end' }),
+                              });
+                              const data = await res.json();
+                              setConfig('boss_status', data.error ? `error: ${data.error}` : 'ended');
+                            } catch {
+                              setConfig('boss_status', 'error: request failed');
+                            }
+                            setTimeout(() => setConfig('boss_status', ''), 4000);
+                          }}
+                        >
+                          ⏹️ Force End / Reset AP
+                        </button>
 
-                          <button
-                            id="boss-force-overkill"
-                            className="btn btn-secondary btn-sm"
-                            disabled={config.boss_status === 'loading'}
-                            onClick={async () => {
-                              setConfig('boss_status', 'loading');
-                              try {
-                                const res = await fetch('/api/gaming/boss/action', {
-                                  method: 'POST',
-                                  headers: { 'Content-Type': 'application/json' },
-                                  body: JSON.stringify({ action: 'overkill' }),
-                                });
-                                const data = await res.json();
-                                setConfig('boss_status', data.error ? `error: ${data.error}` : 'overkill');
-                              } catch {
-                                setConfig('boss_status', 'error: request failed');
-                              }
-                              setTimeout(() => setConfig('boss_status', ''), 4000);
-                            }}
-                          >
-                            💥 Force Trigger Overkill
-                          </button>
+                        <button
+                          id="boss-force-overkill"
+                          className="btn btn-secondary btn-sm"
+                          disabled={config.boss_status === 'loading'}
+                          onClick={async () => {
+                            setConfig('boss_status', 'loading');
+                            try {
+                              const res = await fetch('/api/gaming/boss/action', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ action: 'overkill' }),
+                              });
+                              const data = await res.json();
+                              setConfig('boss_status', data.error ? `error: ${data.error}` : 'overkill');
+                            } catch {
+                              setConfig('boss_status', 'error: request failed');
+                            }
+                            setTimeout(() => setConfig('boss_status', ''), 4000);
+                          }}
+                        >
+                          💥 Force Trigger Overkill
+                        </button>
 
-                          {config.boss_status && (
-                            <span style={{
-                              fontSize: '0.8125rem',
-                              color: config.boss_status.startsWith('error') ? 'var(--color-error)' : 'var(--color-success)',
-                              fontWeight: 500,
-                            }}>
-                              {config.boss_status === 'loading' ? '⏳ Processing...' :
-                               config.boss_status === 'spawned' ? '✅ Boss spawned & posted to Discord!' :
-                               config.boss_status === 'ended' ? '✅ Cycle ended & AP reset.' :
-                               config.boss_status === 'overkill' ? '✅ Overkill Mode triggered!' :
-                               `❌ ${config.boss_status}`}
-                            </span>
-                          )}
-                        </div>
+                        {config.boss_status && (
+                          <span style={{
+                            fontSize: '0.8125rem',
+                            color: config.boss_status.startsWith('error') ? 'var(--color-error)' : 'var(--color-success)',
+                            fontWeight: 500,
+                          }}>
+                            {config.boss_status === 'loading' ? '⏳ Processing...' :
+                             config.boss_status === 'spawned' ? '✅ Boss spawned & posted to Discord!' :
+                             config.boss_status === 'ended' ? '✅ Cycle ended & AP reset.' :
+                             config.boss_status === 'overkill' ? '✅ Overkill Mode triggered!' :
+                             `❌ ${config.boss_status}`}
+                          </span>
+                        )}
+                      </div>
 
-                        {bossSubTab === 'staging' ? (
-                          <>
+                      {bossSubTab === 'staging' ? (
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(460px, 1fr))', gap: '1.5rem', alignItems: 'start' }}>
+                          <div>
                             <div className="section-divider">
                               <div className="section-divider-line" />
                               <span className="section-divider-text">🗓️ Next Week&apos;s Boss Staging &amp; Planner</span>
@@ -1613,7 +1613,9 @@ export default function GamingPage() {
                                 onChange={(e) => setConfig('staged_boss_config', { ...staged, max_hp: e.target.value })}
                               />
                             </div>
+                          </div>
 
+                          <div>
                             {/* Staged Boss & Background Image Section */}
                             <div className="section-divider">
                               <div className="section-divider-line" />
@@ -1621,7 +1623,7 @@ export default function GamingPage() {
                               <div className="section-divider-line" />
                             </div>
 
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.25rem' }}>
                               <ImageUploader
                                 id="staged-boss-image-url"
                                 label="🧌 Next Boss Artwork Image"
@@ -1639,16 +1641,16 @@ export default function GamingPage() {
                                 onChange={(url) => setConfig('staged_boss_config', { ...staged, custom_bg_url: url })}
                                 helpText="Custom background landscape/arena image for next week's boss."
                               />
-
-                              <ImageUploader
-                                id="staged-boss-victory-url"
-                                label="🎉 Next Victory Celebration Image (Family Photo)"
-                                placeholder="https://.../victory_family_celebration.png"
-                                value={staged.victory_image_url || ''}
-                                onChange={(url) => setConfig('staged_boss_config', { ...staged, victory_image_url: url })}
-                                helpText="Family/celebration photo shown on Discord when the boss is defeated on Saturday."
-                              />
                             </div>
+
+                            <ImageUploader
+                              id="staged-boss-victory-url"
+                              label="🎉 Next Victory Celebration Image (Family Photo)"
+                              placeholder="https://.../victory_family_celebration.png"
+                              value={staged.victory_image_url || ''}
+                              onChange={(url) => setConfig('staged_boss_config', { ...staged, victory_image_url: url })}
+                              helpText="Family/celebration photo shown on Discord when the boss is defeated on Saturday."
+                            />
 
                             {/* Staged Player Class Custom Images */}
                             <div className="section-divider">
@@ -1657,7 +1659,7 @@ export default function GamingPage() {
                               <div className="section-divider-line" />
                             </div>
 
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem', marginBottom: '1.25rem' }}>
                               <ImageUploader
                                 id="staged-boss-mom-image-url"
                                 label="🛡️ M.O.M. Class Image"
@@ -1729,194 +1731,198 @@ export default function GamingPage() {
                                 setConfig('staged_boss_config', newStaged);
                               }}
                             />
-                          </>
-                        ) : (
-                          <>
+                          </div>
+                        </div>
+                      ) : (
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(460px, 1fr))', gap: '1.5rem', alignItems: 'start' }}>
+                          <div>
                             <div className="section-divider">
                               <div className="section-divider-line" />
                               <span className="section-divider-text">Boss Settings</span>
                               <div className="section-divider-line" />
                             </div>
 
-                        <div className="form-group">
-                          <label className="form-label">Boss Announcement Channel ID</label>
-                          <input
-                            id="boss-channel-id"
-                            className="form-input"
-                            placeholder="Channel ID for boss card posts (e.g. 1234567890)"
-                            value={config.channel_id || ''}
-                            onChange={(e) => setConfig('channel_id', e.target.value)}
-                          />
-                          <span className="form-hint">Channel where /boss status cards are posted</span>
-                        </div>
+                            <div className="form-group">
+                              <label className="form-label">Boss Announcement Channel ID</label>
+                              <input
+                                id="boss-channel-id"
+                                className="form-input"
+                                placeholder="Channel ID for boss card posts (e.g. 1234567890)"
+                                value={config.channel_id || ''}
+                                onChange={(e) => setConfig('channel_id', e.target.value)}
+                              />
+                              <span className="form-hint">Channel where /boss status cards are posted</span>
+                            </div>
 
-                        {/* Manual Boss Configuration Controls */}
-                        <div className="section-divider">
-                          <div className="section-divider-line" />
-                          <span className="section-divider-text">⚔️ Weekly Boss Setup</span>
-                          <div className="section-divider-line" />
-                        </div>
+                            {/* Manual Boss Configuration Controls */}
+                            <div className="section-divider">
+                              <div className="section-divider-line" />
+                              <span className="section-divider-text">⚔️ Weekly Boss Setup</span>
+                              <div className="section-divider-line" />
+                            </div>
 
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-                          <div className="form-group">
-                            <label className="form-label">🎮 Game Name</label>
-                            <input
-                              id="boss-game-name"
-                              className="form-input"
-                              placeholder="e.g. Diablo 4, Wuthering Waves, Elden Ring"
-                              value={gameName}
-                              onChange={(e) => setConfig('game_name', e.target.value)}
-                            />
-                            <span className="form-hint">The game where the boss originates</span>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                              <div className="form-group">
+                                <label className="form-label">🎮 Game Name</label>
+                                <input
+                                  id="boss-game-name"
+                                  className="form-input"
+                                  placeholder="e.g. Diablo 4, Wuthering Waves, Elden Ring"
+                                  value={gameName}
+                                  onChange={(e) => setConfig('game_name', e.target.value)}
+                                />
+                                <span className="form-hint">The game where the boss originates</span>
+                              </div>
+
+                              <div className="form-group">
+                                <label className="form-label">⚔️ Boss / Character Name</label>
+                                <input
+                                  id="boss-override-name"
+                                  className="form-input"
+                                  placeholder="e.g. Lilith, Aemeth, Malenia"
+                                  value={bossName}
+                                  onChange={(e) => setConfig('override_name', e.target.value)}
+                                />
+                                <span className="form-hint">Name of the boss character</span>
+                              </div>
+                            </div>
+
+                            <div className="form-group">
+                              <label className="form-label">❤️ Manual Base HP (Optional Override)</label>
+                              <input
+                                id="boss-override-hp"
+                                type="number"
+                                className="form-input"
+                                placeholder="e.g. 150000"
+                                value={baseHP}
+                                onChange={(e) => setConfig('override_hp', e.target.value)}
+                              />
+                              <span className="form-hint">Leave blank for automatic player-scaled HP</span>
+                            </div>
                           </div>
 
-                          <div className="form-group">
-                            <label className="form-label">⚔️ Boss / Character Name</label>
-                            <input
-                              id="boss-override-name"
-                              className="form-input"
-                              placeholder="e.g. Lilith, Aemeth, Malenia"
-                              value={bossName}
-                              onChange={(e) => setConfig('override_name', e.target.value)}
+                          <div>
+                            {/* Boss & Background Image Section */}
+                            <div className="section-divider">
+                              <div className="section-divider-line" />
+                              <span className="section-divider-text">🖼️ Boss Artwork & Environment</span>
+                              <div className="section-divider-line" />
+                            </div>
+
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.25rem' }}>
+                              <ImageUploader
+                                id="boss-image-url"
+                                label="🧌 Boss Artwork Image"
+                                placeholder="https://.../boss_art.png"
+                                value={imageUrl}
+                                onChange={(url) => setConfig('custom_image_url', url)}
+                                helpText="Full boss artwork image displayed during spawn & combat."
+                              />
+
+                              <ImageUploader
+                                id="boss-bg-url"
+                                label="🌄 Arena Background Image"
+                                placeholder="https://.../arena_bg.png"
+                                value={bgUrl}
+                                onChange={(url) => setConfig('custom_bg_url', url)}
+                                helpText="Optional custom background landscape image"
+                              />
+                            </div>
+
+                            <ImageUploader
+                              id="boss-victory-url"
+                              label="🎉 Victory Celebration Image (Family Photo)"
+                              placeholder="https://.../victory_family_celebration.png"
+                              value={victoryImageUrl}
+                              onChange={(url) => setConfig('victory_image_url', url)}
+                              helpText="Family/celebration photo shown on Discord when the boss is defeated on Saturday."
                             />
-                            <span className="form-hint">Name of the boss character</span>
+
+                            {/* Player Class Custom Images */}
+                            <div className="section-divider">
+                              <div className="section-divider-line" />
+                              <span className="section-divider-text">🎭 Player Class Character Images (Transparent PNGs)</span>
+                              <div className="section-divider-line" />
+                            </div>
+
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem', marginBottom: '1.25rem' }}>
+                              <ImageUploader
+                                id="boss-mom-image-url"
+                                label="🛡️ M.O.M. Class Image"
+                                placeholder="https://.../mom_character.png"
+                                value={momImageUrl}
+                                onChange={(url) => setConfig('mom_image_url', url)}
+                                helpText="Placed on left side when M.O.M. class is selected"
+                              />
+
+                              <ImageUploader
+                                id="boss-dad-image-url"
+                                label="🔨 D.A.D. Class Image"
+                                placeholder="https://.../dad_character.png"
+                                value={dadImageUrl}
+                                onChange={(url) => setConfig('dad_image_url', url)}
+                                helpText="Placed on left side when D.A.D. class is selected"
+                              />
+
+                              <ImageUploader
+                                id="boss-kid-image-url"
+                                label="⚡ K.I.D. Class Image"
+                                placeholder="https://.../kid_character.png"
+                                value={kidImageUrl}
+                                onChange={(url) => setConfig('kid_image_url', url)}
+                                helpText="Placed on left side when K.I.D. class is selected"
+                              />
+                            </div>
+
+                            {/* Live Canvas Composite Preview Card */}
+                            <BossPreviewCard
+                              bossName={bossName}
+                              imageUrl={imageUrl}
+                              bgUrl={bgUrl}
+                              momImageUrl={momImageUrl}
+                              dadImageUrl={dadImageUrl}
+                              kidImageUrl={kidImageUrl}
+                              onFixIbbLinks={async () => {
+                                const resolveUrl = async (url: string) => {
+                                  if (!url || !url.startsWith('http') || url.includes('i.ibb.co/')) return url;
+                                  try {
+                                    const res = await fetch(url, {
+                                      headers: {
+                                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+                                        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                                      }
+                                    });
+                                    if (res.ok) {
+                                      const html = await res.text();
+                                      const m = html.match(/<meta\s+property=["']og:image["']\s+content=["']([^"']+)["']/i) ||
+                                                html.match(/<img\s+src=["'](https:\/\/i\.ibb\.co\/[^"']+)["']/i) ||
+                                                html.match(/(https:\/\/i\.ibb\.co\/[a-zA-Z0-9_\-\.\/]+)/i);
+                                      if (m && m[1]) return m[1];
+                                    }
+                                  } catch (e) {}
+                                  return url;
+                                };
+
+                                const newMom = await resolveUrl(momImageUrl);
+                                const newDad = await resolveUrl(dadImageUrl);
+                                const newKid = await resolveUrl(kidImageUrl);
+                                const newBg = await resolveUrl(bgUrl);
+                                const newImg = await resolveUrl(imageUrl);
+
+                                if (newMom !== momImageUrl) setConfig('mom_image_url', newMom);
+                                if (newDad !== dadImageUrl) setConfig('dad_image_url', newDad);
+                                if (newKid !== kidImageUrl) setConfig('kid_image_url', newKid);
+                                if (newBg !== bgUrl) setConfig('custom_bg_url', newBg);
+                                if (newImg !== imageUrl) setConfig('custom_image_url', newImg);
+                              }}
+                            />
                           </div>
                         </div>
-
-                        <div className="form-group">
-                          <label className="form-label">❤️ Manual Base HP (Optional Override)</label>
-                          <input
-                            id="boss-override-hp"
-                            type="number"
-                            className="form-input"
-                            placeholder="e.g. 150000"
-                            value={baseHP}
-                            onChange={(e) => setConfig('override_hp', e.target.value)}
-                          />
-                          <span className="form-hint">Leave blank for automatic player-scaled HP</span>
-                        </div>
-
-                        {/* Boss & Background Image Section */}
-                        <div className="section-divider">
-                          <div className="section-divider-line" />
-                          <span className="section-divider-text">🖼️ Boss Artwork & Environment</span>
-                          <div className="section-divider-line" />
-                        </div>
-
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
-                          <ImageUploader
-                            id="boss-image-url"
-                            label="🧌 Boss Artwork Image"
-                            placeholder="https://.../boss_art.png"
-                            value={imageUrl}
-                            onChange={(url) => setConfig('custom_image_url', url)}
-                            helpText="Full boss artwork image displayed during spawn & combat."
-                          />
-
-                          <ImageUploader
-                            id="boss-bg-url"
-                            label="🌄 Arena Background Image"
-                            placeholder="https://.../arena_bg.png"
-                            value={bgUrl}
-                            onChange={(url) => setConfig('custom_bg_url', url)}
-                            helpText="Optional custom background landscape image"
-                          />
-
-                          <ImageUploader
-                            id="boss-victory-url"
-                            label="🎉 Victory Celebration Image (Family Photo)"
-                            placeholder="https://.../victory_family_celebration.png"
-                            value={victoryImageUrl}
-                            onChange={(url) => setConfig('victory_image_url', url)}
-                            helpText="Family/celebration photo shown on Discord when the boss is defeated on Saturday."
-                          />
-                        </div>
-
-                        {/* Player Class Custom Images */}
-                        <div className="section-divider">
-                          <div className="section-divider-line" />
-                          <span className="section-divider-text">🎭 Player Class Character Images (Transparent PNGs)</span>
-                          <div className="section-divider-line" />
-                        </div>
-
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
-                          <ImageUploader
-                            id="boss-mom-image-url"
-                            label="🛡️ M.O.M. Class Image"
-                            placeholder="https://.../mom_character.png"
-                            value={momImageUrl}
-                            onChange={(url) => setConfig('mom_image_url', url)}
-                            helpText="Placed on left side when M.O.M. class is selected"
-                          />
-
-                          <ImageUploader
-                            id="boss-dad-image-url"
-                            label="🔨 D.A.D. Class Image"
-                            placeholder="https://.../dad_character.png"
-                            value={dadImageUrl}
-                            onChange={(url) => setConfig('dad_image_url', url)}
-                            helpText="Placed on left side when D.A.D. class is selected"
-                          />
-
-                          <ImageUploader
-                            id="boss-kid-image-url"
-                            label="⚡ K.I.D. Class Image"
-                            placeholder="https://.../kid_character.png"
-                            value={kidImageUrl}
-                            onChange={(url) => setConfig('kid_image_url', url)}
-                            helpText="Placed on left side when K.I.D. class is selected"
-                          />
-                        </div>
-
-                        {/* Live Canvas Composite Preview Card */}
-                        <BossPreviewCard
-                          bossName={bossName}
-                          imageUrl={imageUrl}
-                          bgUrl={bgUrl}
-                          momImageUrl={momImageUrl}
-                          dadImageUrl={dadImageUrl}
-                          kidImageUrl={kidImageUrl}
-                          onFixIbbLinks={async () => {
-                            const resolveUrl = async (url: string) => {
-                              if (!url || !url.startsWith('http') || url.includes('i.ibb.co/')) return url;
-                              try {
-                                const res = await fetch(url, {
-                                  headers: {
-                                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-                                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-                                  }
-                                });
-                                if (res.ok) {
-                                  const html = await res.text();
-                                  const m = html.match(/<meta\s+property=["']og:image["']\s+content=["']([^"']+)["']/i) ||
-                                            html.match(/<img\s+src=["'](https:\/\/i\.ibb\.co\/[^"']+)["']/i) ||
-                                            html.match(/(https:\/\/i\.ibb\.co\/[a-zA-Z0-9_\-\.\/]+)/i);
-                                  if (m && m[1]) return m[1];
-                                }
-                              } catch (e) {}
-                              return url;
-                            };
-
-                            const newMom = await resolveUrl(momImageUrl);
-                            const newDad = await resolveUrl(dadImageUrl);
-                            const newKid = await resolveUrl(kidImageUrl);
-                            const newBg = await resolveUrl(bgUrl);
-                            const newImg = await resolveUrl(imageUrl);
-
-                            if (newMom !== momImageUrl) setConfig('mom_image_url', newMom);
-                            if (newDad !== dadImageUrl) setConfig('dad_image_url', newDad);
-                            if (newKid !== kidImageUrl) setConfig('kid_image_url', newKid);
-                            if (newBg !== bgUrl) setConfig('custom_bg_url', newBg);
-                            if (newImg !== imageUrl) setConfig('custom_image_url', newImg);
-                          }}
-                        />
-                      </>
-                    )}
-                  </>
-                );
-            }}
-          </FeatureCard>
-              </div>
+                      )}
+                    </>
+                  );
+                }}
+              </FeatureCard>
             </div>
           )}
         </div>
