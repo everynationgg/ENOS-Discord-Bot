@@ -32,7 +32,8 @@ function normalizeTitle(title) {
  */
 async function fetchCheapSharkDeals(minDiscountPercent = 50) {
   try {
-    const res = await fetch(`https://www.cheapshark.com/api/1.0/deals?upperPrice=50&sortBy=Savings&desc=1&pageSize=20`);
+    const storeIds = '1,2,7,11,15,25'; // Steam, GamersGate, GOG, Humble, Fanatical, Epic
+    const res = await fetch(`https://www.cheapshark.com/api/1.0/deals?upperPrice=50&sortBy=Savings&desc=1&pageSize=60&storeID=${storeIds}`);
     if (!res.ok) return [];
     const data = await res.json();
     if (!Array.isArray(data)) return [];
@@ -48,7 +49,7 @@ async function fetchCheapSharkDeals(minDiscountPercent = 50) {
         const savings = Math.round(parseFloat(d.savings || '0'));
         const storeName = STORE_NAMES[d.storeID] || `Store #${d.storeID}`;
         const isFree = sale === 0 || savings === 100;
-        const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+        const expiresAt = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString();
 
         return {
           dealId: `cs_${d.dealID}`,
@@ -65,6 +66,48 @@ async function fetchCheapSharkDeals(minDiscountPercent = 50) {
       });
   } catch (err) {
     logger.error('[FREE DEALS] Error fetching CheapShark deals:', err.message);
+    return [];
+  }
+}
+
+/**
+ * Fetches discounted/free games directly from Steam's Featured Categories API.
+ */
+async function fetchSteamFeaturedDeals(minDiscountPercent = 50) {
+  try {
+    const res = await fetch('https://store.steampowered.com/api/featuredcategories/?cc=US&l=en');
+    if (!res.ok) return [];
+    const data = await res.json();
+
+    const specials = data?.specials?.items || [];
+    return specials
+      .filter((d) => {
+        const discountPct = d.discount_percent || 0;
+        return discountPct >= minDiscountPercent;
+      })
+      .slice(0, 20)
+      .map((d) => {
+        const normal = (d.original_price || 0) / 100;
+        const sale = (d.final_price || 0) / 100;
+        const savings = d.discount_percent || 0;
+        const isFree = sale === 0 || savings >= 100;
+        const expiresAt = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString();
+        const appId = d.id;
+        return {
+          dealId: `steam_${appId}`,
+          title: d.name,
+          storeName: 'Steam',
+          normalPrice: normal,
+          salePrice: sale,
+          savingsPercent: savings,
+          isFree,
+          dealUrl: `https://store.steampowered.com/app/${appId}`,
+          imageUrl: d.header_image || `https://cdn.akamai.steamstatic.com/steam/apps/${appId}/header.jpg`,
+          expiresAt,
+        };
+      });
+  } catch (err) {
+    logger.error('[FREE DEALS] Error fetching Steam featured deals:', err.message);
     return [];
   }
 }
@@ -112,13 +155,14 @@ async function fetchGamerPowerDeals() {
  * Scrapes and aggregates deals from multiple platforms with title normalization.
  */
 async function fetchAllDeals(minDiscountPercent = 50) {
-  const [csDeals, gpDeals] = await Promise.all([
+  const [csDeals, gpDeals, steamDeals] = await Promise.all([
     fetchCheapSharkDeals(minDiscountPercent),
     fetchGamerPowerDeals(),
+    fetchSteamFeaturedDeals(minDiscountPercent),
   ]);
 
   const dealMap = new Map();
-  [...gpDeals, ...csDeals].forEach((d) => {
+  [...gpDeals, ...steamDeals, ...csDeals].forEach((d) => {
     const normKey = normalizeTitle(d.title);
     if (normKey && !dealMap.has(normKey) && !dealMap.has(d.dealId)) {
       dealMap.set(normKey, d);
@@ -132,6 +176,9 @@ async function fetchAllDeals(minDiscountPercent = 50) {
  * Dispatches deal alert cards to Discord channel.
  */
 async function checkAndDispatchDeals(client, guildId) {
+  // Clean up expired deal messages from Discord on every cycle
+  await cleanExpiredDeals(client).catch((e) => logger.warn('[FREE DEALS] cleanExpiredDeals error:', e.message));
+
   const featureConfig = await getFeatureConfig(guildId, 'free_game_alerts');
   if (!featureConfig?.enabled) return { count: 0 };
 
@@ -307,6 +354,7 @@ module.exports = {
   normalizeTitle,
   fetchCheapSharkDeals,
   fetchGamerPowerDeals,
+  fetchSteamFeaturedDeals,
   fetchAllDeals,
   checkAndDispatchDeals,
   cleanExpiredDeals,
