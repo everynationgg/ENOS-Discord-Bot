@@ -96,7 +96,7 @@ function initCrons(client) {
     }
   });
 
-  // ─── Initial Live Alert & Free Game Deal Checks on Startup ────────────────────
+  // ─── Initial Live Alert, Free Game Deal & Boss Canvas Checks on Startup ──────
   checkTwitchLive(client).catch((err) => logger.error('[CRON] Initial Twitch check failed:', err.message));
   checkTikTokLive(client).catch((err) => logger.error('[CRON] Initial TikTok check failed:', err.message));
   (async () => {
@@ -111,6 +111,17 @@ function initCrons(client) {
       }
     } catch (err) {
       logger.error('[CRON] Initial deals check failed:', err.message);
+    }
+  })();
+  (async () => {
+    try {
+      const { spawnAndAnnounceWeeklyBoss } = require('../modules/gaming/boss');
+      const guildId = process.env.DISCORD_GUILD_ID;
+      if (guildId) {
+        await spawnAndAnnounceWeeklyBoss(client, guildId);
+      }
+    } catch (err) {
+      logger.error('[CRON] Initial boss canvas sync failed:', err.message);
     }
   })();
 
