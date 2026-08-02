@@ -12,7 +12,7 @@ interface Channel {
 
 export default function LeaderboardsDashboard() {
   const { status } = useSession();
-  const [activeTab, setActiveTab] = useState<'vault' | 'boss' | 'trivia'>('vault');
+  const [activeTab, setActiveTab] = useState<'vault' | 'boss' | 'trivia' | 'achievements'>('vault');
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<any>(null);
   const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
@@ -162,6 +162,15 @@ export default function LeaderboardsDashboard() {
       const name = e.username ? `@${e.username}` : `<@${e.discord_id}>`;
       return `${medal} 🧠 **${name}** — **${e.points.toLocaleString()} pts (₱${Number(e.points).toFixed(2)})**`;
     });
+  } else if (activeTab === 'achievements') {
+    embedTitle = '📜 Achievement: Recruitment — Every Nation';
+    embedColor = '#8b5cf6';
+    embedFooter = 'ENOS Achievements System • Tracked via Gatekeeper';
+    embedLines = [
+      '💜 **Enis (5 Invites)**: "They Who Herald the Nation" | 50 Vault Coins',
+      '🔥 **Enara (50 Invites)**: "Those Who Exalt the Nation" | 1 Month Nitro + Boost',
+      '👑 **Enorium (100 Invites)**: "The One Who Ordains the Nation" | 1 Year Nitro + Boost (Crown)',
+    ];
   }
 
   const embedDescription = embedLines.length > 0 ? embedLines.join('\n') : '*No recorded entries found.*';
@@ -198,6 +207,13 @@ export default function LeaderboardsDashboard() {
             id="sidebar-lb-trivia"
           >
             🧠 Daily Trivia
+          </button>
+          <button
+            className={`sidebar-item ${activeTab === 'achievements' ? 'active' : ''}`}
+            onClick={() => setActiveTab('achievements')}
+            id="sidebar-lb-achievements"
+          >
+            🏆 Achievements
           </button>
         </aside>
 

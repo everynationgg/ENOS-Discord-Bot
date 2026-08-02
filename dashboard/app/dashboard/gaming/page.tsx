@@ -562,6 +562,37 @@ function AchievementsCardForm({ config, setConfig }: { config: any; setConfig: (
     <>
       <div className="section-divider">
         <div className="section-divider-line" />
+        <span className="section-divider-text">📢 Achievement Display & Announcement Channels</span>
+        <div className="section-divider-line" />
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '1.25rem' }}>
+        <div className="form-group">
+          <label className="form-label">Master Achievement Card Channel ID</label>
+          <input
+            id="achievement-channel-id"
+            className="form-input"
+            placeholder="Channel ID to post master achievement browser card"
+            value={config.channel_id || ''}
+            onChange={(e) => setConfig('channel_id', e.target.value)}
+          />
+          <span className="form-hint">Channel where the interactive achievement browser card is posted.</span>
+        </div>
+        <div className="form-group">
+          <label className="form-label">Staff Audit Log Channel ID</label>
+          <input
+            id="achievement-log-channel-id"
+            className="form-input"
+            placeholder="Channel ID for crown title swap & fraud alerts"
+            value={config.log_channel_id || ''}
+            onChange={(e) => setConfig('log_channel_id', e.target.value)}
+          />
+          <span className="form-hint">Channel where title transfers and moderator audit events are posted.</span>
+        </div>
+      </div>
+
+      <div className="section-divider">
+        <div className="section-divider-line" />
         <span className="section-divider-text">🏆 Recruitment Achievement Tier Setup</span>
         <div className="section-divider-line" />
       </div>
