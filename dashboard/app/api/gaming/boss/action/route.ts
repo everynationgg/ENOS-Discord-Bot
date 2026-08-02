@@ -107,7 +107,7 @@ export async function POST(req: NextRequest) {
       let activeBoss: any = null;
       if (existingBoss) {
         // Update existing row
-        const { data: updated, error: updErr } = await supabaseAdmin
+        let { data: updated, error: updErr } = await supabaseAdmin
           .from('boss_seasons')
           .update({
             boss_name: bossName,
@@ -126,13 +126,38 @@ export async function POST(req: NextRequest) {
           .select()
           .single();
 
-        if (updErr) {
+        if (updErr && updErr.message.includes('custom_bg_url')) {
+          // Fallback if custom_bg_url column migration has not been applied yet
+          const { data: retryUpdated, error: retryErr } = await supabaseAdmin
+            .from('boss_seasons')
+            .update({
+              boss_name: bossName,
+              boss_title: bossTitle,
+              lore,
+              max_hp: hp,
+              current_hp: hp,
+              is_defeated: false,
+              mom_buff: false,
+              dad_debuff: false,
+              custom_image_url: finalImageUrl,
+              last_action: '⚡ Admin force spawned a new Weekly Boss!',
+            })
+            .eq('id', existingBoss.id)
+            .select()
+            .single();
+
+          if (retryErr) {
+            return NextResponse.json({ error: retryErr.message }, { status: 500 });
+          }
+          activeBoss = retryUpdated;
+        } else if (updErr) {
           return NextResponse.json({ error: updErr.message }, { status: 500 });
+        } else {
+          activeBoss = updated;
         }
-        activeBoss = updated;
       } else {
         // Upsert row safely
-        const { data: inserted, error: insErr } = await supabaseAdmin
+        let { data: inserted, error: insErr } = await supabaseAdmin
           .from('boss_seasons')
           .upsert({
             guild_id: guildId,
@@ -153,10 +178,37 @@ export async function POST(req: NextRequest) {
           .select()
           .single();
 
-        if (insErr) {
+        if (insErr && insErr.message.includes('custom_bg_url')) {
+          // Fallback if custom_bg_url column migration has not been applied yet
+          const { data: retryInserted, error: retryInsErr } = await supabaseAdmin
+            .from('boss_seasons')
+            .upsert({
+              guild_id: guildId,
+              week_identifier: currentWeek,
+              boss_name: bossName,
+              boss_title: bossTitle,
+              lore,
+              max_hp: hp,
+              current_hp: hp,
+              is_overkill: false,
+              is_defeated: false,
+              mom_buff: false,
+              dad_debuff: false,
+              custom_image_url: finalImageUrl,
+              last_action: '⚡ Admin force spawned a new Weekly Boss!',
+            }, { onConflict: 'guild_id,week_identifier,is_overkill' })
+            .select()
+            .single();
+
+          if (retryInsErr) {
+            return NextResponse.json({ error: retryInsErr.message }, { status: 500 });
+          }
+          activeBoss = retryInserted;
+        } else if (insErr) {
           return NextResponse.json({ error: insErr.message }, { status: 500 });
+        } else {
+          activeBoss = inserted;
         }
-        activeBoss = inserted;
       }
 
       // Bot worker will detect this DB change via Realtime and post the full canvas card
