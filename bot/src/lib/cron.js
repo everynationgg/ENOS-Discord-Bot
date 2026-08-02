@@ -167,11 +167,16 @@ function initCrons(client) {
           .eq('feature_key', 'weekly_boss')
           .eq('enabled', true);
 
-        for (const c of configs || []) {
+        const guildIds = (configs || []).map(c => c.guild_id);
+        if (guildIds.length === 0 && process.env.DISCORD_GUILD_ID) {
+          guildIds.push(process.env.DISCORD_GUILD_ID);
+        }
+
+        for (const gId of guildIds) {
           try {
-            await spawnAndAnnounceWeeklyBoss(client, c.guild_id);
+            await spawnAndAnnounceWeeklyBoss(client, gId);
           } catch (err) {
-            logger.error(`[CRON] Weekly Boss spawn failed for guild ${c.guild_id}:`, err.message);
+            logger.error(`[CRON] Weekly Boss spawn failed for guild ${gId}:`, err.message);
           }
         }
       } catch (err) {
