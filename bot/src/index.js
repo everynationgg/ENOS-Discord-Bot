@@ -45,11 +45,36 @@ client.cooldowns = new Collection();
   }
 })();
 
-// ─── Initialize Cron Jobs & Voice Herald Sub-Bot after ready ─────────────────
+// ─── Initialize Cron Jobs, Voice Herald Sub-Bot & Realtime Listeners after ready ─
 client.once(Events.ClientReady, async () => {
   initCrons(client);
   const { initVoiceBot } = require('./modules/social/tts');
   initVoiceBot(client);
+
+  // Real-Time Supabase Listener: Automatically render full Arena Canvas Card when boss changes
+  try {
+    const { supabase } = require('./lib/supabase');
+    const { spawnAndAnnounceWeeklyBoss } = require('./modules/gaming/boss');
+
+    supabase
+      .channel('realtime_boss_updates')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'boss_seasons' },
+        async (payload) => {
+          logger.info('[REALTIME BOSS] Detected boss season change:', payload.new?.boss_name);
+          const guildId = payload.new?.guild_id || process.env.DISCORD_GUILD_ID;
+          if (guildId) {
+            await spawnAndAnnounceWeeklyBoss(client, guildId);
+          }
+        }
+      )
+      .subscribe();
+    logger.info('[REALTIME BOSS] Subscribed to real-time boss updates.');
+  } catch (err) {
+    logger.error('[REALTIME BOSS] Realtime subscription warning:', err.message);
+  }
+
   logger.info(`[READY] Logged in as ${client.user.tag}`);
 });
 
