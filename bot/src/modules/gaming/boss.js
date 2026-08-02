@@ -5,15 +5,18 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 
 /**
- * Gets the current ISO week identifier string (e.g. "2026-W30").
+ * Gets the current ISO week identifier string (e.g. "2026-W32").
+ * Uses GMT+8 (Asia/Manila) timezone offset so midnight Monday resets trigger for the correct week.
  * @returns {string}
  */
 function getWeekIdentifier(date = new Date()) {
-  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  const tzOffsetMs = 8 * 60 * 60 * 1000;
+  const targetDate = new Date(date.getTime() + tzOffsetMs);
+  const d = new Date(Date.UTC(targetDate.getUTCFullYear(), targetDate.getUTCMonth(), targetDate.getUTCDate()));
   const dayNum = d.getUTCDay() || 7;
   d.setUTCDate(d.getUTCDate() + 4 - dayNum);
   const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-  const weekNo = Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+  const weekNo = Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
   return `${d.getUTCFullYear()}-W${String(weekNo).padStart(2, '0')}`;
 }
 
