@@ -44,9 +44,10 @@ CREATE TRIGGER trigger_member_invites_updated_at
   FOR EACH ROW
   EXECUTE FUNCTION update_member_invites_updated_at();
 
--- Seed initial recruitment achievement configuration into feature_configs if not present
-INSERT INTO feature_configs (key, enabled, config)
+-- Seed initial recruitment achievement configuration into guild_config for default guild if present
+INSERT INTO guild_config (guild_id, feature_key, enabled, config)
 VALUES (
+  'global',
   'recruitment_achievement',
   true,
   '{
@@ -76,4 +77,4 @@ VALUES (
     }
   }'::jsonb
 )
-ON CONFLICT (key) DO NOTHING;
+ON CONFLICT (guild_id, feature_key) DO NOTHING;

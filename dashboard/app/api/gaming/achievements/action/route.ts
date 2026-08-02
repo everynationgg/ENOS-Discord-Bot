@@ -9,9 +9,9 @@ export async function GET() {
   try {
     // Fetch recruitment achievement config
     const { data: configData } = await supabase
-      .from('feature_configs')
+      .from('guild_config')
       .select('enabled, config')
-      .eq('key', 'recruitment_achievement')
+      .eq('feature_key', 'recruitment_achievement')
       .maybeSingle();
 
     // Fetch invites list
@@ -39,15 +39,16 @@ export async function POST(req: Request) {
 
     if (action === 'save_config') {
       const { error } = await supabase
-        .from('feature_configs')
+        .from('guild_config')
         .upsert(
           {
-            key: 'recruitment_achievement',
+            guild_id: 'global',
+            feature_key: 'recruitment_achievement',
             enabled: enabled ?? true,
             config,
             updated_at: new Date().toISOString(),
           },
-          { onConflict: 'key' }
+          { onConflict: 'guild_id,feature_key' }
         );
 
       if (error) throw new Error(error.message);
