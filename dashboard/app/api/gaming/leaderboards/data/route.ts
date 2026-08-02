@@ -47,6 +47,12 @@ export async function GET(req: NextRequest) {
         .eq('guild_id', guildId)
         .order('points', { ascending: false })
         .limit(10),
+
+      // Recruitment Invites Leaderboard
+      supabaseAdmin
+        .from('member_invites')
+        .select('inviter_id')
+        .eq('status', 'valid'),
     ]);
 
     const token = process.env.DISCORD_TOKEN || process.env.DISCORD_BOT_TOKEN;
@@ -56,6 +62,20 @@ export async function GET(req: NextRequest) {
     const rawVault = vaultRes.data || [];
     const rawBoss = bossRes.data || [];
     const rawTrivia = triviaRes.data || [];
+    const rawInvites = (invitesRes as any)?.data || [];
+
+    // Aggregate invites per inviter
+    const inviteCounts: Record<string, number> = {};
+    for (const inv of rawInvites) {
+      if (inv.inviter_id) {
+        inviteCounts[inv.inviter_id] = (inviteCounts[inv.inviter_id] || 0) + 1;
+      }
+    }
+
+    const sortedAchievers = Object.entries(inviteCounts)
+      .map(([inviter_id, valid_invites]) => ({ inviter_id, valid_invites }))
+      .sort((a, b) => b.valid_invites - a.valid_invites)
+      .slice(0, 10);
 
     // Collect all unique Discord user IDs
     const userIds = Array.from(
@@ -63,6 +83,7 @@ export async function GET(req: NextRequest) {
         ...rawVault.map((v) => v.discord_id),
         ...rawBoss.map((b) => b.user_id),
         ...rawTrivia.map((t) => t.discord_id),
+        ...sortedAchievers.map((a) => a.inviter_id),
       ])
     ).filter(Boolean);
 
@@ -118,6 +139,20 @@ export async function GET(req: NextRequest) {
       avatar_url: userProfiles[t.discord_id]?.avatar_url || getDiscordAvatar(t.discord_id),
     }));
 
+    const achievements = sortedAchievers.map((a) => {
+      let tierTitle = 'Unranked Recruiter';
+      if (a.valid_invites >= 100) tierTitle = '👑 Enorium (The One Who Ordains)';
+      else if (a.valid_invites >= 50) tierTitle = '🔥 Enara (Those Who Exalt)';
+      else if (a.valid_invites >= 5) tierTitle = '💜 Enis (They Who Herald)';
+
+      return {
+        ...a,
+        tier_title: tierTitle,
+        username: userProfiles[a.inviter_id]?.username || `Member (${a.inviter_id.slice(-4)})`,
+        avatar_url: userProfiles[a.inviter_id]?.avatar_url || getDiscordAvatar(a.inviter_id),
+      };
+    });
+
     return NextResponse.json({
       success: true,
       guild_id: guildId,
@@ -125,6 +160,7 @@ export async function GET(req: NextRequest) {
       vault,
       boss,
       trivia,
+      achievements,
     });
   } catch (err: any) {
     console.error('[LEADERBOARD DATA ERROR]:', err);

@@ -1703,13 +1703,6 @@ export default function GamingPage() {
           >
             🐉 Weekly Boss
           </button>
-          <button
-            className={`sidebar-item ${activeTab === 'achievements' ? 'active' : ''}`}
-            onClick={() => setActiveTab('achievements')}
-            id="sidebar-game-achievements"
-          >
-            🏆 Achievements
-          </button>
         </aside>
 
         {/* Detail Content Area */}
@@ -2014,31 +2007,6 @@ export default function GamingPage() {
               >
                 {(config, setConfig) => <BossCardForm config={config} setConfig={setConfig} />}
               </FeatureCard>
-            </div>
-          )}
-
-          {activeTab === 'achievements' && (
-            <div>
-              <div className="feature-instructions" style={{ marginBottom: '1.5rem' }}>
-                <h3>ENOS Community Achievements System Guide</h3>
-                <p>
-                  Manage all ENOS community achievement modules (Recruitment, Boss RPG, Trivia, Vault Economy). Members earn progressive titles (Enis, Enara, Enorium), Vault Coins, and Discord Nitro rewards as they engage in server activities.
-                </p>
-              </div>
-
-              <div className="feature-form-card">
-                <FeatureCard
-                  id="achievements-system"
-                  icon="🏆"
-                  title="ENOS Achievements System"
-                  description="Unified 3-tier achievement platform supporting Recruitment invite tracking, Boss combat, Trivia drops, and Vault economy milestones."
-                  featureKey="recruitment_achievement"
-                  initialEnabled={configs['recruitment_achievement']?.enabled ?? true}
-                  initialConfig={configs['recruitment_achievement']?.config ?? {}}
-                >
-                  {(config, setConfig) => <AchievementsCardForm config={config} setConfig={setConfig} />}
-                </FeatureCard>
-              </div>
             </div>
           )}
         </div>

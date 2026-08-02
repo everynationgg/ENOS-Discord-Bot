@@ -254,14 +254,16 @@ export default function LeaderboardsDashboard() {
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                   <span style={{ fontSize: '1.25rem' }}>
-                    {activeTab === 'vault' ? '💰' : activeTab === 'boss' ? '⚔️' : '🧠'}
+                    {activeTab === 'vault' ? '💰' : activeTab === 'boss' ? '⚔️' : activeTab === 'trivia' ? '🧠' : '📜'}
                   </span>
                   <h2 style={{ fontSize: '1.1rem', fontWeight: 700, margin: 0 }}>
                     {activeTab === 'vault'
                       ? 'Unified Vault Standings'
                       : activeTab === 'boss'
                       ? `Weekly Boss Standings (${currentWeek})`
-                      : 'Trivia Champions Standings'}
+                      : activeTab === 'trivia'
+                      ? 'Trivia Champions Standings'
+                      : 'Recruitment Achievement Standings'}
                   </h2>
                 </div>
 
@@ -450,6 +452,68 @@ export default function LeaderboardsDashboard() {
                   </table>
                 </div>
               )}
+
+              {activeTab === 'achievements' && (
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
+                    <thead>
+                      <tr
+                        style={{
+                          borderBottom: '1px solid var(--border-color)',
+                          color: 'var(--text-muted)',
+                          textAlign: 'left',
+                        }}
+                      >
+                        <th style={{ padding: '0.65rem 0.5rem', width: '50px' }}>Rank</th>
+                        <th style={{ padding: '0.65rem 0.5rem' }}>Member</th>
+                        <th style={{ padding: '0.65rem 0.5rem' }}>Title Achieved</th>
+                        <th style={{ padding: '0.65rem 0.5rem', textAlign: 'right' }}>Valid Invites</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(data?.achievements || []).map((row: any, idx: number) => {
+                        const medal = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `${idx + 1}.`;
+                        return (
+                          <tr
+                            key={row.inviter_id || idx}
+                            style={{
+                              borderBottom: '1px solid var(--border-color)',
+                            }}
+                          >
+                            <td style={{ padding: '0.65rem 0.5rem', fontWeight: 700 }}>{medal}</td>
+                            <td style={{ padding: '0.65rem 0.5rem' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                <img
+                                  src={row.avatar_url}
+                                  alt={row.username}
+                                  style={{ width: 28, height: 28, borderRadius: '50%', objectFit: 'cover' }}
+                                />
+                                <div>
+                                  <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{row.username}</div>
+                                  <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontFamily: 'monospace' }}>{row.inviter_id}</div>
+                                </div>
+                              </div>
+                            </td>
+                            <td style={{ padding: '0.65rem 0.5rem', fontSize: '0.8rem', color: '#a78bfa', fontWeight: 600 }}>
+                              {row.tier_title}
+                            </td>
+                            <td style={{ padding: '0.65rem 0.5rem', textAlign: 'right', fontWeight: 700, color: 'var(--accent-primary)' }}>
+                              {row.valid_invites}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                      {(!data?.achievements || data.achievements.length === 0) && (
+                        <tr>
+                          <td colSpan={4} style={{ padding: '1.5rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+                            No valid member invite records logged yet. New invitations will appear here automatically.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
 
             {/* 2. Right Side: Force Post Controls & Discord Embed Live Preview */}
@@ -576,6 +640,7 @@ export default function LeaderboardsDashboard() {
                   presetType="showcase"
                   title={embedTitle}
                   bodyMarkdown={embedDescription}
+                  bannerUrl={activeTab === 'achievements' ? '/images/achievements-card-preview.png' : undefined}
                 />
               </div>
             </div>
