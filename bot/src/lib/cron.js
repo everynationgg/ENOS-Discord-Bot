@@ -269,6 +269,43 @@ function initCrons(client) {
     }
   });
 
+  // ─── Pending Invite Maturity Check: Every day at 03:05 AM ─────────────────────
+  cron.schedule(
+    '5 3 * * *',
+    async () => {
+      try {
+        const oneYearAgo = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString();
+        const { data: maturedInvites } = await supabase
+          .from('member_invites')
+          .select('id, inviter_id')
+          .eq('status', 'pending')
+          .lte('invited_account_created_at', oneYearAgo);
+
+        if (maturedInvites && maturedInvites.length > 0) {
+          const maturedIds = maturedInvites.map(i => i.id);
+          await supabase
+            .from('member_invites')
+            .update({ status: 'valid' })
+            .in('id', maturedIds);
+
+          logger.info(`[CRON] Upgraded ${maturedIds.length} pending invites to valid!`);
+
+          // Upgrade tiers for affected inviters across guilds
+          const affectedInviters = [...new Set(maturedInvites.map(i => i.inviter_id))];
+          for (const inviterId of affectedInviters) {
+            for (const guild of client.guilds.cache.values()) {
+              const { checkAndUpgradeUserTiers } = require('../modules/gaming/recruitment');
+              await checkAndUpgradeUserTiers(guild, inviterId).catch(() => null);
+            }
+          }
+        }
+      } catch (err) {
+        logger.error('[CRON] Pending invite maturity check failed:', err.message);
+      }
+    },
+    { timezone: tz }
+  );
+
   logger.info('[CRON] All scheduled jobs initialized.');
 }
 

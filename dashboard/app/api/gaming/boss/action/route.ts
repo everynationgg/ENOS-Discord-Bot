@@ -107,7 +107,7 @@ export async function POST(req: NextRequest) {
       let activeBoss: any = null;
       if (existingBoss) {
         // Update existing row
-        let { data: updated, error: updErr } = await supabaseAdmin
+        const { data: updated, error: updErr } = await supabaseAdmin
           .from('boss_seasons')
           .update({
             boss_name: bossName,
@@ -157,7 +157,7 @@ export async function POST(req: NextRequest) {
         }
       } else {
         // Upsert row safely
-        let { data: inserted, error: insErr } = await supabaseAdmin
+        const { data: inserted, error: insErr } = await supabaseAdmin
           .from('boss_seasons')
           .upsert({
             guild_id: guildId,

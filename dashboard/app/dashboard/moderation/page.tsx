@@ -220,6 +220,7 @@ export default function ModerationPage() {
       fetchShowcaseHistory();
       if (channels.length === 0) fetchAnnouncebotData();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab]);
 
   const handleApplyPreset = (preset: 'major' | 'patch' | 'showcase') => {
@@ -787,7 +788,7 @@ export default function ModerationPage() {
                     Create a log channel (e.g. <code>#support-transcripts</code>) where transcripts of closed sessions are archived. Input its ID in <strong>Transcript Log Channel ID</strong>.
                   </li>
                   <li>
-                    Define the bot's tone and instructions in <strong>AI Persona / Instructions</strong>.
+                    Define the bot&apos;s tone and instructions in <strong>AI Persona / Instructions</strong>.
                   </li>
                   <li>
                     Populate **Custom Q&A Knowledge cards** with server rules or common FAQs. Gemini reads these cards to supply exact server facts!
@@ -850,7 +851,7 @@ export default function ModerationPage() {
                             value={config.launcher_channel_id || ''}
                             onChange={(e) => setConfig('launcher_channel_id', e.target.value)}
                           />
-                          <span className="form-hint">Channel where the permanent "Start Chat" embed is posted</span>
+                          <span className="form-hint">Channel where the permanent &quot;Start Chat&quot; embed is posted</span>
                         </div>
 
                         <div className="form-group">
@@ -1671,7 +1672,7 @@ export default function ModerationPage() {
                     </div>
                     <div>
                       <label className="form-label" style={{ fontWeight: 600, display: 'block', marginBottom: '0.4rem' }}>
-                        🚀 "Try Feature" Channel ID
+                        🚀 &quot;Try Feature&quot; Channel ID
                       </label>
                       <input
                         type="text"

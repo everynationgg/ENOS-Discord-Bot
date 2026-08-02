@@ -209,7 +209,7 @@ function TriviaStatusSection({ refreshKey }: { refreshKey: number }) {
 
         {participants.length === 0 ? (
           <div style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', fontStyle: 'italic', padding: '0.5rem 0' }}>
-            No members have clicked 'Start Trivia' yet for this drop.
+            No members have clicked &apos;Start Trivia&apos; yet for this drop.
           </div>
         ) : (
           <div style={{ overflowX: 'auto' }}>
@@ -508,6 +508,1050 @@ function BossPreviewCard({
   );
 }
 
+function AchievementsCardForm({ config, setConfig }: { config: any; setConfig: (key: string, val: any) => void }) {
+  const tiers = config.tiers || {
+    enis: { title: 'They Who Herald the Nation', threshold: 5, reward_type: 'coins', reward_val: 50 },
+    enara: { title: 'Those Who Exalt the Nation', threshold: 50, reward_type: 'nitro', reward_val: '1 Month Discord Nitro + Boost' },
+    enorium: { title: 'The One Who Ordains the Nation', threshold: 100, reward_type: 'nitro', reward_val: '1 Year Discord Nitro + Boost', exclusive: true },
+  };
+
+  const [invites, setInvites] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [statusMsg, setStatusMsg] = useState('');
+
+  const fetchInvites = async () => {
+    try {
+      const res = await fetch('/api/gaming/achievements/action');
+      const data = await res.json();
+      if (data.success && data.invites) {
+        setInvites(data.invites);
+      }
+    } catch (e) {
+      console.error('Failed to fetch invite log', e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchInvites();
+  }, []);
+
+  const handleUpdateStatus = async (inviteId: string, newStatus: string) => {
+    try {
+      setStatusMsg('Updating...');
+      const res = await fetch('/api/gaming/achievements/action', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'update_invite_status', inviteId, newStatus }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setStatusMsg(`Updated status to ${newStatus}`);
+        fetchInvites();
+      } else {
+        setStatusMsg(`Error: ${data.error}`);
+      }
+    } catch {
+      setStatusMsg('Error updating status');
+    }
+    setTimeout(() => setStatusMsg(''), 3000);
+  };
+
+  return (
+    <>
+      <div className="section-divider">
+        <div className="section-divider-line" />
+        <span className="section-divider-text">🏆 Recruitment Achievement Tier Setup</span>
+        <div className="section-divider-line" />
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.75rem', marginBottom: '1.25rem' }}>
+        {/* Enis Tier */}
+        <div style={{ background: 'var(--bg-secondary)', padding: '1rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+          <h4 style={{ margin: '0 0 0.5rem 0', color: '#A78BFA' }}>🟣 Tier I — Enis</h4>
+          <div className="form-group">
+            <label className="form-label">Title Phrase</label>
+            <input
+              className="form-input"
+              value={tiers.enis?.title || ''}
+              onChange={(e) => setConfig('tiers', { ...tiers, enis: { ...tiers.enis, title: e.target.value } })}
+            />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Invites Required</label>
+            <input
+              type="number" className="form-input"
+              value={tiers.enis?.threshold ?? 5}
+              onChange={(e) => setConfig('tiers', { ...tiers, enis: { ...tiers.enis, threshold: parseInt(e.target.value, 10) || 5 } })}
+            />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Reward</label>
+            <input
+              className="form-input"
+              value={tiers.enis?.reward_val || ''}
+              onChange={(e) => setConfig('tiers', { ...tiers, enis: { ...tiers.enis, reward_val: e.target.value } })}
+            />
+          </div>
+        </div>
+
+        {/* Enara Tier */}
+        <div style={{ background: 'var(--bg-secondary)', padding: '1rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+          <h4 style={{ margin: '0 0 0.5rem 0', color: '#F97316' }}>🔥 Tier II — Enara</h4>
+          <div className="form-group">
+            <label className="form-label">Title Phrase</label>
+            <input
+              className="form-input"
+              value={tiers.enara?.title || ''}
+              onChange={(e) => setConfig('tiers', { ...tiers, enara: { ...tiers.enara, title: e.target.value } })}
+            />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Invites Required</label>
+            <input
+              type="number" className="form-input"
+              value={tiers.enara?.threshold ?? 50}
+              onChange={(e) => setConfig('tiers', { ...tiers, enara: { ...tiers.enara, threshold: parseInt(e.target.value, 10) || 50 } })}
+            />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Reward</label>
+            <input
+              className="form-input"
+              value={tiers.enara?.reward_val || ''}
+              onChange={(e) => setConfig('tiers', { ...tiers, enara: { ...tiers.enara, reward_val: e.target.value } })}
+            />
+          </div>
+        </div>
+
+        {/* Enorium Tier */}
+        <div style={{ background: 'var(--bg-secondary)', padding: '1rem', borderRadius: '8px', border: '1px solid #F59E0B' }}>
+          <h4 style={{ margin: '0 0 0.5rem 0', color: '#F59E0B' }}>👑 Tier III — Enorium (Crown)</h4>
+          <div className="form-group">
+            <label className="form-label">Title Phrase</label>
+            <input
+              className="form-input"
+              value={tiers.enorium?.title || ''}
+              onChange={(e) => setConfig('tiers', { ...tiers, enorium: { ...tiers.enorium, title: e.target.value } })}
+            />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Invites Required</label>
+            <input
+              type="number" className="form-input"
+              value={tiers.enorium?.threshold ?? 100}
+              onChange={(e) => setConfig('tiers', { ...tiers, enorium: { ...tiers.enorium, threshold: parseInt(e.target.value, 10) || 100 } })}
+            />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Reward</label>
+            <input
+              className="form-input"
+              value={tiers.enorium?.reward_val || ''}
+              onChange={(e) => setConfig('tiers', { ...tiers, enorium: { ...tiers.enorium, reward_val: e.target.value } })}
+            />
+          </div>
+        </div>
+      </div>
+
+      <div className="section-divider">
+        <div className="section-divider-line" />
+        <span className="section-divider-text">🛡️ Qualification & Anti-Fraud Rules</span>
+        <div className="section-divider-line" />
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '1.25rem' }}>
+        <div className="form-group">
+          <label className="form-label">Minimum Account Age (Days)</label>
+          <input
+            type="number" className="form-input"
+            value={config.min_account_age_days ?? 365}
+            onChange={(e) => setConfig('min_account_age_days', parseInt(e.target.value, 10) || 365)}
+          />
+          <span className="form-hint">Accounts younger than this stay Pending until reaching target age.</span>
+        </div>
+        <div className="form-group">
+          <label className="form-label">Require Gatekeeper Onboarding</label>
+          <select
+            className="form-input"
+            value={config.require_onboarding ? 'true' : 'false'}
+            onChange={(e) => setConfig('require_onboarding', e.target.value === 'true')}
+          >
+            <option value="true">Enabled (Must complete onboarding)</option>
+            <option value="false">Disabled</option>
+          </select>
+        </div>
+      </div>
+
+      <div className="section-divider">
+        <div className="section-divider-line" />
+        <span className="section-divider-text">📜 Member Invite Audit & Moderation Log</span>
+        <div className="section-divider-line" />
+      </div>
+
+      {statusMsg && <div style={{ fontSize: '0.8125rem', color: 'var(--color-success)', marginBottom: '0.5rem' }}>{statusMsg}</div>}
+
+      <div style={{ background: 'var(--bg-secondary)', borderRadius: '8px', padding: '1rem', border: '1px solid var(--border-color)' }}>
+        {loading ? (
+          <div style={{ padding: '1rem', color: 'var(--text-muted)' }}>Loading invite records...</div>
+        ) : invites.length === 0 ? (
+          <div style={{ padding: '1rem', color: 'var(--text-muted)' }}>No invite records logged yet. New invites will appear here after onboarding.</div>
+        ) : (
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8125rem' }}>
+              <thead>
+                <tr style={{ borderBottom: '1px solid var(--border-color)', textAlign: 'left' }}>
+                  <th style={{ padding: '0.5rem' }}>Inviter ID</th>
+                  <th style={{ padding: '0.5rem' }}>Invited Member ID</th>
+                  <th style={{ padding: '0.5rem' }}>Status</th>
+                  <th style={{ padding: '0.5rem' }}>Account Created</th>
+                  <th style={{ padding: '0.5rem' }}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {invites.map((inv: any) => (
+                  <tr key={inv.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                    <td style={{ padding: '0.5rem', fontFamily: 'monospace' }}>{inv.inviter_id}</td>
+                    <td style={{ padding: '0.5rem', fontFamily: 'monospace' }}>{inv.invited_member_id}</td>
+                    <td style={{ padding: '0.5rem' }}>
+                      <span className={`badge ${inv.status === 'valid' ? 'badge-success' : inv.status === 'pending' ? 'badge-warning' : 'badge-danger'}`}>
+                        {inv.status}
+                      </span>
+                    </td>
+                    <td style={{ padding: '0.5rem' }}>{new Date(inv.invited_account_created_at).toLocaleDateString()}</td>
+                    <td style={{ padding: '0.5rem' }}>
+                      {inv.status !== 'revoked' ? (
+                        <button className="btn btn-sm btn-danger" onClick={() => handleUpdateStatus(inv.id, 'revoked')}>Revoke</button>
+                      ) : (
+                        <button className="btn btn-sm btn-secondary" onClick={() => handleUpdateStatus(inv.id, 'valid')}>Restore</button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </>
+  );
+}
+
+function VaultCardForm({ config, setConfig }: { config: any; setConfig: (key: string, val: any) => void }) {
+  const rates = config.rates || {};
+  const multipliers: any[] = config.role_multipliers || [];
+  const tierRoles = config.tier_roles || {};
+  const [dispatchingHub, setDispatchingHub] = useState(false);
+  const [hubDispatchStatus, setHubDispatchStatus] = useState('');
+
+  return (
+    <>
+      <div className="section-divider">
+        <div className="section-divider-line" />
+        <span className="section-divider-text">Financial Controls & Rates (1 Coin = ₱1 PHP)</span>
+        <div className="section-divider-line" />
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+        <div className="form-group">
+          <label className="form-label">Daily Earning Cap (₱ PHP Max/Day)</label>
+          <input
+            id="vault-daily-cap"
+            type="number" step="0.1" min="0.1" max="100"
+            className="form-input"
+            value={rates.daily_cap ?? 1.50}
+            onChange={(e) => setConfig('rates', { ...rates, daily_cap: parseFloat(e.target.value) })}
+          />
+        </div>
+        <div className="form-group">
+          <label className="form-label">Coins per Message (₱ PHP)</label>
+          <input
+            id="vault-msg-rate"
+            type="number" step="0.01" min="0" max="10"
+            className="form-input"
+            value={rates.message ?? 0.02}
+            onChange={(e) => setConfig('rates', { ...rates, message: parseFloat(e.target.value) })}
+          />
+        </div>
+        <div className="form-group">
+          <label className="form-label">Coins per Voice Min (₱ PHP)</label>
+          <input
+            id="vault-voice-rate"
+            type="number" step="0.01" min="0" max="10"
+            className="form-input"
+            value={rates.voice_per_minute ?? 0.01}
+            onChange={(e) => setConfig('rates', { ...rates, voice_per_minute: parseFloat(e.target.value) })}
+          />
+        </div>
+        <div className="form-group">
+          <label className="form-label">Daily Quest Hub Channel ID</label>
+          <input
+            id="vault-quest-channel"
+            className="form-input"
+            placeholder="Channel ID to post 'Get Daily Quests' card"
+            value={config.quest_channel_id || ''}
+            onChange={(e) => setConfig('quest_channel_id', e.target.value)}
+          />
+          <div style={{ marginTop: '0.5rem' }}>
+            <button
+              type="button"
+              className="btn btn-primary btn-sm"
+              disabled={!config.quest_channel_id || dispatchingHub}
+              onClick={async () => {
+                setDispatchingHub(true);
+                setHubDispatchStatus('Dispatching launcher card to Discord...');
+                try {
+                  const res = await fetch('/api/gaming/vault/action', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      action: 'dispatch_quest_hub',
+                      channel_id: config.quest_channel_id,
+                    }),
+                  });
+                  const data = await res.json();
+                  if (res.ok && data.success) {
+                    setHubDispatchStatus('✅ Daily Quest Hub card successfully posted to Discord!');
+                  } else {
+                    setHubDispatchStatus(`❌ Failed: ${data.error || 'Unknown error'}`);
+                  }
+                } catch (e: any) {
+                  setHubDispatchStatus(`❌ Error: ${e.message}`);
+                } finally {
+                  setDispatchingHub(false);
+                }
+              }}
+              style={{ backgroundColor: '#10b981', border: 'none', fontWeight: 600, fontSize: '0.8rem', width: '100%' }}
+            >
+              {dispatchingHub ? 'Posting to Discord...' : '🚀 Dispatch Quest Hub Card to Channel'}
+            </button>
+            {hubDispatchStatus && (
+              <div style={{
+                marginTop: '0.4rem',
+                fontSize: '0.8rem',
+                fontWeight: 500,
+                color: hubDispatchStatus.startsWith('✅') ? '#34d399' : hubDispatchStatus.startsWith('❌') ? '#f87171' : '#facc15'
+              }}>
+                {hubDispatchStatus}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div className="section-divider">
+        <div className="section-divider-line" />
+        <span className="section-divider-text">Role Multipliers</span>
+        <div className="section-divider-line" />
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+        {multipliers.map((m: any, i: number) => (
+          <div key={i} className="multiplier-row">
+            <input
+              id={`multiplier-role-${i}`}
+              className="form-input"
+              placeholder="Role ID"
+              value={m.role_id || ''}
+              onChange={(e) => {
+                const updated = [...multipliers];
+                updated[i] = { ...m, role_id: e.target.value };
+                setConfig('role_multipliers', updated);
+              }}
+            />
+            <input
+              id={`multiplier-val-${i}`}
+              className="form-input"
+              type="number" step="0.1" min="0.1" max="10"
+              placeholder="e.g. 1.5"
+              value={m.multiplier || ''}
+              onChange={(e) => {
+                const updated = [...multipliers];
+                updated[i] = { ...m, multiplier: parseFloat(e.target.value) };
+                setConfig('role_multipliers', updated);
+              }}
+            />
+            <button
+              id={`remove-multiplier-${i}`}
+              className="btn btn-danger btn-icon btn-sm"
+              onClick={() => setConfig('role_multipliers', multipliers.filter((_: any, j: number) => j !== i))}
+            >✕</button>
+          </div>
+        ))}
+        <button
+          id="add-multiplier-btn"
+          className="btn btn-secondary btn-sm"
+          onClick={() => setConfig('role_multipliers', [...multipliers, { role_id: '', multiplier: 1.5 }])}
+        >
+          + Add Multiplier
+        </button>
+      </div>
+
+      <div className="section-divider">
+        <div className="section-divider-line" />
+        <span className="section-divider-text">9 Nitro Badge Tier Roles</span>
+        <div className="section-divider-line" />
+      </div>
+
+      {[
+        { key: 'starter', emoji: '💨', label: 'Starter (0 coins)', rarity: 'COMMON' },
+        { key: 'bronze', emoji: '🟤', label: 'Bronze (40 coins / ₱40)', rarity: 'UNCOMMON' },
+        { key: 'silver', emoji: '⚪', label: 'Silver (125 coins / ₱125)', rarity: 'UNCOMMON' },
+        { key: 'gold', emoji: '🟡', label: 'Gold (250 coins / ₱250)', rarity: 'RARE' },
+        { key: 'platinum', emoji: '🪙', label: 'Platinum 1-Year (500 coins / ₱500)', rarity: 'RARE' },
+        { key: 'diamond', emoji: '🔷', label: 'Diamond (1,000 coins / ₱1,000)', rarity: 'EPIC' },
+        { key: 'emerald', emoji: '💚', label: 'Emerald (1,500 coins / ₱1,500)', rarity: 'EPIC' },
+        { key: 'ruby', emoji: '🔴', label: 'Ruby (2,500 coins / ₱2,500)', rarity: 'LEGENDARY' },
+        { key: 'opal', emoji: '🔮', label: 'Opal (3,000+ coins / ₱3,000+)', rarity: 'MYTHIC' },
+      ].map(({ key, emoji, label, rarity }) => (
+        <div className="form-group" key={key} style={{ marginBottom: '0.5rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.2rem' }}>
+            <label className="form-label" style={{ margin: 0 }}>{emoji} {label}</label>
+            <span style={{ fontSize: '0.7rem', color: 'var(--accent-primary)', fontWeight: 600 }}>[▲ {rarity}]</span>
+          </div>
+          <input
+            id={`tier-role-${key}`}
+            className="form-input"
+            placeholder="Discord Role ID to auto-assign"
+            value={tierRoles[key] || ''}
+            onChange={(e) => setConfig('tier_roles', { ...tierRoles, [key]: e.target.value })}
+          />
+        </div>
+      ))}
+    </>
+  );
+}
+
+function DealsCardForm({ config, setConfig }: { config: any; setConfig: (key: string, val: any) => void }) {
+  const [dealStatusMsg, setDealStatusMsg] = useState('');
+  const [checkingDeals, setCheckingDeals] = useState(false);
+
+  const handleTriggerDeals = async () => {
+    setCheckingDeals(true);
+    setDealStatusMsg('Scraping Steam & Epic Games Store for deals...');
+    try {
+      const res = await fetch('/api/gaming/deals/action', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'trigger',
+          channel_id: config.channel_id,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setDealStatusMsg(`✅ ${data.message}`);
+      } else {
+        setDealStatusMsg(`❌ Failed: ${data.error || 'Unknown error'}`);
+      }
+    } catch (e: any) {
+      setDealStatusMsg(`❌ Error: ${e.message}`);
+    } finally {
+      setCheckingDeals(false);
+    }
+  };
+
+  return (
+    <>
+      <div className="section-divider">
+        <div className="section-divider-line" />
+        <span className="section-divider-text">Target Channel & Filtering</span>
+        <div className="section-divider-line" />
+      </div>
+
+      <div className="form-group">
+        <label className="form-label">Alert Announcement Channel ID</label>
+        <input
+          id="deals-channel-id"
+          className="form-input"
+          placeholder="Channel ID to post deal alerts"
+          value={config.channel_id || ''}
+          onChange={(e) => setConfig('channel_id', e.target.value)}
+        />
+        <span className="form-hint">Text channel where deal cards will be posted</span>
+      </div>
+
+      <div className="form-group">
+        <label className="form-label">Minimum Discount Threshold Filter</label>
+        <select
+          id="deals-min-discount"
+          className="form-input"
+          value={config.min_discount_percent ?? 50}
+          onChange={(e) => setConfig('min_discount_percent', parseInt(e.target.value))}
+        >
+          <option value={50}>50% OFF or Greater (Recommended)</option>
+          <option value={75}>75% OFF or Greater (Deep Discounts)</option>
+          <option value={90}>90% OFF or Greater</option>
+          <option value={100}>100% FREE ONLY (Giveaways & Free Games Only)</option>
+        </select>
+      </div>
+
+      <div style={{ marginTop: '1.25rem', paddingTop: '1rem', borderTop: '1px solid var(--border-color)' }}>
+        <button
+          type="button"
+          className="btn btn-primary"
+          disabled={!config.channel_id || checkingDeals}
+          onClick={handleTriggerDeals}
+          style={{ backgroundColor: '#10b981', border: 'none', fontWeight: 600, width: '100%' }}
+        >
+          {checkingDeals ? 'Scanning Platforms...' : '🚀 Force Check & Dispatch Deals Now'}
+        </button>
+
+        {dealStatusMsg && (
+          <div style={{
+            marginTop: '0.5rem',
+            fontSize: '0.85rem',
+            fontWeight: 500,
+            color: dealStatusMsg.startsWith('✅') ? '#34d399' : dealStatusMsg.startsWith('❌') ? '#f87171' : '#facc15'
+          }}>
+            {dealStatusMsg}
+          </div>
+        )}
+      </div>
+    </>
+  );
+}
+
+function TriviaCardForm({ config, setConfig, setTriviaRefreshKey }: { config: any; setConfig: (key: string, val: any) => void; setTriviaRefreshKey: React.Dispatch<React.SetStateAction<number>> }) {
+  const allowedChannels: any[] = config.allowed_channels || [];
+  const allowedRoles: string[] = config.allowed_roles || [];
+  const [manualStatus, setManualStatus] = useState<string>('');
+
+  const handleManualAction = async (action: string) => {
+    setManualStatus('loading');
+    try {
+      const res = await fetch('/api/gaming/trivia/action', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action }),
+      });
+      const data = await res.json();
+      setManualStatus(data.error ? `error: ${data.error}` : action === 'trigger' ? 'triggered' : action === 'skip' ? 'skipped' : 'rerolled');
+      if (!data.error) setTriviaRefreshKey((k) => k + 1);
+    } catch {
+      setManualStatus('error: request failed');
+    }
+  };
+
+  return (
+    <>
+      <div className="section-divider">
+        <div className="section-divider-line" />
+        <span className="section-divider-text">Trivia Channel Whitelist & Priority Weights</span>
+        <div className="section-divider-line" />
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '1rem' }}>
+        {allowedChannels.map((item: any, i: number) => (
+          <div key={i} className="multiplier-row" style={{ gridTemplateColumns: '2fr 1.2fr 2fr auto' }}>
+            <input
+              id={`trivia-chan-${i}`}
+              className="form-input"
+              placeholder="Channel ID (e.g. 123456789)"
+              value={item.channel_id || ''}
+              onChange={(e) => {
+                const updated = [...allowedChannels];
+                updated[i] = { ...item, channel_id: e.target.value };
+                setConfig('allowed_channels', updated);
+              }}
+            />
+            <select
+              id={`trivia-weight-${i}`}
+              className="form-input"
+              value={item.weight || 'medium'}
+              onChange={(e) => {
+                const updated = [...allowedChannels];
+                updated[i] = { ...item, weight: e.target.value };
+                setConfig('allowed_channels', updated);
+              }}
+            >
+              <option value="high">🔥 High (3x)</option>
+              <option value="medium">⚡ Medium (2x)</option>
+              <option value="low">🌱 Low (1x)</option>
+            </select>
+            <input
+              id={`trivia-topic-${i}`}
+              className="form-input"
+              placeholder="Topic / Game (optional)"
+              value={item.topic || ''}
+              onChange={(e) => {
+                const updated = [...allowedChannels];
+                updated[i] = { ...item, topic: e.target.value };
+                setConfig('allowed_channels', updated);
+              }}
+            />
+            <button
+              id={`remove-trivia-chan-${i}`}
+              className="btn btn-danger btn-icon btn-sm"
+              onClick={() => setConfig('allowed_channels', allowedChannels.filter((_: any, j: number) => j !== i))}
+            >✕</button>
+          </div>
+        ))}
+        <button
+          id="add-trivia-channel-btn"
+          className="btn btn-secondary btn-sm"
+          onClick={() => setConfig('allowed_channels', [...allowedChannels, { channel_id: '', weight: 'medium', topic: '' }])}
+        >
+          + Add Channel Whitelist
+        </button>
+      </div>
+
+      <div className="section-divider">
+        <div className="section-divider-line" />
+        <span className="section-divider-text">Schedule & Rewards</span>
+        <div className="section-divider-line" />
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+        <div className="form-group">
+          <label className="form-label">Close Time (24h Format)</label>
+          <input
+            id="trivia-close-time"
+            className="form-input"
+            placeholder="e.g. 22:00"
+            value={config.close_time || '22:00'}
+            onChange={(e) => setConfig('close_time', e.target.value)}
+          />
+          <span className="form-hint">Daily time when active session closes if not filled</span>
+        </div>
+        <div className="form-group">
+          <label className="form-label">Timezone</label>
+          <input
+            id="trivia-timezone"
+            className="form-input"
+            placeholder="e.g. Asia/Manila"
+            value={config.timezone || 'Asia/Manila'}
+            onChange={(e) => setConfig('timezone', e.target.value)}
+          />
+          <span className="form-hint">Used to determine daily drop schedule & close hour</span>
+        </div>
+        <div className="form-group">
+          <label className="form-label">Drops Per Day</label>
+          <input
+            id="trivia-drops-per-day"
+            type="number" min="1" max="5"
+            className="form-input"
+            value={config.drops_per_day ?? 1}
+            onChange={(e) => setConfig('drops_per_day', parseInt(e.target.value) || 1)}
+          />
+          <span className="form-hint">Number of auto-scheduled trivia drops every day</span>
+        </div>
+        <div className="form-group">
+          <label className="form-label">Leaderboard Channel ID (Optional)</label>
+          <input
+            id="trivia-lb-channel"
+            className="form-input"
+            placeholder="e.g. 123456789"
+            value={config.leaderboard_channel_id || ''}
+            onChange={(e) => setConfig('leaderboard_channel_id', e.target.value)}
+          />
+          <span className="form-hint">Auto-posts & updates Top 5 trivia points leaderboard</span>
+        </div>
+      </div>
+
+      <div className="section-divider">
+        <div className="section-divider-line" />
+        <span className="section-divider-text">Allowed Roles (Access Control)</span>
+        <div className="section-divider-line" />
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '1rem' }}>
+        {allowedRoles.map((roleId: string, i: number) => (
+          <div key={i} className="multiplier-row" style={{ gridTemplateColumns: '1fr auto' }}>
+            <input
+              id={`trivia-role-${i}`}
+              className="form-input"
+              placeholder="Role ID"
+              value={roleId}
+              onChange={(e) => {
+                const updated = [...allowedRoles];
+                updated[i] = e.target.value;
+                setConfig('allowed_roles', updated);
+              }}
+            />
+            <button
+              id={`remove-trivia-role-${i}`}
+              className="btn btn-danger btn-icon btn-sm"
+              onClick={() => setConfig('allowed_roles', allowedRoles.filter((_: any, j: number) => j !== i))}
+            >✕</button>
+          </div>
+        ))}
+        <button
+          id="add-trivia-role-btn"
+          className="btn btn-secondary btn-sm"
+          onClick={() => setConfig('allowed_roles', [...allowedRoles, ''])}
+        >
+          + Add Allowed Role
+        </button>
+      </div>
+
+      <div style={{ marginTop: '1.25rem', paddingTop: '1rem', borderTop: '1px solid var(--border-color)' }}>
+        <div style={{ fontWeight: 600, fontSize: '0.85rem', marginBottom: '0.5rem', color: 'var(--text-secondary)' }}>
+          ⚡ Manual Trivia Operations
+        </div>
+        <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            className="btn btn-primary btn-sm"
+            onClick={() => handleManualAction('trigger')}
+            style={{ backgroundColor: '#8b5cf6', border: 'none' }}
+          >
+            🚀 Force Spawn Drop Now
+          </button>
+          <button
+            type="button"
+            className="btn btn-secondary btn-sm"
+            onClick={() => handleManualAction('skip')}
+            style={{ backgroundColor: '#ef4444', color: '#fff', border: 'none' }}
+          >
+            🛑 Force Close Active Session
+          </button>
+          <button
+            type="button"
+            className="btn btn-secondary btn-sm"
+            onClick={() => handleManualAction('reroll')}
+            style={{ backgroundColor: '#3b82f6', color: '#fff', border: 'none' }}
+          >
+            🎲 Reroll Question & Image
+          </button>
+        </div>
+        {manualStatus && (
+          <div style={{ marginTop: '0.5rem' }}>
+            <span style={{
+              fontSize: '0.8125rem',
+              color: manualStatus.startsWith('error') ? 'var(--color-error)' : 'var(--color-success)',
+              fontWeight: 500,
+            }}>
+              {manualStatus === 'loading' ? '⏳ Processing...' :
+               manualStatus === 'triggered' ? '✅ Drop triggered!' :
+               manualStatus === 'skipped' ? '✅ Session closed.' :
+               manualStatus === 'rerolled' ? '✅ Rerolled successfully.' :
+               `❌ ${manualStatus}`}
+            </span>
+          </div>
+        )}
+      </div>
+    </>
+  );
+}
+
+function BossCardForm({ config, setConfig }: { config: any; setConfig: (key: string, val: any) => void }) {
+  const [bossSubTab, setBossSubTab] = useState<'active' | 'staging'>('active');
+  const [showClassImages, setShowClassImages] = useState(false);
+  const gameName = config.game_name || '';
+  const bossName = config.override_name || '';
+  const baseHP = config.override_hp || '';
+  const imageUrl = config.custom_image_url || '';
+  const bgUrl = config.custom_bg_url || '';
+  const victoryImageUrl = config.victory_image_url || '';
+  const momImageUrl = config.mom_image_url || '';
+  const dadImageUrl = config.dad_image_url || '';
+  const kidImageUrl = config.kid_image_url || '';
+
+  const staged = config.staged_boss_config || {};
+
+  return (
+    <>
+      <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '0.75rem' }}>
+        <button
+          type="button"
+          className={`btn btn-sm ${bossSubTab === 'active' ? 'btn-primary' : 'btn-secondary'}`}
+          onClick={() => setBossSubTab('active')}
+        >
+          ⚔️ Active Boss & Live Config
+        </button>
+        <button
+          type="button"
+          className={`btn btn-sm ${bossSubTab === 'staging' ? 'btn-primary' : 'btn-secondary'}`}
+          onClick={() => setBossSubTab('staging')}
+        >
+          🗓️ Next Week&apos;s Boss Stager
+        </button>
+      </div>
+
+      {/* Admin Quick Action Controls — Fixed at top */}
+      <div style={{
+        background: 'rgba(250, 204, 21, 0.05)',
+        border: '1px solid rgba(250, 204, 21, 0.2)',
+        borderRadius: '8px',
+        padding: '0.75rem 1rem',
+        marginBottom: '1rem',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        flexWrap: 'wrap',
+        gap: '0.5rem'
+      }}>
+        <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#facc15' }}>
+          ⚡ Admin Controls (Guild 1111851610474291240)
+        </div>
+        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            className="btn btn-secondary btn-sm"
+            style={{ backgroundColor: '#ef4444', color: '#fff', border: 'none' }}
+            onClick={async () => {
+              if (!confirm('Are you sure you want to FORCE RESET the weekly boss? This will reset Boss HP and player AP for the current week.')) return;
+              try {
+                const res = await fetch('/api/gaming/boss/action', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ action: 'force_reset' }),
+                });
+                const data = await res.json();
+                if (res.ok) {
+                  alert(`✅ ${data.message || 'Boss reset successfully!'}`);
+                } else {
+                  alert(`❌ Reset failed: ${data.error || 'Unknown error'}`);
+                }
+              } catch (e: any) {
+                alert(`❌ Request error: ${e.message}`);
+              }
+            }}
+          >
+            🔄 Force Weekly Reset
+          </button>
+          <button
+            type="button"
+            className="btn btn-primary btn-sm"
+            style={{ backgroundColor: '#3b82f6', border: 'none' }}
+            onClick={async () => {
+              if (!confirm('Are you sure you want to FORCE SPAWN the Weekly Boss? This will update or spawn the active boss for the current week.')) return;
+              try {
+                const res = await fetch('/api/gaming/boss/action', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    action: 'force_spawn',
+                    boss_name: bossName,
+                    hp: baseHP,
+                    image_url: imageUrl,
+                  }),
+                });
+                const data = await res.json();
+                if (res.ok) {
+                  alert(`✅ ${data.message || 'Boss force spawned successfully!'}`);
+                } else {
+                  alert(`❌ Force spawn failed: ${data.error || 'Unknown error'}`);
+                }
+              } catch (e: any) {
+                alert(`❌ Request error: ${e.message}`);
+              }
+            }}
+          >
+            ⚔️ Force Spawn Weekly Boss
+          </button>
+        </div>
+      </div>
+
+      {bossSubTab === 'active' ? (
+        <>
+          <div className="section-divider">
+            <div className="section-divider-line" />
+            <span className="section-divider-text">Active Boss Configuration</span>
+            <div className="section-divider-line" />
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+            <div className="form-group">
+              <label className="form-label">Game Name</label>
+              <input
+                id="boss-game-name"
+                className="form-input"
+                placeholder="e.g. Where Winds Meet"
+                value={gameName}
+                onChange={(e) => setConfig('game_name', e.target.value)}
+              />
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Boss Name Override</label>
+              <input
+                id="boss-override-name"
+                className="form-input"
+                placeholder="e.g. Glitched Void Sovereign"
+                value={bossName}
+                onChange={(e) => setConfig('override_name', e.target.value)}
+              />
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Base Max HP</label>
+              <input
+                id="boss-override-hp"
+                type="number"
+                className="form-input"
+                placeholder="e.g. 500000"
+                value={baseHP}
+                onChange={(e) => setConfig('override_hp', parseInt(e.target.value) || '')}
+              />
+              <span className="form-hint">Scaled automatically based on total weekly participants</span>
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Announcement Channel ID</label>
+              <input
+                id="boss-announcement-channel"
+                className="form-input"
+                placeholder="Channel ID to post weekly boss status card"
+                value={config.channel_id || ''}
+                onChange={(e) => setConfig('channel_id', e.target.value)}
+              />
+            </div>
+          </div>
+
+          {/* Collapsible Advanced Settings (Class Cards & Custom Images) */}
+          <div style={{ marginTop: '1rem', borderTop: '1px solid var(--border-subtle)', paddingTop: '0.75rem' }}>
+            <button
+              type="button"
+              className="btn btn-secondary btn-sm"
+              onClick={() => setShowClassImages(!showClassImages)}
+              style={{ width: '100%', justifyContent: 'space-between', display: 'flex', alignItems: 'center' }}
+            >
+              <span>🎨 Advanced Settings — Class Cards & Arena Artwork</span>
+              <span>{showClassImages ? '▲ Hide' : '▼ Expand'}</span>
+            </button>
+
+            {showClassImages && (
+              <div style={{ marginTop: '0.75rem', padding: '0.75rem', background: 'var(--bg-tertiary)', borderRadius: '8px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                  <ImageUploader
+                    id="boss-custom-image"
+                    label="Boss Banner Image URL"
+                    value={imageUrl}
+                    onChange={(url) => setConfig('custom_image_url', url)}
+                    previewHeight="120px"
+                  />
+                  <ImageUploader
+                    id="boss-custom-bg"
+                    label="Boss Arena Background URL"
+                    value={bgUrl}
+                    onChange={(url) => setConfig('custom_bg_url', url)}
+                    previewHeight="120px"
+                  />
+                  <ImageUploader
+                    id="boss-victory-image"
+                    label="Victory Background Image URL"
+                    value={victoryImageUrl}
+                    onChange={(url) => setConfig('victory_image_url', url)}
+                    previewHeight="120px"
+                  />
+                  <ImageUploader
+                    id="boss-mom-image"
+                    label="M.O.M. Class Image URL"
+                    value={momImageUrl}
+                    onChange={(url) => setConfig('mom_image_url', url)}
+                    previewHeight="120px"
+                  />
+                  <ImageUploader
+                    id="boss-dad-image"
+                    label="D.A.D. Class Image URL"
+                    value={dadImageUrl}
+                    onChange={(url) => setConfig('dad_image_url', url)}
+                    previewHeight="120px"
+                  />
+                  <ImageUploader
+                    id="boss-kid-image"
+                    label="K.I.D. Class Image URL"
+                    value={kidImageUrl}
+                    onChange={(url) => setConfig('kid_image_url', url)}
+                    previewHeight="120px"
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+        </>
+      ) : (
+        <>
+          <div className="section-divider">
+            <div className="section-divider-line" />
+            <span className="section-divider-text">🗓️ Next Week&apos;s Staged Boss</span>
+            <div className="section-divider-line" />
+          </div>
+
+          <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', marginBottom: '0.75rem' }}>
+            Pre-configure next week&apos;s boss in advance. On Monday 00:00 GMT+8, the system automatically deploys these values to active boss status.
+          </p>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+            <div className="form-group">
+              <label className="form-label">Staged Game Name</label>
+              <input
+                id="staged-game-name"
+                className="form-input"
+                placeholder="e.g. Palworld"
+                value={staged.game_name || ''}
+                onChange={(e) => setConfig('staged_boss_config', { ...staged, game_name: e.target.value })}
+              />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Staged Boss Name</label>
+              <input
+                id="staged-boss-name"
+                className="form-input"
+                placeholder="e.g. Jetragon Corruptor"
+                value={staged.override_name || ''}
+                onChange={(e) => setConfig('staged_boss_config', { ...staged, override_name: e.target.value })}
+              />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Staged Base Max HP</label>
+              <input
+                id="staged-boss-hp"
+                type="number"
+                className="form-input"
+                placeholder="e.g. 600000"
+                value={staged.override_hp || ''}
+                onChange={(e) => setConfig('staged_boss_config', { ...staged, override_hp: parseInt(e.target.value) || '' })}
+              />
+            </div>
+          </div>
+
+          <div style={{ marginTop: '0.75rem' }}>
+            <ImageUploader
+              id="staged-boss-image"
+              label="Staged Boss Banner Image URL"
+              value={staged.custom_image_url || ''}
+              onChange={(url) => setConfig('staged_boss_config', { ...staged, custom_image_url: url })}
+              previewHeight="120px"
+            />
+          </div>
+
+          <div style={{ marginTop: '1rem', paddingTop: '0.75rem', borderTop: '1px solid var(--border-subtle)' }}>
+            <button
+              type="button"
+              className="btn btn-primary btn-sm"
+              style={{ backgroundColor: '#8b5cf6', border: 'none', fontWeight: 600, width: '100%' }}
+              onClick={async () => {
+                if (!confirm('Force deploy staged boss configuration to active boss row immediately?')) return;
+                try {
+                  const res = await fetch('/api/gaming/boss/action', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'deploy_staged' }),
+                  });
+                  const data = await res.json();
+                  if (res.ok) {
+                    alert(`✅ ${data.message || 'Staged boss deployed successfully!'}`);
+                  } else {
+                    alert(`❌ Deployment failed: ${data.error || 'Unknown error'}`);
+                  }
+                } catch (e: any) {
+                  alert(`❌ Request error: ${e.message}`);
+                }
+              }}
+            >
+              🚀 Force Deploy Next Week Staged Boss Now
+            </button>
+          </div>
+        </>
+      )}
+    </>
+  );
+}
+
 export default function GamingPage() {
   const [configs, setConfigs] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(true);
@@ -586,6 +1630,13 @@ export default function GamingPage() {
             id="sidebar-game-boss"
           >
             🐉 Weekly Boss
+          </button>
+          <button
+            className={`sidebar-item ${activeTab === 'achievements' ? 'active' : ''}`}
+            onClick={() => setActiveTab('achievements')}
+            id="sidebar-game-achievements"
+          >
+            🏆 Achievements
           </button>
         </aside>
 
@@ -783,190 +1834,7 @@ export default function GamingPage() {
                   initialEnabled={vaultConfig.enabled ?? false}
                   initialConfig={vaultConfig.config ?? {}}
                 >
-                  {(config, setConfig) => {
-                    const rates = config.rates || {};
-                    const multipliers: any[] = config.role_multipliers || [];
-                    const tierRoles = config.tier_roles || {};
-                    const [dispatchingHub, setDispatchingHub] = useState(false);
-                    const [hubDispatchStatus, setHubDispatchStatus] = useState('');
-
-                    return (
-                      <>
-                        <div className="section-divider">
-                          <div className="section-divider-line" />
-                          <span className="section-divider-text">Financial Controls & Rates (1 Coin = ₱1 PHP)</span>
-                          <div className="section-divider-line" />
-                        </div>
-
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-                          <div className="form-group">
-                            <label className="form-label">Daily Earning Cap (₱ PHP Max/Day)</label>
-                            <input
-                              id="vault-daily-cap"
-                              type="number" step="0.1" min="0.1" max="100"
-                              className="form-input"
-                              value={rates.daily_cap ?? 1.50}
-                              onChange={(e) => setConfig('rates', { ...rates, daily_cap: parseFloat(e.target.value) })}
-                            />
-                          </div>
-                          <div className="form-group">
-                            <label className="form-label">Coins per Message (₱ PHP)</label>
-                            <input
-                              id="vault-msg-rate"
-                              type="number" step="0.01" min="0" max="10"
-                              className="form-input"
-                              value={rates.message ?? 0.02}
-                              onChange={(e) => setConfig('rates', { ...rates, message: parseFloat(e.target.value) })}
-                            />
-                          </div>
-                          <div className="form-group">
-                            <label className="form-label">Coins per Voice Min (₱ PHP)</label>
-                            <input
-                              id="vault-voice-rate"
-                              type="number" step="0.01" min="0" max="10"
-                              className="form-input"
-                              value={rates.voice_per_minute ?? 0.01}
-                              onChange={(e) => setConfig('rates', { ...rates, voice_per_minute: parseFloat(e.target.value) })}
-                            />
-                          </div>
-                          <div className="form-group">
-                            <label className="form-label">Daily Quest Hub Channel ID</label>
-                            <input
-                              id="vault-quest-channel"
-                              className="form-input"
-                              placeholder="Channel ID to post 'Get Daily Quests' card"
-                              value={config.quest_channel_id || ''}
-                              onChange={(e) => setConfig('quest_channel_id', e.target.value)}
-                            />
-                            <div style={{ marginTop: '0.5rem' }}>
-                              <button
-                                type="button"
-                                className="btn btn-primary btn-sm"
-                                disabled={!config.quest_channel_id || dispatchingHub}
-                                onClick={async () => {
-                                  setDispatchingHub(true);
-                                  setHubDispatchStatus('Dispatching launcher card to Discord...');
-                                  try {
-                                    const res = await fetch('/api/gaming/vault/action', {
-                                      method: 'POST',
-                                      headers: { 'Content-Type': 'application/json' },
-                                      body: JSON.stringify({
-                                        action: 'dispatch_quest_hub',
-                                        channel_id: config.quest_channel_id,
-                                      }),
-                                    });
-                                    const data = await res.json();
-                                    if (res.ok && data.success) {
-                                      setHubDispatchStatus('✅ Daily Quest Hub card successfully posted to Discord!');
-                                    } else {
-                                      setHubDispatchStatus(`❌ Failed: ${data.error || 'Unknown error'}`);
-                                    }
-                                  } catch (e: any) {
-                                    setHubDispatchStatus(`❌ Error: ${e.message}`);
-                                  } finally {
-                                    setDispatchingHub(false);
-                                  }
-                                }}
-                                style={{ backgroundColor: '#10b981', border: 'none', fontWeight: 600, fontSize: '0.8rem', width: '100%' }}
-                              >
-                                {dispatchingHub ? 'Posting to Discord...' : '🚀 Dispatch Quest Hub Card to Channel'}
-                              </button>
-                              {hubDispatchStatus && (
-                                <div style={{
-                                  marginTop: '0.4rem',
-                                  fontSize: '0.8rem',
-                                  fontWeight: 500,
-                                  color: hubDispatchStatus.startsWith('✅') ? '#34d399' : hubDispatchStatus.startsWith('❌') ? '#f87171' : '#facc15'
-                                }}>
-                                  {hubDispatchStatus}
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="section-divider">
-                          <div className="section-divider-line" />
-                          <span className="section-divider-text">Role Multipliers</span>
-                          <div className="section-divider-line" />
-                        </div>
-
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                          {multipliers.map((m: any, i: number) => (
-                            <div key={i} className="multiplier-row">
-                              <input
-                                id={`multiplier-role-${i}`}
-                                className="form-input"
-                                placeholder="Role ID"
-                                value={m.role_id || ''}
-                                onChange={(e) => {
-                                  const updated = [...multipliers];
-                                  updated[i] = { ...m, role_id: e.target.value };
-                                  setConfig('role_multipliers', updated);
-                                }}
-                              />
-                              <input
-                                id={`multiplier-val-${i}`}
-                                className="form-input"
-                                type="number" step="0.1" min="0.1" max="10"
-                                placeholder="e.g. 1.5"
-                                value={m.multiplier || ''}
-                                onChange={(e) => {
-                                  const updated = [...multipliers];
-                                  updated[i] = { ...m, multiplier: parseFloat(e.target.value) };
-                                  setConfig('role_multipliers', updated);
-                                }}
-                              />
-                              <button
-                                id={`remove-multiplier-${i}`}
-                                className="btn btn-danger btn-icon btn-sm"
-                                onClick={() => setConfig('role_multipliers', multipliers.filter((_: any, j: number) => j !== i))}
-                              >✕</button>
-                            </div>
-                          ))}
-                          <button
-                            id="add-multiplier-btn"
-                            className="btn btn-secondary btn-sm"
-                            onClick={() => setConfig('role_multipliers', [...multipliers, { role_id: '', multiplier: 1.5 }])}
-                          >
-                            + Add Multiplier
-                          </button>
-                        </div>
-
-                        <div className="section-divider">
-                          <div className="section-divider-line" />
-                          <span className="section-divider-text">9 Nitro Badge Tier Roles</span>
-                          <div className="section-divider-line" />
-                        </div>
-
-                        {[
-                          { key: 'starter', emoji: '💨', label: 'Starter (0 coins)', rarity: 'COMMON' },
-                          { key: 'bronze', emoji: '🟤', label: 'Bronze (40 coins / ₱40)', rarity: 'UNCOMMON' },
-                          { key: 'silver', emoji: '⚪', label: 'Silver (125 coins / ₱125)', rarity: 'UNCOMMON' },
-                          { key: 'gold', emoji: '🟡', label: 'Gold (250 coins / ₱250)', rarity: 'RARE' },
-                          { key: 'platinum', emoji: '🪙', label: 'Platinum 1-Year (500 coins / ₱500)', rarity: 'RARE' },
-                          { key: 'diamond', emoji: '🔷', label: 'Diamond (1,000 coins / ₱1,000)', rarity: 'EPIC' },
-                          { key: 'emerald', emoji: '💚', label: 'Emerald (1,500 coins / ₱1,500)', rarity: 'EPIC' },
-                          { key: 'ruby', emoji: '🔴', label: 'Ruby (2,500 coins / ₱2,500)', rarity: 'LEGENDARY' },
-                          { key: 'opal', emoji: '🔮', label: 'Opal (3,000+ coins / ₱3,000+)', rarity: 'MYTHIC' },
-                        ].map(({ key, emoji, label, rarity }) => (
-                          <div className="form-group" key={key} style={{ marginBottom: '0.5rem' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.2rem' }}>
-                              <label className="form-label" style={{ margin: 0 }}>{emoji} {label}</label>
-                              <span style={{ fontSize: '0.7rem', color: 'var(--accent-primary)', fontWeight: 600 }}>[▲ {rarity}]</span>
-                            </div>
-                            <input
-                              id={`tier-role-${key}`}
-                              className="form-input"
-                              placeholder="Discord Role ID to auto-assign"
-                              value={tierRoles[key] || ''}
-                              onChange={(e) => setConfig('tier_roles', { ...tierRoles, [key]: e.target.value })}
-                            />
-                          </div>
-                        ))}
-                      </>
-                    );
-                  }}
+                  {(config, setConfig) => <VaultCardForm config={config} setConfig={setConfig} />}
                 </FeatureCard>
               </div>
             </div>
@@ -1001,95 +1869,7 @@ export default function GamingPage() {
                   initialEnabled={dealsConfig.enabled ?? false}
                   initialConfig={dealsConfig.config ?? {}}
                 >
-                  {(config, setConfig) => {
-                    const [dealStatusMsg, setDealStatusMsg] = useState('');
-                    const [checkingDeals, setCheckingDeals] = useState(false);
-
-                    const handleTriggerDeals = async () => {
-                      setCheckingDeals(true);
-                      setDealStatusMsg('Scraping Steam & Epic Games Store for deals...');
-                      try {
-                        const res = await fetch('/api/gaming/deals/action', {
-                          method: 'POST',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({
-                            action: 'trigger',
-                            channel_id: config.channel_id,
-                          }),
-                        });
-                        const data = await res.json();
-                        if (res.ok && data.success) {
-                          setDealStatusMsg(`✅ ${data.message}`);
-                        } else {
-                          setDealStatusMsg(`❌ Failed: ${data.error || 'Unknown error'}`);
-                        }
-                      } catch (e: any) {
-                        setDealStatusMsg(`❌ Error: ${e.message}`);
-                      } finally {
-                        setCheckingDeals(false);
-                      }
-                    };
-
-                    return (
-                      <>
-                        <div className="section-divider">
-                          <div className="section-divider-line" />
-                          <span className="section-divider-text">Target Channel & Filtering</span>
-                          <div className="section-divider-line" />
-                        </div>
-
-                        <div className="form-group">
-                          <label className="form-label">Alert Announcement Channel ID</label>
-                          <input
-                            id="deals-channel-id"
-                            className="form-input"
-                            placeholder="Channel ID to post deal alerts"
-                            value={config.channel_id || ''}
-                            onChange={(e) => setConfig('channel_id', e.target.value)}
-                          />
-                          <span className="form-hint">Text channel where deal cards will be posted</span>
-                        </div>
-
-                        <div className="form-group">
-                          <label className="form-label">Minimum Discount Threshold Filter</label>
-                          <select
-                            id="deals-min-discount"
-                            className="form-input"
-                            value={config.min_discount_percent ?? 50}
-                            onChange={(e) => setConfig('min_discount_percent', parseInt(e.target.value))}
-                          >
-                            <option value={50}>50% OFF or Greater (Recommended)</option>
-                            <option value={75}>75% OFF or Greater (Deep Discounts)</option>
-                            <option value={90}>90% OFF or Greater</option>
-                            <option value={100}>100% FREE ONLY (Giveaways & Free Games Only)</option>
-                          </select>
-                        </div>
-
-                        <div style={{ marginTop: '1.25rem', paddingTop: '1rem', borderTop: '1px solid var(--border-color)' }}>
-                          <button
-                            type="button"
-                            className="btn btn-primary"
-                            disabled={!config.channel_id || checkingDeals}
-                            onClick={handleTriggerDeals}
-                            style={{ backgroundColor: '#10b981', border: 'none', fontWeight: 600, width: '100%' }}
-                          >
-                            {checkingDeals ? 'Scanning Platforms...' : '🚀 Force Check & Dispatch Deals Now'}
-                          </button>
-
-                          {dealStatusMsg && (
-                            <div style={{
-                              marginTop: '0.5rem',
-                              fontSize: '0.85rem',
-                              fontWeight: 500,
-                              color: dealStatusMsg.startsWith('✅') ? '#34d399' : dealStatusMsg.startsWith('❌') ? '#f87171' : '#facc15'
-                            }}>
-                              {dealStatusMsg}
-                            </div>
-                          )}
-                        </div>
-                      </>
-                    );
-                  }}
+                  {(config, setConfig) => <DealsCardForm config={config} setConfig={setConfig} />}
                 </FeatureCard>
               </div>
             </div>
@@ -1108,7 +1888,7 @@ export default function GamingPage() {
                   <li>Enable the feature and add the <strong>Channel Whitelist</strong> below — these are the channels where trivia can drop.</li>
                   <li>Set a <strong>Priority</strong> per channel: <code>high</code> (3x weight), <code>medium</code> (2x), or <code>low</code> (1x) — dead channels can be revived with low priority.</li>
                   <li>Optionally set a <strong>Topic</strong> for a channel (e.g. <code>Palworld survival mechanics</code>) for themed questions. Leave blank for general trivia.</li>
-                  <li>Configure the <strong>Close Time</strong> (in 24h format, e.g. <code>22:00</code>) — sessions close at this time if 3 winners haven't claimed all spots first.</li>
+                  <li>Configure the <strong>Close Time</strong> (in 24h format, e.g. <code>22:00</code>) — sessions close at this time if 3 winners haven&apos;t claimed all spots first.</li>
                   <li>Set the server <strong>Timezone</strong> and <strong>Drops Per Day</strong> (1–3 drops daily, evenly auto-scheduled throughout daytime hours).</li>
                   <li>Optionally configure a <strong>Leaderboard Channel ID</strong> to post and auto-update a live Top 5 trivia points leaderboard.</li>
                   <li>Set <strong>Allowed Roles</strong> to restrict who can participate (leave empty to allow all members).</li>
@@ -1129,270 +1909,7 @@ export default function GamingPage() {
                   initialEnabled={triviaConfig.enabled ?? false}
                   initialConfig={triviaConfig.config ?? {}}
                 >
-                  {(config, setConfig) => {
-                    const allowedChannels: any[] = config.allowed_channels || [];
-                    const allowedRoles: string[] = config.allowed_roles || [];
-                    const [manualStatus, setManualStatus] = useState<string>('');
-
-                    const handleManualAction = async (action: string) => {
-                      setManualStatus('loading');
-                      try {
-                        const res = await fetch('/api/gaming/trivia/action', {
-                          method: 'POST',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({ action }),
-                        });
-                        const data = await res.json();
-                        setManualStatus(data.error ? `error: ${data.error}` : action === 'trigger' ? 'triggered' : action === 'skip' ? 'skipped' : 'rerolled');
-                        if (!data.error) setTriviaRefreshKey((k) => k + 1);
-                      } catch {
-                        setManualStatus('error: request failed');
-                      }
-                      setTimeout(() => setManualStatus(''), 4000);
-                    };
-
-                    return (
-                      <>
-                        {/* Timezone & Close Time */}
-                        <div className="section-divider">
-                          <div className="section-divider-line" />
-                          <span className="section-divider-text">Schedule Settings</span>
-                          <div className="section-divider-line" />
-                        </div>
-
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.75rem' }}>
-                          <div className="form-group">
-                            <label className="form-label">Timezone</label>
-                            <input
-                              id="trivia-timezone"
-                              className="form-input"
-                              placeholder="e.g. Asia/Manila, America/New_York"
-                              value={config.timezone || ''}
-                              onChange={(e) => setConfig('timezone', e.target.value)}
-                            />
-                            <span className="form-hint">IANA timezone string</span>
-                          </div>
-                          <div className="form-group">
-                            <label className="form-label">Auto-Close Time (24h)</label>
-                            <input
-                              id="trivia-close-time"
-                              className="form-input"
-                              placeholder="e.g. 22:00"
-                              value={config.close_time || ''}
-                              onChange={(e) => setConfig('close_time', e.target.value)}
-                            />
-                            <span className="form-hint">Between 01:00 – 23:00 (server timezone)</span>
-                          </div>
-                          <div className="form-group">
-                            <label className="form-label">Drops Per Day (1–3)</label>
-                            <input
-                              id="trivia-drops-per-day"
-                              type="number"
-                              min={1}
-                              max={3}
-                              className="form-input"
-                              placeholder="1"
-                              value={config.drops_per_day ?? 1}
-                              onChange={(e) => {
-                                const val = Math.min(3, Math.max(1, parseInt(e.target.value, 10) || 1));
-                                setConfig('drops_per_day', val);
-                              }}
-                            />
-                            <span className="form-hint">Number of daily trivia drops (max 3)</span>
-                          </div>
-                        </div>
-
-                        {/* Channel Whitelist */}
-                        <div className="section-divider">
-                          <div className="section-divider-line" />
-                          <span className="section-divider-text">Channel Whitelist</span>
-                          <div className="section-divider-line" />
-                        </div>
-
-                        <div style={{ display: 'grid', gridTemplateColumns: '100px 1fr 90px 80px', gap: '0.5rem', marginBottom: '0.4rem', paddingRight: '0.25rem' }}>
-                          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 'bold' }}>Priority</span>
-                          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 'bold' }}>Channel ID</span>
-                          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 'bold' }}>Topic</span>
-                          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 'bold' }}>Remove</span>
-                        </div>
-
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                          {allowedChannels.map((ch: any, i: number) => (
-                            <div key={i} style={{ display: 'grid', gridTemplateColumns: '100px 1fr 90px 80px', gap: '0.5rem', alignItems: 'center' }}>
-                              <select
-                                id={`trivia-ch-priority-${i}`}
-                                className="form-input"
-                                value={ch.priority || 'medium'}
-                                onChange={(e) => {
-                                  const updated = [...allowedChannels];
-                                  updated[i] = { ...ch, priority: e.target.value };
-                                  setConfig('allowed_channels', updated);
-                                }}
-                                style={{ padding: '0.375rem 0.5rem', fontSize: '0.8125rem' }}
-                              >
-                                <option value="high">🔴 High</option>
-                                <option value="medium">🟡 Medium</option>
-                                <option value="low">🟢 Low</option>
-                              </select>
-                              <input
-                                id={`trivia-ch-id-${i}`}
-                                className="form-input"
-                                placeholder="Channel ID"
-                                value={ch.channel_id || ''}
-                                onChange={(e) => {
-                                  const updated = [...allowedChannels];
-                                  updated[i] = { ...ch, channel_id: e.target.value };
-                                  setConfig('allowed_channels', updated);
-                                }}
-                                style={{ padding: '0.375rem 0.625rem', fontSize: '0.8125rem' }}
-                              />
-                              <input
-                                id={`trivia-ch-topic-${i}`}
-                                className="form-input"
-                                placeholder="e.g. Palworld"
-                                value={ch.topic || ''}
-                                onChange={(e) => {
-                                  const updated = [...allowedChannels];
-                                  updated[i] = { ...ch, topic: e.target.value };
-                                  setConfig('allowed_channels', updated);
-                                }}
-                                style={{ padding: '0.375rem 0.625rem', fontSize: '0.8125rem' }}
-                              />
-                              <button
-                                id={`trivia-remove-ch-${i}`}
-                                className="btn btn-danger btn-icon btn-sm"
-                                onClick={() => setConfig('allowed_channels', allowedChannels.filter((_: any, j: number) => j !== i))}
-                              >✕</button>
-                            </div>
-                          ))}
-                          <button
-                            id="trivia-add-channel-btn"
-                            className="btn btn-secondary btn-sm"
-                            onClick={() => setConfig('allowed_channels', [...allowedChannels, { channel_id: '', priority: 'medium', topic: '' }])}
-                          >
-                            + Add Channel
-                          </button>
-                        </div>
-
-                        {/* Allowed Roles */}
-                        <div className="section-divider">
-                          <div className="section-divider-line" />
-                          <span className="section-divider-text">Participation Roles</span>
-                          <div className="section-divider-line" />
-                        </div>
-
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                          {allowedRoles.map((roleId: string, i: number) => (
-                            <div key={i} style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                              <input
-                                id={`trivia-role-${i}`}
-                                className="form-input"
-                                placeholder="Role ID or Role Name"
-                                value={roleId}
-                                onChange={(e) => {
-                                  const updated = [...allowedRoles];
-                                  updated[i] = e.target.value;
-                                  setConfig('allowed_roles', updated);
-                                }}
-                              />
-                              <button
-                                id={`trivia-remove-role-${i}`}
-                                className="btn btn-danger btn-icon btn-sm"
-                                onClick={() => setConfig('allowed_roles', allowedRoles.filter((_: string, j: number) => j !== i))}
-                              >✕</button>
-                            </div>
-                          ))}
-                          <button
-                            id="trivia-add-role-btn"
-                            className="btn btn-secondary btn-sm"
-                            onClick={() => setConfig('allowed_roles', [...allowedRoles, ''])}
-                          >
-                            + Add Role
-                          </button>
-                          <span className="form-hint">Leave empty to allow all members to participate.</span>
-                        </div>
-
-                        {/* Live Leaderboard & Drop Notification Channels */}
-                        <div className="section-divider">
-                          <div className="section-divider-line" />
-                          <span className="section-divider-text">Notifications & Live Leaderboard</span>
-                          <div className="section-divider-line" />
-                        </div>
-
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-                          <div className="form-group">
-                            <label className="form-label">Drop Notification Channel ID</label>
-                            <input
-                              id="trivia-notification-channel"
-                              className="form-input"
-                              placeholder="Channel ID to send 'Trivia Drop Live in #channel' alerts"
-                              value={config.notification_channel_id || ''}
-                              onChange={(e) => setConfig('notification_channel_id', e.target.value)}
-                            />
-                            <span className="form-hint">Posts an alert mentioning the channel ID where the trivia drop spawned. Leave empty to disable.</span>
-                          </div>
-                          <div className="form-group">
-                            <label className="form-label">Leaderboard Channel ID</label>
-                            <input
-                              id="trivia-leaderboard-channel"
-                              className="form-input"
-                              placeholder="Channel where top 5 points are auto-posted"
-                              value={config.leaderboard_channel_id || ''}
-                              onChange={(e) => setConfig('leaderboard_channel_id', e.target.value)}
-                            />
-                            <span className="form-hint">Bot will post and edit a single message here as scores update. Leave empty to disable.</span>
-                          </div>
-                        </div>
-
-                        {/* Manual Controls */}
-                        <div className="section-divider">
-                          <div className="section-divider-line" />
-                          <span className="section-divider-text">Manual Safety Controls</span>
-                          <div className="section-divider-line" />
-                        </div>
-
-                        <div style={{ display: 'flex', gap: '0.625rem', flexWrap: 'wrap', alignItems: 'center' }}>
-                          <button
-                            id="trivia-force-trigger"
-                            className="btn btn-primary btn-sm"
-                            disabled={manualStatus === 'loading'}
-                            onClick={() => handleManualAction('trigger')}
-                          >
-                            ⚡ Force Trigger
-                          </button>
-                          <button
-                            id="trivia-skip"
-                            className="btn btn-secondary btn-sm"
-                            disabled={manualStatus === 'loading'}
-                            onClick={() => handleManualAction('skip')}
-                          >
-                            ⏭️ Skip / Close Active
-                          </button>
-                          <button
-                            id="trivia-reroll"
-                            className="btn btn-secondary btn-sm"
-                            disabled={manualStatus === 'loading'}
-                            onClick={() => handleManualAction('reroll')}
-                          >
-                            🎲 Reroll Drop
-                          </button>
-                          {manualStatus && (
-                            <span style={{
-                              fontSize: '0.8125rem',
-                              color: manualStatus.startsWith('error') ? 'var(--color-error)' : 'var(--color-success)',
-                              fontWeight: 500,
-                            }}>
-                              {manualStatus === 'loading' ? '⏳ Processing...' :
-                               manualStatus === 'triggered' ? '✅ Drop triggered!' :
-                               manualStatus === 'skipped' ? '✅ Session closed.' :
-                               manualStatus === 'rerolled' ? '✅ Rerolled successfully.' :
-                               `❌ ${manualStatus}`}
-                            </span>
-                          )}
-                        </div>
-                      </>
-                    );
-                  }}
+                  {(config, setConfig) => <TriviaCardForm config={config} setConfig={setConfig} setTriviaRefreshKey={setTriviaRefreshKey} />}
                 </FeatureCard>
               </div>
             </div>
@@ -1423,580 +1940,33 @@ export default function GamingPage() {
                 initialEnabled={configs['weekly_boss']?.enabled ?? true}
                 initialConfig={configs['weekly_boss']?.config ?? {}}
               >
-                {(config, setConfig) => {
-                  const [bossSubTab, setBossSubTab] = useState<'active' | 'staging'>('active');
-                  const [showClassImages, setShowClassImages] = useState(false);
-                  const gameName = config.game_name || '';
-                  const bossName = config.override_name || '';
-                  const baseHP = config.override_hp || '';
-                  const imageUrl = config.custom_image_url || '';
-                  const bgUrl = config.custom_bg_url || '';
-                  const victoryImageUrl = config.victory_image_url || '';
-                  const momImageUrl = config.mom_image_url || '';
-                  const dadImageUrl = config.dad_image_url || '';
-                  const kidImageUrl = config.kid_image_url || '';
-
-                  const staged = config.staged_boss_config || {};
-
-                  return (
-                    <>
-                      <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '0.75rem' }}>
-                        <button
-                          type="button"
-                          className={`btn btn-sm ${bossSubTab === 'active' ? 'btn-primary' : 'btn-secondary'}`}
-                          onClick={() => setBossSubTab('active')}
-                        >
-                          ⚔️ Active Boss & Live Config
-                        </button>
-                        <button
-                          type="button"
-                          className={`btn btn-sm ${bossSubTab === 'staging' ? 'btn-primary' : 'btn-secondary'}`}
-                          onClick={() => setBossSubTab('staging')}
-                        >
-                          🗓️ Next Week&apos;s Boss Stager
-                        </button>
-                      </div>
-
-                      {/* Admin Quick Action Controls — Fixed at top */}
-                      <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.25rem', flexWrap: 'wrap', alignItems: 'center', background: 'rgba(139, 92, 246, 0.08)', padding: '0.75rem 1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)' }}>
-                        <button
-                          id="boss-force-spawn"
-                          className="btn btn-primary btn-sm"
-                          disabled={config.boss_status === 'loading'}
-                          onClick={async () => {
-                            setConfig('boss_status', 'loading');
-                            try {
-                              const res = await fetch('/api/gaming/boss/action', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({
-                                  action: 'spawn',
-                                  gameName,
-                                  customName: bossName,
-                                  customHp: baseHP,
-                                  customImageUrl: imageUrl,
-                                  customBgUrl: bgUrl,
-                                }),
-                              });
-                              const data = await res.json();
-                              setConfig('boss_status', data.error ? `error: ${data.error}` : 'spawned');
-                            } catch {
-                              setConfig('boss_status', 'error: request failed');
-                            }
-                            setTimeout(() => setConfig('boss_status', ''), 4000);
-                          }}
-                        >
-                          🚀 Spawn Boss & Post Card to Discord
-                        </button>
-
-                        <button
-                          id="boss-force-end"
-                          className="btn btn-secondary btn-sm"
-                          disabled={config.boss_status === 'loading'}
-                          onClick={async () => {
-                            setConfig('boss_status', 'loading');
-                            try {
-                              const res = await fetch('/api/gaming/boss/action', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ action: 'end' }),
-                              });
-                              const data = await res.json();
-                              setConfig('boss_status', data.error ? `error: ${data.error}` : 'ended');
-                            } catch {
-                              setConfig('boss_status', 'error: request failed');
-                            }
-                            setTimeout(() => setConfig('boss_status', ''), 4000);
-                          }}
-                        >
-                          ⏹️ Force End / Reset AP
-                        </button>
-
-                        <button
-                          id="boss-force-overkill"
-                          className="btn btn-secondary btn-sm"
-                          disabled={config.boss_status === 'loading'}
-                          onClick={async () => {
-                            setConfig('boss_status', 'loading');
-                            try {
-                              const res = await fetch('/api/gaming/boss/action', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ action: 'overkill' }),
-                              });
-                              const data = await res.json();
-                              setConfig('boss_status', data.error ? `error: ${data.error}` : 'overkill');
-                            } catch {
-                              setConfig('boss_status', 'error: request failed');
-                            }
-                            setTimeout(() => setConfig('boss_status', ''), 4000);
-                          }}
-                        >
-                          💥 Force Trigger Overkill
-                        </button>
-
-                        {config.boss_status && (
-                          <span style={{
-                            fontSize: '0.8125rem',
-                            color: config.boss_status.startsWith('error') ? 'var(--color-error)' : 'var(--color-success)',
-                            fontWeight: 500,
-                          }}>
-                            {config.boss_status === 'loading' ? '⏳ Processing...' :
-                             config.boss_status === 'spawned' ? '✅ Boss spawned & posted to Discord!' :
-                             config.boss_status === 'ended' ? '✅ Cycle ended & AP reset.' :
-                             config.boss_status === 'overkill' ? '✅ Overkill Mode triggered!' :
-                             `❌ ${config.boss_status}`}
-                          </span>
-                        )}
-                      </div>
-
-                      {bossSubTab === 'staging' ? (
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(460px, 1fr))', gap: '1.5rem', alignItems: 'start' }}>
-                          <div>
-                            <div className="section-divider">
-                              <div className="section-divider-line" />
-                              <span className="section-divider-text">🗓️ Next Week&apos;s Boss Staging &amp; Planner</span>
-                              <div className="section-divider-line" />
-                            </div>
-
-                            <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>
-                              Pre-configure next week&apos;s boss ahead of time. When Monday midnight arrives, the bot will automatically deploy this staged boss for your server!
-                            </p>
-
-                            <div style={{ marginBottom: '1.25rem' }}>
-                              <button
-                                type="button"
-                                className="btn btn-primary btn-sm"
-                                disabled={config.boss_status === 'loading'}
-                                onClick={async () => {
-                                  setConfig('boss_status', 'loading');
-                                  try {
-                                    const res = await fetch('/api/gaming/boss/action', {
-                                      method: 'POST',
-                                      headers: { 'Content-Type': 'application/json' },
-                                      body: JSON.stringify({
-                                        action: 'spawn_staged',
-                                        stagedConfig: staged,
-                                      }),
-                                    });
-                                    const data = await res.json();
-                                    if (data.success) {
-                                      // Promote staged fields into active config state in frontend UI
-                                      if (staged.boss_name) setConfig('override_name', staged.boss_name);
-                                      if (staged.boss_title) setConfig('boss_title', staged.boss_title);
-                                      if (staged.lore) setConfig('lore', staged.lore);
-                                      if (staged.max_hp) setConfig('override_hp', staged.max_hp);
-                                      if (staged.custom_image_url) setConfig('custom_image_url', staged.custom_image_url);
-                                      if (staged.custom_bg_url) setConfig('custom_bg_url', staged.custom_bg_url);
-                                      if (staged.victory_image_url) setConfig('victory_image_url', staged.victory_image_url);
-                                      if (staged.mom_image_url) setConfig('mom_image_url', staged.mom_image_url);
-                                      if (staged.dad_image_url) setConfig('dad_image_url', staged.dad_image_url);
-                                      if (staged.kid_image_url) setConfig('kid_image_url', staged.kid_image_url);
-
-                                      // Wipe staged_boss_config clean in UI state
-                                      setConfig('staged_boss_config', {});
-
-                                      // Switch view to Active Boss tab
-                                      setBossSubTab('active');
-                                      setConfig('boss_status', 'spawned');
-                                    } else {
-                                      setConfig('boss_status', `error: ${data.error}`);
-                                    }
-                                  } catch {
-                                    setConfig('boss_status', 'error: request failed');
-                                  }
-                                  setTimeout(() => setConfig('boss_status', ''), 4000);
-                                }}
-                              >
-                                🚀 Force Deploy Next Week&apos;s Staged Boss Right Now
-                              </button>
-                            </div>
-
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
-                              <label style={{ fontSize: '0.875rem', fontWeight: 600 }}>Enable Pre-Staged Boss for Next Week</label>
-                              <input
-                                type="checkbox"
-                                checked={staged.enabled ?? false}
-                                onChange={(e) => setConfig('staged_boss_config', { ...staged, enabled: e.target.checked })}
-                              />
-                            </div>
-
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-                              <div className="form-group">
-                                <label className="form-label">Next Boss Name</label>
-                                <input
-                                  className="form-input"
-                                  placeholder="e.g. Lord Vorath"
-                                  value={staged.boss_name || ''}
-                                  onChange={(e) => setConfig('staged_boss_config', { ...staged, boss_name: e.target.value })}
-                                />
-                              </div>
-                              <div className="form-group">
-                                <label className="form-label">Next Boss Title</label>
-                                <input
-                                  className="form-input"
-                                  placeholder="e.g. The Abyssal Sovereign"
-                                  value={staged.boss_title || ''}
-                                  onChange={(e) => setConfig('staged_boss_config', { ...staged, boss_title: e.target.value })}
-                                />
-                              </div>
-                            </div>
-
-                            <div className="form-group">
-                              <label className="form-label">Next Boss Lore</label>
-                              <textarea
-                                className="form-input"
-                                rows={2}
-                                placeholder="Awakened from the deep void, it seeks to devour the digital realm..."
-                                value={staged.lore || ''}
-                                onChange={(e) => setConfig('staged_boss_config', { ...staged, lore: e.target.value })}
-                              />
-                            </div>
-
-                            <div className="form-group" style={{ marginBottom: '1.25rem' }}>
-                              <label className="form-label">Next Boss Max HP</label>
-                              <input
-                                type="number"
-                                className="form-input"
-                                placeholder="e.g. 500000"
-                                value={staged.max_hp || ''}
-                                onChange={(e) => setConfig('staged_boss_config', { ...staged, max_hp: e.target.value })}
-                              />
-                            </div>
-                          </div>
-
-                          <div>
-                            {/* Staged Boss & Background Image Section */}
-                            <div className="section-divider">
-                              <div className="section-divider-line" />
-                              <span className="section-divider-text">🖼️ Next Week Artwork & Arena Environment</span>
-                              <div className="section-divider-line" />
-                            </div>
-
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.25rem' }}>
-                              <ImageUploader
-                                id="staged-boss-image-url"
-                                label="🧌 Next Boss Artwork Image"
-                                placeholder="https://.../next_boss_art.png"
-                                value={staged.custom_image_url || ''}
-                                onChange={(url) => setConfig('staged_boss_config', { ...staged, custom_image_url: url })}
-                                helpText="Full artwork image for next week's boss. (Leave blank to inherit current boss artwork)"
-                              />
-
-                              <ImageUploader
-                                id="staged-boss-bg-url"
-                                label="🌄 Next Arena Background Image (Optional 16:9)"
-                                placeholder="https://.../next_arena_bg.png"
-                                value={staged.custom_bg_url || ''}
-                                onChange={(url) => setConfig('staged_boss_config', { ...staged, custom_bg_url: url })}
-                                helpText="Custom background landscape/arena image for next week's boss."
-                              />
-                            </div>
-
-
-                            {/* Staged Advanced Images — Victory + Class Characters */}
-                            <div style={{ marginBottom: '1.25rem' }}>
-                              <button
-                                type="button"
-                                onClick={() => setShowClassImages(v => !v)}
-                                style={{
-                                  background: 'none',
-                                  border: '1px solid var(--border-subtle)',
-                                  borderRadius: 'var(--radius-sm)',
-                                  color: 'var(--text-muted)',
-                                  fontSize: '0.8125rem',
-                                  cursor: 'pointer',
-                                  padding: '0.35rem 0.75rem',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: '0.4rem',
-                                }}
-                              >
-                                {showClassImages ? '▾' : '▸'} Advanced — Victory &amp; Class Character Images
-                              </button>
-                              {showClassImages && (
-                                <div style={{ marginTop: '0.75rem' }}>
-                                  <ImageUploader
-                                    id="staged-boss-victory-url"
-                                    label="🎉 Victory Celebration Image (Family Photo)"
-                                    placeholder="https://.../victory_family_celebration.png"
-                                    value={staged.victory_image_url || ''}
-                                    onChange={(url) => setConfig('staged_boss_config', { ...staged, victory_image_url: url })}
-                                  />
-                                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem', marginTop: '0.75rem' }}>
-                                    <ImageUploader
-                                      id="staged-boss-mom-image-url"
-                                      label="🛡️ M.O.M. Class Image"
-                                      placeholder="https://.../mom_character.png"
-                                      value={staged.mom_image_url || ''}
-                                      onChange={(url) => setConfig('staged_boss_config', { ...staged, mom_image_url: url })}
-                                    />
-                                    <ImageUploader
-                                      id="staged-boss-dad-image-url"
-                                      label="🔨 D.A.D. Class Image"
-                                      placeholder="https://.../dad_character.png"
-                                      value={staged.dad_image_url || ''}
-                                      onChange={(url) => setConfig('staged_boss_config', { ...staged, dad_image_url: url })}
-                                    />
-                                    <ImageUploader
-                                      id="staged-boss-kid-image-url"
-                                      label="⚡ K.I.D. Class Image"
-                                      placeholder="https://.../kid_character.png"
-                                      value={staged.kid_image_url || ''}
-                                      onChange={(url) => setConfig('staged_boss_config', { ...staged, kid_image_url: url })}
-                                    />
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-
-                            <BossPreviewCard
-                              bossName={staged.boss_name || 'Next Week Staged Boss'}
-                              imageUrl={staged.custom_image_url || imageUrl}
-                              bgUrl={staged.custom_bg_url || bgUrl}
-                              momImageUrl={staged.mom_image_url || momImageUrl}
-                              dadImageUrl={staged.dad_image_url || dadImageUrl}
-                              kidImageUrl={staged.kid_image_url || kidImageUrl}
-                              onFixIbbLinks={async () => {
-                                const resolveUrl = async (url: string) => {
-                                  if (!url || !url.startsWith('http') || url.includes('i.ibb.co/')) return url;
-                                  try {
-                                    const res = await fetch(url, {
-                                      headers: {
-                                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-                                        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-                                      }
-                                    });
-                                    if (res.ok) {
-                                      const html = await res.text();
-                                      const m = html.match(/<meta\s+property=["']og:image["']\s+content=["']([^"']+)["']/i) ||
-                                                html.match(/<img\s+src=["'](https:\/\/i\.ibb\.co\/[^"']+)["']/i) ||
-                                                html.match(/(https:\/\/i\.ibb\.co\/[a-zA-Z0-9_\-\.\/]+)/i);
-                                      if (m && m[1]) return m[1];
-                                    }
-                                  } catch (e) {}
-                                  return url;
-                                };
-
-                                const newMom = await resolveUrl(staged.mom_image_url);
-                                const newDad = await resolveUrl(staged.dad_image_url);
-                                const newKid = await resolveUrl(staged.kid_image_url);
-                                const newBg = await resolveUrl(staged.custom_bg_url);
-                                const newImg = await resolveUrl(staged.custom_image_url);
-
-                                const newStaged = { ...staged };
-                                if (newMom !== staged.mom_image_url) newStaged.mom_image_url = newMom;
-                                if (newDad !== staged.dad_image_url) newStaged.dad_image_url = newDad;
-                                if (newKid !== staged.kid_image_url) newStaged.kid_image_url = newKid;
-                                if (newBg !== staged.custom_bg_url) newStaged.custom_bg_url = newBg;
-                                if (newImg !== staged.custom_image_url) newStaged.custom_image_url = newImg;
-                                setConfig('staged_boss_config', newStaged);
-                              }}
-                            />
-                          </div>
-                        </div>
-                      ) : (
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(460px, 1fr))', gap: '1.5rem', alignItems: 'start' }}>
-                          <div>
-                            <div className="section-divider">
-                              <div className="section-divider-line" />
-                              <span className="section-divider-text">Boss Settings</span>
-                              <div className="section-divider-line" />
-                            </div>
-
-                            <div className="form-group">
-                              <label className="form-label">Boss Announcement Channel ID</label>
-                              <input
-                                id="boss-channel-id"
-                                className="form-input"
-                                placeholder="Channel ID for boss card posts (e.g. 1234567890)"
-                                value={config.channel_id || ''}
-                                onChange={(e) => setConfig('channel_id', e.target.value)}
-                              />
-                              <span className="form-hint">Channel where /boss status cards are posted</span>
-                            </div>
-
-                            {/* Manual Boss Configuration Controls */}
-                            <div className="section-divider">
-                              <div className="section-divider-line" />
-                              <span className="section-divider-text">⚔️ Weekly Boss Setup</span>
-                              <div className="section-divider-line" />
-                            </div>
-
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-                              <div className="form-group">
-                                <label className="form-label">🎮 Game Name</label>
-                                <input
-                                  id="boss-game-name"
-                                  className="form-input"
-                                  placeholder="e.g. Diablo 4, Wuthering Waves, Elden Ring"
-                                  value={gameName}
-                                  onChange={(e) => setConfig('game_name', e.target.value)}
-                                />
-                                <span className="form-hint">The game where the boss originates</span>
-                              </div>
-
-                              <div className="form-group">
-                                <label className="form-label">⚔️ Boss / Character Name</label>
-                                <input
-                                  id="boss-override-name"
-                                  className="form-input"
-                                  placeholder="e.g. Lilith, Aemeth, Malenia"
-                                  value={bossName}
-                                  onChange={(e) => setConfig('override_name', e.target.value)}
-                                />
-                                <span className="form-hint">Name of the boss character</span>
-                              </div>
-                            </div>
-
-                            <div className="form-group">
-                              <label className="form-label">❤️ Manual Base HP (Optional Override)</label>
-                              <input
-                                id="boss-override-hp"
-                                type="number"
-                                className="form-input"
-                                placeholder="e.g. 150000"
-                                value={baseHP}
-                                onChange={(e) => setConfig('override_hp', e.target.value)}
-                              />
-                              <span className="form-hint">Leave blank for automatic player-scaled HP</span>
-                            </div>
-                          </div>
-
-                          <div>
-                            {/* Boss & Background Image Section */}
-                            <div className="section-divider">
-                              <div className="section-divider-line" />
-                              <span className="section-divider-text">🖼️ Boss Artwork & Environment</span>
-                              <div className="section-divider-line" />
-                            </div>
-
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.25rem' }}>
-                              <ImageUploader
-                                id="boss-image-url"
-                                label="🧌 Boss Artwork Image"
-                                placeholder="https://.../boss_art.png"
-                                value={imageUrl}
-                                onChange={(url) => setConfig('custom_image_url', url)}
-                                helpText="Full boss artwork image displayed during spawn & combat."
-                              />
-
-                              <ImageUploader
-                                id="boss-bg-url"
-                                label="🌄 Arena Background Image"
-                                placeholder="https://.../arena_bg.png"
-                                value={bgUrl}
-                                onChange={(url) => setConfig('custom_bg_url', url)}
-                                helpText="Optional custom background landscape image"
-                              />
-                            </div>
-
-
-                            {/* Active Advanced Images — Victory + Class Characters */}
-                            <div style={{ marginBottom: '1.25rem' }}>
-                              <button
-                                type="button"
-                                onClick={() => setShowClassImages(v => !v)}
-                                style={{
-                                  background: 'none',
-                                  border: '1px solid var(--border-subtle)',
-                                  borderRadius: 'var(--radius-sm)',
-                                  color: 'var(--text-muted)',
-                                  fontSize: '0.8125rem',
-                                  cursor: 'pointer',
-                                  padding: '0.35rem 0.75rem',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: '0.4rem',
-                                }}
-                              >
-                                {showClassImages ? '▾' : '▸'} Advanced — Victory &amp; Class Character Images
-                              </button>
-                              {showClassImages && (
-                                <div style={{ marginTop: '0.75rem' }}>
-                                  <ImageUploader
-                                    id="boss-victory-url"
-                                    label="🎉 Victory Celebration Image (Family Photo)"
-                                    placeholder="https://.../victory_family_celebration.png"
-                                    value={victoryImageUrl}
-                                    onChange={(url) => setConfig('victory_image_url', url)}
-                                  />
-                                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem', marginTop: '0.75rem' }}>
-                                    <ImageUploader
-                                      id="boss-mom-image-url"
-                                      label="🛡️ M.O.M. Class Image"
-                                      placeholder="https://.../mom_character.png"
-                                      value={momImageUrl}
-                                      onChange={(url) => setConfig('mom_image_url', url)}
-                                    />
-                                    <ImageUploader
-                                      id="boss-dad-image-url"
-                                      label="🔨 D.A.D. Class Image"
-                                      placeholder="https://.../dad_character.png"
-                                      value={dadImageUrl}
-                                      onChange={(url) => setConfig('dad_image_url', url)}
-                                    />
-                                    <ImageUploader
-                                      id="boss-kid-image-url"
-                                      label="⚡ K.I.D. Class Image"
-                                      placeholder="https://.../kid_character.png"
-                                      value={kidImageUrl}
-                                      onChange={(url) => setConfig('kid_image_url', url)}
-                                    />
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-
-                            {/* Live Canvas Composite Preview Card */}
-                            <BossPreviewCard
-                              bossName={bossName}
-                              imageUrl={imageUrl}
-                              bgUrl={bgUrl}
-                              momImageUrl={momImageUrl}
-                              dadImageUrl={dadImageUrl}
-                              kidImageUrl={kidImageUrl}
-                              onFixIbbLinks={async () => {
-                                const resolveUrl = async (url: string) => {
-                                  if (!url || !url.startsWith('http') || url.includes('i.ibb.co/')) return url;
-                                  try {
-                                    const res = await fetch(url, {
-                                      headers: {
-                                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-                                        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-                                      }
-                                    });
-                                    if (res.ok) {
-                                      const html = await res.text();
-                                      const m = html.match(/<meta\s+property=["']og:image["']\s+content=["']([^"']+)["']/i) ||
-                                                html.match(/<img\s+src=["'](https:\/\/i\.ibb\.co\/[^"']+)["']/i) ||
-                                                html.match(/(https:\/\/i\.ibb\.co\/[a-zA-Z0-9_\-\.\/]+)/i);
-                                      if (m && m[1]) return m[1];
-                                    }
-                                  } catch (e) {}
-                                  return url;
-                                };
-
-                                const newMom = await resolveUrl(momImageUrl);
-                                const newDad = await resolveUrl(dadImageUrl);
-                                const newKid = await resolveUrl(kidImageUrl);
-                                const newBg = await resolveUrl(bgUrl);
-                                const newImg = await resolveUrl(imageUrl);
-
-                                if (newMom !== momImageUrl) setConfig('mom_image_url', newMom);
-                                if (newDad !== dadImageUrl) setConfig('dad_image_url', newDad);
-                                if (newKid !== kidImageUrl) setConfig('kid_image_url', newKid);
-                                if (newBg !== bgUrl) setConfig('custom_bg_url', newBg);
-                                if (newImg !== imageUrl) setConfig('custom_image_url', newImg);
-                              }}
-                            />
-                          </div>
-                        </div>
-                      )}
-                    </>
-                  );
-                }}
+                {(config, setConfig) => <BossCardForm config={config} setConfig={setConfig} />}
               </FeatureCard>
+            </div>
+          )}
+
+          {activeTab === 'achievements' && (
+            <div>
+              <div className="feature-instructions" style={{ marginBottom: '1.5rem' }}>
+                <h3>ENOS Community Achievements System Guide</h3>
+                <p>
+                  Manage all ENOS community achievement modules (Recruitment, Boss RPG, Trivia, Vault Economy). Members earn progressive titles (Enis, Enara, Enorium), Vault Coins, and Discord Nitro rewards as they engage in server activities.
+                </p>
+              </div>
+
+              <div className="feature-form-card">
+                <FeatureCard
+                  id="achievements-system"
+                  icon="🏆"
+                  title="ENOS Achievements System"
+                  description="Unified 3-tier achievement platform supporting Recruitment invite tracking, Boss combat, Trivia drops, and Vault economy milestones."
+                  featureKey="recruitment_achievement"
+                  initialEnabled={configs['recruitment_achievement']?.enabled ?? true}
+                  initialConfig={configs['recruitment_achievement']?.config ?? {}}
+                >
+                  {(config, setConfig) => <AchievementsCardForm config={config} setConfig={setConfig} />}
+                </FeatureCard>
+              </div>
             </div>
           )}
         </div>

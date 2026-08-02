@@ -75,7 +75,7 @@ export default function TermsPage() {
         <section style={{ marginBottom: '2rem' }}>
           <h2 style={{ fontSize: '1.25rem', color: '#facc15', marginBottom: '0.75rem' }}>2. Eligibility & Age Requirements</h2>
           <p style={{ color: '#cbd5e1' }}>
-            You must be at least 13 years old (or the minimum age of digital consent required in your jurisdiction) to use ENOS, in compliance with Discord's Terms of Service and legal standards.
+            You must be at least 13 years old (or the minimum age of digital consent required in your jurisdiction) to use ENOS, in compliance with Discord&apos;s Terms of Service and legal standards.
           </p>
         </section>
 
@@ -101,14 +101,14 @@ export default function TermsPage() {
         <section style={{ marginBottom: '2rem' }}>
           <h2 style={{ fontSize: '1.25rem', color: '#facc15', marginBottom: '0.75rem' }}>5. Acceptable Use & Conduct</h2>
           <p style={{ color: '#cbd5e1' }}>
-            Users agree not to exploit bugs, use automated bots/self-bots to farm Vault Coins or daily quests, attempt to reverse-engineer API endpoints, or violate Discord's Community Guidelines and Terms of Service.
+            Users agree not to exploit bugs, use automated bots/self-bots to farm Vault Coins or daily quests, attempt to reverse-engineer API endpoints, or violate Discord&apos;s Community Guidelines and Terms of Service.
           </p>
         </section>
 
         <section style={{ marginBottom: '2rem' }}>
           <h2 style={{ fontSize: '1.25rem', color: '#facc15', marginBottom: '0.75rem' }}>6. Termination & Service Availability</h2>
           <p style={{ color: '#cbd5e1' }}>
-            We reserve the right to suspend or terminate access to the bot or dashboard for any user or server that violates these Terms. The Service is provided on an "AS IS" and "AS AVAILABLE" basis without warranties of any kind.
+            We reserve the right to suspend or terminate access to the bot or dashboard for any user or server that violates these Terms. The Service is provided on an &quot;AS IS&quot; and &quot;AS AVAILABLE&quot; basis without warranties of any kind.
           </p>
         </section>
 

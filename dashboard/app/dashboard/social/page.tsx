@@ -395,7 +395,7 @@ export default function SocialPage() {
 
               <div className="overview-item">
                 <h3>🔴 Social Sync — Live Alert Hub</h3>
-                <p>Auto-posts rich embeds when creators go live on Twitch or TikTok. Updates to 'Ended' state when stream closes.</p>
+                <p>Auto-posts rich embeds when creators go live on Twitch or TikTok. Updates to &apos;Ended&apos; state when stream closes.</p>
               </div>
 
               <div className="overview-item">
@@ -429,7 +429,7 @@ export default function SocialPage() {
                 </p>
                 <ol>
                   <li>Select the <strong>Platform</strong> (Twitch 👾 or TikTok 🎵).</li>
-                  <li>Enter the streamer's <strong>Username / Handle</strong>.</li>
+                  <li>Enter the streamer&apos;s <strong>Username / Handle</strong>.</li>
                   <li>Select the <strong>Target Discord Channel</strong> for automated live alert announcements.</li>
                 </ol>
                 <div className="tip-box">
@@ -1137,14 +1137,14 @@ export default function SocialPage() {
                 <h3>Birthday Queue Instructions</h3>
                 <p>Review and authorize announcement cards for members celebrating birthdays in the next 3 days.</p>
                 <ol>
-                  <li>Type in traits or fun facts inside the <strong>Member Traits</strong> box (e.g. "loves FPS games, plays Valorant, always helpful").</li>
+                  <li>Type in traits or fun facts inside the <strong>Member Traits</strong> box (e.g. &quot;loves FPS games, plays Valorant, always helpful&quot;).</li>
                   <li>Click <strong>🤖 Transform with AI</strong> to trigger Google Gemini AI to draft a polished greeting using your custom Prompt Formula.</li>
                   <li>Click <strong>💾 Save & Approve</strong> to queue the wish. The bot will release it publicly at the configured announcement hour on their birthday.</li>
                   <li>Use <strong>📣 Send Now</strong> to skip scheduling and post it immediately, or <strong>🗑️ Delete</strong> to clear the queue item.</li>
                 </ol>
                 <div className="tip-box">
                   <strong>💡 Daily Processing:</strong><br />
-                  Wishes that are approved will release automatically at the selected post hour on the user's birthday date.
+                  Wishes that are approved will release automatically at the selected post hour on the user&apos;s birthday date.
                 </div>
               </div>
 
