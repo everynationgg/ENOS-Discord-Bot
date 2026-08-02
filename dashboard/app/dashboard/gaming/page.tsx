@@ -1562,6 +1562,31 @@ export default function GamingPage() {
                               Pre-configure next week&apos;s boss ahead of time. When Monday midnight arrives, the bot will automatically deploy this staged boss for your server!
                             </p>
 
+                            <div style={{ marginBottom: '1.25rem' }}>
+                              <button
+                                type="button"
+                                className="btn btn-primary btn-sm"
+                                disabled={config.boss_status === 'loading'}
+                                onClick={async () => {
+                                  setConfig('boss_status', 'loading');
+                                  try {
+                                    const res = await fetch('/api/gaming/boss/action', {
+                                      method: 'POST',
+                                      headers: { 'Content-Type': 'application/json' },
+                                      body: JSON.stringify({ action: 'spawn_staged' }),
+                                    });
+                                    const data = await res.json();
+                                    setConfig('boss_status', data.error ? `error: ${data.error}` : 'spawned');
+                                  } catch {
+                                    setConfig('boss_status', 'error: request failed');
+                                  }
+                                  setTimeout(() => setConfig('boss_status', ''), 4000);
+                                }}
+                              >
+                                🚀 Force Deploy Next Week&apos;s Staged Boss Right Now
+                              </button>
+                            </div>
+
                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
                               <label style={{ fontSize: '0.875rem', fontWeight: 600 }}>Enable Pre-Staged Boss for Next Week</label>
                               <input

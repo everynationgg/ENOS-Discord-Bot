@@ -217,7 +217,7 @@ export async function POST(req: NextRequest) {
     const resolvedImageUrl = await resolveDirectImageUrl(rawImageUrl);
     const resolvedBgUrl = await resolveDirectImageUrl(rawBgUrl);
 
-    if (action === 'spawn') {
+    if (action === 'spawn' || action === 'spawn_staged') {
       // Check if Guild Admin pre-staged next week's boss config in guild_config
       const { data: featureRow } = await supabaseAdmin
         .from('guild_config')
@@ -237,21 +237,21 @@ export async function POST(req: NextRequest) {
       let hp = customHp ? parseInt(customHp, 10) : 150000;
       let finalImageUrl = resolvedImageUrl || null;
 
-      if (stagedConfig) {
-        if (stagedConfig.boss_name) bossName = stagedConfig.boss_name;
-        if (stagedConfig.boss_title) bossTitle = stagedConfig.boss_title;
-        if (stagedConfig.lore) lore = stagedConfig.lore;
-        if (stagedConfig.max_hp) hp = Number(stagedConfig.max_hp);
-        if (stagedConfig.custom_image_url) finalImageUrl = await resolveDirectImageUrl(stagedConfig.custom_image_url);
+      if (action === 'spawn_staged' || stagedConfig) {
+        if (stagedConfig?.boss_name) bossName = stagedConfig.boss_name;
+        if (stagedConfig?.boss_title) bossTitle = stagedConfig.boss_title;
+        if (stagedConfig?.lore) lore = stagedConfig.lore;
+        if (stagedConfig?.max_hp) hp = Number(stagedConfig.max_hp);
+        if (stagedConfig?.custom_image_url) finalImageUrl = await resolveDirectImageUrl(stagedConfig.custom_image_url);
 
         // Promote staged artwork into active config and clear staged_boss_config
         const updatedCfg = { ...(featureRow?.config || {}) };
-        if (stagedConfig.custom_image_url) updatedCfg.custom_image_url = stagedConfig.custom_image_url;
-        if (stagedConfig.custom_bg_url) updatedCfg.custom_bg_url = stagedConfig.custom_bg_url;
-        if (stagedConfig.victory_image_url) updatedCfg.victory_image_url = stagedConfig.victory_image_url;
-        if (stagedConfig.mom_image_url) updatedCfg.mom_image_url = stagedConfig.mom_image_url;
-        if (stagedConfig.dad_image_url) updatedCfg.dad_image_url = stagedConfig.dad_image_url;
-        if (stagedConfig.kid_image_url) updatedCfg.kid_image_url = stagedConfig.kid_image_url;
+        if (stagedConfig?.custom_image_url) updatedCfg.custom_image_url = stagedConfig.custom_image_url;
+        if (stagedConfig?.custom_bg_url) updatedCfg.custom_bg_url = stagedConfig.custom_bg_url;
+        if (stagedConfig?.victory_image_url) updatedCfg.victory_image_url = stagedConfig.victory_image_url;
+        if (stagedConfig?.mom_image_url) updatedCfg.mom_image_url = stagedConfig.mom_image_url;
+        if (stagedConfig?.dad_image_url) updatedCfg.dad_image_url = stagedConfig.dad_image_url;
+        if (stagedConfig?.kid_image_url) updatedCfg.kid_image_url = stagedConfig.kid_image_url;
 
         delete updatedCfg.staged_boss_config;
         await supabaseAdmin.from('guild_config').upsert({
