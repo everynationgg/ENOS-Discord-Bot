@@ -344,10 +344,85 @@ async function handleRecruitmentInteraction(interaction) {
   }
 }
 
+/**
+ * Posts or updates the Master Achievement Card in Discord
+ */
+async function postMasterAchievementCard(client, guildId, channelId) {
+  if (!channelId) throw new Error('Channel ID is required');
+
+  const channel = await client.channels.fetch(channelId).catch(() => null);
+  if (!channel || !channel.isTextBased()) {
+    throw new Error(`Channel ${channelId} not found or not text-based`);
+  }
+
+  const { renderAchievementDetailCanvas } = require('./achievementCanvas');
+
+  const achievementDef = {
+    icon_emoji: '📜',
+    title: 'Recruitment',
+    description: 'Track successful member invitations to Every Nation.',
+    tier1_title: 'They Who Herald the Nation',
+    tier1_goal: 5,
+    tier1_reward_coins: 50,
+    tier2_title: 'Those Who Exalt the Nation',
+    tier2_goal: 50,
+    tier2_reward_coins: '1 Month Nitro + Boost',
+    tier3_title: 'The One Who Ordains the Nation',
+    tier3_goal: 100,
+    tier3_reward_coins: '1 Year Nitro + Boost',
+  };
+
+  const buffer = await renderAchievementDetailCanvas(achievementDef, 1, 1);
+
+  const embed = new EmbedBuilder()
+    .setColor(0x8B5CF6)
+    .setTitle('📜 Achievement: Recruitment')
+    .setDescription(
+      'Track successful member invitations to Every Nation.\n\n' +
+      '💜 **Enis (5 Invites)** → Title: **"They Who Herald the Nation"** | *50 Vault Coins*\n' +
+      '🔥 **Enara (50 Invites)** → Title: **"Those Who Exalt the Nation"** | *1 Month Discord Nitro + Boost*\n' +
+      '👑 **Enorium (100 Invites)** → Title: **"The One Who Ordains the Nation"** | *1 Year Discord Nitro + Boost*'
+    )
+    .setImage('attachment://achievement.png')
+    .setFooter({ text: 'ENOS Community Achievements System • Interactive Buttons Below' })
+    .setTimestamp();
+
+  const prevBtn = new ButtonBuilder()
+    .setCustomId('achievement_prev')
+    .setLabel('⬅ Previous')
+    .setStyle(ButtonStyle.Secondary);
+
+  const progressBtn = new ButtonBuilder()
+    .setCustomId('achievement_progress')
+    .setLabel('📊 Check Progress')
+    .setStyle(ButtonStyle.Primary);
+
+  const nextBtn = new ButtonBuilder()
+    .setCustomId('achievement_next')
+    .setLabel('➡ Next')
+    .setStyle(ButtonStyle.Secondary);
+
+  const rulesBtn = new ButtonBuilder()
+    .setCustomId('achievement_rules')
+    .setLabel('📜 Rules')
+    .setStyle(ButtonStyle.Secondary);
+
+  const row = new ActionRowBuilder().addComponents(prevBtn, progressBtn, nextBtn, rulesBtn);
+
+  await channel.send({
+    embeds: [embed],
+    files: [{ attachment: buffer, name: 'achievement.png' }],
+    components: [row],
+  });
+
+  return true;
+}
+
 module.exports = {
   recordMemberInvite,
   checkAndUpgradeUserTiers,
   getRecruitmentProgressEmbed,
   getRecruitmentRulesEmbed,
   handleRecruitmentInteraction,
+  postMasterAchievementCard,
 };

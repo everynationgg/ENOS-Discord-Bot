@@ -69,6 +69,21 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: true, message: `Invite status updated to ${newStatus}` });
     }
 
+    if (action === 'dispatch_card') {
+      const channelId = body.channel_id;
+      if (!channelId) {
+        return NextResponse.json({ success: false, error: 'Target Channel ID is required' }, { status: 400 });
+      }
+
+      const { error } = await supabase.from('system_logs').insert({
+        event_type: 'achievement_dispatch_card',
+        payload: { channel_id: channelId, timestamp: new Date().toISOString() },
+      });
+
+      if (error) throw new Error(error.message);
+      return NextResponse.json({ success: true, message: 'Card dispatch request sent to bot!' });
+    }
+
     return NextResponse.json({ success: false, error: 'Invalid action' }, { status: 400 });
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });

@@ -518,6 +518,7 @@ function AchievementsCardForm({ config, setConfig }: { config: any; setConfig: (
   const [invites, setInvites] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusMsg, setStatusMsg] = useState('');
+  const [dispatching, setDispatching] = useState(false);
 
   const fetchInvites = async () => {
     try {
@@ -558,6 +559,35 @@ function AchievementsCardForm({ config, setConfig }: { config: any; setConfig: (
     setTimeout(() => setStatusMsg(''), 3000);
   };
 
+  const handleDispatchCard = async () => {
+    if (!config.channel_id) {
+      setStatusMsg('❌ Please enter a Master Achievement Card Channel ID first.');
+      setTimeout(() => setStatusMsg(''), 4000);
+      return;
+    }
+
+    setDispatching(true);
+    setStatusMsg('⏳ Dispatching achievement card to Discord...');
+    try {
+      const res = await fetch('/api/gaming/achievements/action', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'dispatch_card', channel_id: config.channel_id }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setStatusMsg('✅ Master Achievement Card successfully posted to Discord!');
+      } else {
+        setStatusMsg(`❌ Error: ${data.error}`);
+      }
+    } catch {
+      setStatusMsg('❌ Failed to send dispatch request.');
+    } finally {
+      setDispatching(false);
+      setTimeout(() => setStatusMsg(''), 5000);
+    }
+  };
+
   return (
     <>
       <div className="section-divider">
@@ -566,7 +596,7 @@ function AchievementsCardForm({ config, setConfig }: { config: any; setConfig: (
         <div className="section-divider-line" />
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '1.25rem' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '1rem' }}>
         <div className="form-group">
           <label className="form-label">Master Achievement Card Channel ID</label>
           <input
@@ -589,6 +619,17 @@ function AchievementsCardForm({ config, setConfig }: { config: any; setConfig: (
           />
           <span className="form-hint">Channel where title transfers and moderator audit events are posted.</span>
         </div>
+      </div>
+
+      <div style={{ marginBottom: '1.25rem', display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+        <button
+          type="button"
+          className="btn btn-primary btn-sm"
+          disabled={dispatching}
+          onClick={handleDispatchCard}
+        >
+          {dispatching ? '⏳ Dispatching...' : '🚀 Post / Dispatch Master Achievement Card to Discord'}
+        </button>
       </div>
 
       <div className="section-divider">
