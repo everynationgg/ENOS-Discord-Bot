@@ -1425,6 +1425,7 @@ export default function GamingPage() {
               >
                 {(config, setConfig) => {
                   const [bossSubTab, setBossSubTab] = useState<'active' | 'staging'>('active');
+                  const [showClassImages, setShowClassImages] = useState(false);
                   const gameName = config.game_name || '';
                   const bossName = config.override_name || '';
                   const baseHP = config.override_hp || '';
@@ -1677,40 +1678,52 @@ export default function GamingPage() {
                               helpText="Family/celebration photo shown on Discord when the boss is defeated on Saturday."
                             />
 
-                            {/* Staged Player Class Custom Images */}
-                            <div className="section-divider">
-                              <div className="section-divider-line" />
-                              <span className="section-divider-text">🎭 Next Week Player Class Images</span>
-                              <div className="section-divider-line" />
-                            </div>
 
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem', marginBottom: '1.25rem' }}>
-                              <ImageUploader
-                                id="staged-boss-mom-image-url"
-                                label="🛡️ M.O.M. Class Image"
-                                placeholder="https://.../mom_character.png"
-                                value={staged.mom_image_url || ''}
-                                onChange={(url) => setConfig('staged_boss_config', { ...staged, mom_image_url: url })}
-                                helpText="Leave blank to keep active M.O.M. class image"
-                              />
-
-                              <ImageUploader
-                                id="staged-boss-dad-image-url"
-                                label="🔨 D.A.D. Class Image"
-                                placeholder="https://.../dad_character.png"
-                                value={staged.dad_image_url || ''}
-                                onChange={(url) => setConfig('staged_boss_config', { ...staged, dad_image_url: url })}
-                                helpText="Leave blank to keep active D.A.D. class image"
-                              />
-
-                              <ImageUploader
-                                id="staged-boss-kid-image-url"
-                                label="⚡ K.I.D. Class Image"
-                                placeholder="https://.../kid_character.png"
-                                value={staged.kid_image_url || ''}
-                                onChange={(url) => setConfig('staged_boss_config', { ...staged, kid_image_url: url })}
-                                helpText="Leave blank to keep active K.I.D. class image"
-                              />
+                            {/* Staged Player Class Custom Images — Advanced Setting */}
+                            <div style={{ marginBottom: '1.25rem' }}>
+                              <button
+                                type="button"
+                                onClick={() => setShowClassImages(v => !v)}
+                                style={{
+                                  background: 'none',
+                                  border: '1px solid var(--border-subtle)',
+                                  borderRadius: 'var(--radius-sm)',
+                                  color: 'var(--text-muted)',
+                                  fontSize: '0.8125rem',
+                                  cursor: 'pointer',
+                                  padding: '0.35rem 0.75rem',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '0.4rem',
+                                }}
+                              >
+                                {showClassImages ? '▾' : '▸'} Advanced — Class Character Images
+                              </button>
+                              {showClassImages && (
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem', marginTop: '0.75rem' }}>
+                                  <ImageUploader
+                                    id="staged-boss-mom-image-url"
+                                    label="🛡️ M.O.M. Class Image"
+                                    placeholder="https://.../mom_character.png"
+                                    value={staged.mom_image_url || ''}
+                                    onChange={(url) => setConfig('staged_boss_config', { ...staged, mom_image_url: url })}
+                                  />
+                                  <ImageUploader
+                                    id="staged-boss-dad-image-url"
+                                    label="🔨 D.A.D. Class Image"
+                                    placeholder="https://.../dad_character.png"
+                                    value={staged.dad_image_url || ''}
+                                    onChange={(url) => setConfig('staged_boss_config', { ...staged, dad_image_url: url })}
+                                  />
+                                  <ImageUploader
+                                    id="staged-boss-kid-image-url"
+                                    label="⚡ K.I.D. Class Image"
+                                    placeholder="https://.../kid_character.png"
+                                    value={staged.kid_image_url || ''}
+                                    onChange={(url) => setConfig('staged_boss_config', { ...staged, kid_image_url: url })}
+                                  />
+                                </div>
+                              )}
                             </div>
 
                             <BossPreviewCard
@@ -1863,40 +1876,52 @@ export default function GamingPage() {
                               helpText="Family/celebration photo shown on Discord when the boss is defeated on Saturday."
                             />
 
-                            {/* Player Class Custom Images */}
-                            <div className="section-divider">
-                              <div className="section-divider-line" />
-                              <span className="section-divider-text">🎭 Player Class Character Images (Transparent PNGs)</span>
-                              <div className="section-divider-line" />
-                            </div>
 
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem', marginBottom: '1.25rem' }}>
-                              <ImageUploader
-                                id="boss-mom-image-url"
-                                label="🛡️ M.O.M. Class Image"
-                                placeholder="https://.../mom_character.png"
-                                value={momImageUrl}
-                                onChange={(url) => setConfig('mom_image_url', url)}
-                                helpText="Placed on left side when M.O.M. class is selected"
-                              />
-
-                              <ImageUploader
-                                id="boss-dad-image-url"
-                                label="🔨 D.A.D. Class Image"
-                                placeholder="https://.../dad_character.png"
-                                value={dadImageUrl}
-                                onChange={(url) => setConfig('dad_image_url', url)}
-                                helpText="Placed on left side when D.A.D. class is selected"
-                              />
-
-                              <ImageUploader
-                                id="boss-kid-image-url"
-                                label="⚡ K.I.D. Class Image"
-                                placeholder="https://.../kid_character.png"
-                                value={kidImageUrl}
-                                onChange={(url) => setConfig('kid_image_url', url)}
-                                helpText="Placed on left side when K.I.D. class is selected"
-                              />
+                            {/* Player Class Custom Images — Advanced Setting */}
+                            <div style={{ marginBottom: '1.25rem' }}>
+                              <button
+                                type="button"
+                                onClick={() => setShowClassImages(v => !v)}
+                                style={{
+                                  background: 'none',
+                                  border: '1px solid var(--border-subtle)',
+                                  borderRadius: 'var(--radius-sm)',
+                                  color: 'var(--text-muted)',
+                                  fontSize: '0.8125rem',
+                                  cursor: 'pointer',
+                                  padding: '0.35rem 0.75rem',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '0.4rem',
+                                }}
+                              >
+                                {showClassImages ? '▾' : '▸'} Advanced — Class Character Images
+                              </button>
+                              {showClassImages && (
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem', marginTop: '0.75rem' }}>
+                                  <ImageUploader
+                                    id="boss-mom-image-url"
+                                    label="🛡️ M.O.M. Class Image"
+                                    placeholder="https://.../mom_character.png"
+                                    value={momImageUrl}
+                                    onChange={(url) => setConfig('mom_image_url', url)}
+                                  />
+                                  <ImageUploader
+                                    id="boss-dad-image-url"
+                                    label="🔨 D.A.D. Class Image"
+                                    placeholder="https://.../dad_character.png"
+                                    value={dadImageUrl}
+                                    onChange={(url) => setConfig('dad_image_url', url)}
+                                  />
+                                  <ImageUploader
+                                    id="boss-kid-image-url"
+                                    label="⚡ K.I.D. Class Image"
+                                    placeholder="https://.../kid_character.png"
+                                    value={kidImageUrl}
+                                    onChange={(url) => setConfig('kid_image_url', url)}
+                                  />
+                                </div>
+                              )}
                             </div>
 
                             {/* Live Canvas Composite Preview Card */}

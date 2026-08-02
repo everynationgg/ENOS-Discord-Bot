@@ -185,7 +185,7 @@ function initCrons(client) {
 
         for (const gId of guildIds) {
           try {
-            await spawnAndAnnounceWeeklyBoss(client, gId);
+            await spawnAndAnnounceWeeklyBoss(client, gId, { forceNewPost: true });
           } catch (err) {
             logger.error(`[CRON] Weekly Boss spawn failed for guild ${gId}:`, err.message);
           }

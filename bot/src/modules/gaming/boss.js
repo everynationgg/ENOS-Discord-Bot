@@ -770,8 +770,14 @@ async function concludeWeeklyBossBattle(guildId, client = null) {
 
 /**
  * Spawns/retrieves the active weekly boss and posts/edits the public Boss Card in Discord.
+ * @param {import('discord.js').Client} client
+ * @param {string} guildId
+ * @param {object} [opts]
+ * @param {boolean} [opts.forceNewPost=false] When true (Monday reset): deletes all existing bot-owned
+ *   boss cards in the channel and always posts a brand new message. When false (Realtime live update):
+ *   edits the existing card in place, or posts if none found.
  */
-async function spawnAndAnnounceWeeklyBoss(client, guildId) {
+async function spawnAndAnnounceWeeklyBoss(client, guildId, { forceNewPost = false } = {}) {
   const boss = await getOrCreateActiveBoss(guildId);
   if (!boss) return null;
 
@@ -797,24 +803,42 @@ async function spawnAndAnnounceWeeklyBoss(client, guildId) {
     }
 
     const payload = await buildPublicBossEmbedPayload(guildId);
-    let messageId = featureRow?.config?.last_message_id;
-    let publicMsg = messageId ? await channel.messages.fetch(messageId).catch(() => null) : null;
 
-    if (!publicMsg) {
-      const recent = await channel.messages.fetch({ limit: 15 }).catch(() => null);
-      if (recent) {
-        publicMsg = recent.find(
-          (m) =>
-            m.author.id === client.user.id &&
-            m.embeds.some((e) => e.title?.includes('Weekly Boss') || e.title?.includes('OVERKILL'))
-        );
+    if (forceNewPost) {
+      // ── Monday Reset: scan channel and delete every bot-owned boss card ──────
+      try {
+        const recent = await channel.messages.fetch({ limit: 50 }).catch(() => null);
+        if (recent) {
+          const bossMessages = recent.filter(
+            (m) =>
+              m.author.id === client.user.id &&
+              m.embeds.some(
+                (e) =>
+                  e.title?.includes('Weekly Boss') ||
+                  e.title?.includes('OVERKILL') ||
+                  e.title?.includes('VICTORY')
+              )
+          );
+          if (bossMessages.size > 0) {
+            // Bulk delete if all under 14 days; fall back to individual deletes otherwise
+            const ids = bossMessages.map((m) => m.id);
+            const cutoff = Date.now() - 13 * 24 * 60 * 60 * 1000; // 13 days
+            const allRecent = bossMessages.every((m) => m.createdTimestamp > cutoff);
+            if (allRecent && ids.length > 1) {
+              await channel.bulkDelete(ids).catch(() => null);
+            } else {
+              for (const m of bossMessages.values()) {
+                await m.delete().catch(() => null);
+              }
+            }
+            logger.info(`[BOSS SPAWN] Cleared ${bossMessages.size} old boss card(s) from channel ${channelId}`);
+          }
+        }
+      } catch (cleanErr) {
+        logger.warn('[BOSS SPAWN] Could not clean old boss cards (non-fatal):', cleanErr.message);
       }
-    }
 
-    if (publicMsg) {
-      await publicMsg.edit(payload);
-      logger.info(`[BOSS SPAWN] Updated existing Weekly Boss card in channel ${channelId}`);
-    } else {
+      // Post the fresh card
       const newMsg = await channel.send(payload);
       if (newMsg?.id) {
         await supabase.from('guild_config').upsert({
@@ -823,7 +847,38 @@ async function spawnAndAnnounceWeeklyBoss(client, guildId) {
           config: { ...(featureRow?.config || {}), last_message_id: newMsg.id, last_channel_id: channelId },
           updated_at: new Date().toISOString(),
         });
-        logger.info(`[BOSS SPAWN] Posted new Weekly Boss card to channel ${channelId}`);
+        logger.info(`[BOSS SPAWN] Posted fresh Weekly Boss card for new week in channel ${channelId}`);
+      }
+    } else {
+      // ── Realtime Update: edit existing card or post if missing ───────────────
+      let messageId = featureRow?.config?.last_message_id;
+      let publicMsg = messageId ? await channel.messages.fetch(messageId).catch(() => null) : null;
+
+      if (!publicMsg) {
+        const recent = await channel.messages.fetch({ limit: 15 }).catch(() => null);
+        if (recent) {
+          publicMsg = recent.find(
+            (m) =>
+              m.author.id === client.user.id &&
+              m.embeds.some((e) => e.title?.includes('Weekly Boss') || e.title?.includes('OVERKILL'))
+          );
+        }
+      }
+
+      if (publicMsg) {
+        await publicMsg.edit(payload);
+        logger.info(`[BOSS SPAWN] Updated existing Weekly Boss card in channel ${channelId}`);
+      } else {
+        const newMsg = await channel.send(payload);
+        if (newMsg?.id) {
+          await supabase.from('guild_config').upsert({
+            guild_id: guildId,
+            feature_key: 'weekly_boss',
+            config: { ...(featureRow?.config || {}), last_message_id: newMsg.id, last_channel_id: channelId },
+            updated_at: new Date().toISOString(),
+          });
+          logger.info(`[BOSS SPAWN] Posted new Weekly Boss card to channel ${channelId}`);
+        }
       }
     }
   } catch (err) {
