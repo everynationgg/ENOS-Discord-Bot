@@ -269,10 +269,6 @@ export default function ImageUploader({
           )}
         </div>
 
-        {/* Drag and Drop Zone Hint */}
-        <div style={{ marginTop: '0.4rem', fontSize: '0.75rem', color: 'var(--text-muted, #94a3b8)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span>💡 Tip: Paste direct URL or drag & drop image file directly into box</span>
-        </div>
 
         {/* Thumbnail Preview */}
         {value && (
@@ -307,11 +303,6 @@ export default function ImageUploader({
         </div>
       )}
 
-      {helpText && (
-        <span className="form-help" style={{ display: 'block', marginTop: '0.35rem', fontSize: '0.78125rem', color: 'var(--text-muted, #94a3b8)' }}>
-          {helpText}
-        </span>
-      )}
     </div>
   );
 }
