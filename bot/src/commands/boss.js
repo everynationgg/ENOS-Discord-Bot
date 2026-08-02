@@ -120,11 +120,13 @@ async function buildPublicBossEmbedPayload(guildId) {
     .eq('feature_key', 'weekly_boss')
     .maybeSingle();
 
-  const [momUrl, dadUrl, kidUrl, victoryUrl] = await Promise.all([
+  const [momUrl, dadUrl, kidUrl, victoryUrl, bgUrl, mainImgUrl] = await Promise.all([
     resolveImageUrl(featureRow?.config?.mom_image_url || null),
     resolveImageUrl(featureRow?.config?.dad_image_url || null),
     resolveImageUrl(featureRow?.config?.kid_image_url || null),
     resolveImageUrl(featureRow?.config?.victory_image_url || null),
+    resolveImageUrl(boss.custom_bg_url || featureRow?.config?.custom_bg_url || null),
+    resolveImageUrl(boss.custom_image_url || featureRow?.config?.custom_image_url || null),
   ]);
   const classImageUrls = { mom: momUrl, dad: dadUrl, kid: kidUrl };
 
@@ -133,8 +135,8 @@ async function buildPublicBossEmbedPayload(guildId) {
   const buffer = await renderBossImage({
     bossName: boss.boss_name,
     bossTitle: boss.boss_title,
-    customImageUrl: boss.custom_image_url,
-    customBgUrl: featureRow?.config?.custom_bg_url || null,
+    customImageUrl: mainImgUrl,
+    customBgUrl: bgUrl,
     victoryImageUrl: victoryUrl,
     classImageUrls,
     currentHp: Number(boss.current_hp),
@@ -223,10 +225,12 @@ async function buildPersonalCombatPayload(guildId, userId, combatResult = null) 
     .eq('feature_key', 'weekly_boss')
     .maybeSingle();
 
-  const [momUrl2, dadUrl2, kidUrl2] = await Promise.all([
+  const [momUrl2, dadUrl2, kidUrl2, bgUrl2, mainImgUrl2] = await Promise.all([
     resolveImageUrl(featureRow?.config?.mom_image_url || null),
     resolveImageUrl(featureRow?.config?.dad_image_url || null),
     resolveImageUrl(featureRow?.config?.kid_image_url || null),
+    resolveImageUrl(boss.custom_bg_url || featureRow?.config?.custom_bg_url || null),
+    resolveImageUrl(boss.custom_image_url || featureRow?.config?.custom_image_url || null),
   ]);
   const classImageUrls = { mom: momUrl2, dad: dadUrl2, kid: kidUrl2 };
 
@@ -235,8 +239,8 @@ async function buildPersonalCombatPayload(guildId, userId, combatResult = null) 
   const buffer = await renderBossImage({
     bossName: boss.boss_name,
     bossTitle: boss.boss_title,
-    customImageUrl: boss.custom_image_url,
-    customBgUrl: featureRow?.config?.custom_bg_url || null,
+    customImageUrl: mainImgUrl2,
+    customBgUrl: bgUrl2,
     userClassKey: activeClass,
     classImageUrls,
     currentHp: Number(boss.current_hp),
