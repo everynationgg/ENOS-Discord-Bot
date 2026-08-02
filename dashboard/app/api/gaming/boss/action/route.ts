@@ -88,7 +88,11 @@ async function postBossCardToDiscord(guildId: string, boss: any) {
     footer: {
       text: `ENOS Weekly RPG System • Week ${boss.week_identifier} • Today at ${new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}`,
     },
-    image: imageBuffer ? { url: 'attachment://weekly_boss_arena.png' } : undefined,
+    image: imageBuffer
+      ? { url: 'attachment://weekly_boss_arena.png' }
+      : boss.custom_image_url
+      ? { url: boss.custom_image_url }
+      : undefined,
   };
 
   const components = [
