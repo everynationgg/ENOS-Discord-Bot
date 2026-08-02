@@ -1669,17 +1669,8 @@ export default function GamingPage() {
                               />
                             </div>
 
-                            <ImageUploader
-                              id="staged-boss-victory-url"
-                              label="🎉 Next Victory Celebration Image (Family Photo)"
-                              placeholder="https://.../victory_family_celebration.png"
-                              value={staged.victory_image_url || ''}
-                              onChange={(url) => setConfig('staged_boss_config', { ...staged, victory_image_url: url })}
-                              helpText="Family/celebration photo shown on Discord when the boss is defeated on Saturday."
-                            />
 
-
-                            {/* Staged Player Class Custom Images — Advanced Setting */}
+                            {/* Staged Advanced Images — Victory + Class Characters */}
                             <div style={{ marginBottom: '1.25rem' }}>
                               <button
                                 type="button"
@@ -1697,31 +1688,40 @@ export default function GamingPage() {
                                   gap: '0.4rem',
                                 }}
                               >
-                                {showClassImages ? '▾' : '▸'} Advanced — Class Character Images
+                                {showClassImages ? '▾' : '▸'} Advanced — Victory &amp; Class Character Images
                               </button>
                               {showClassImages && (
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem', marginTop: '0.75rem' }}>
+                                <div style={{ marginTop: '0.75rem' }}>
                                   <ImageUploader
-                                    id="staged-boss-mom-image-url"
-                                    label="🛡️ M.O.M. Class Image"
-                                    placeholder="https://.../mom_character.png"
-                                    value={staged.mom_image_url || ''}
-                                    onChange={(url) => setConfig('staged_boss_config', { ...staged, mom_image_url: url })}
+                                    id="staged-boss-victory-url"
+                                    label="🎉 Victory Celebration Image (Family Photo)"
+                                    placeholder="https://.../victory_family_celebration.png"
+                                    value={staged.victory_image_url || ''}
+                                    onChange={(url) => setConfig('staged_boss_config', { ...staged, victory_image_url: url })}
                                   />
-                                  <ImageUploader
-                                    id="staged-boss-dad-image-url"
-                                    label="🔨 D.A.D. Class Image"
-                                    placeholder="https://.../dad_character.png"
-                                    value={staged.dad_image_url || ''}
-                                    onChange={(url) => setConfig('staged_boss_config', { ...staged, dad_image_url: url })}
-                                  />
-                                  <ImageUploader
-                                    id="staged-boss-kid-image-url"
-                                    label="⚡ K.I.D. Class Image"
-                                    placeholder="https://.../kid_character.png"
-                                    value={staged.kid_image_url || ''}
-                                    onChange={(url) => setConfig('staged_boss_config', { ...staged, kid_image_url: url })}
-                                  />
+                                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem', marginTop: '0.75rem' }}>
+                                    <ImageUploader
+                                      id="staged-boss-mom-image-url"
+                                      label="🛡️ M.O.M. Class Image"
+                                      placeholder="https://.../mom_character.png"
+                                      value={staged.mom_image_url || ''}
+                                      onChange={(url) => setConfig('staged_boss_config', { ...staged, mom_image_url: url })}
+                                    />
+                                    <ImageUploader
+                                      id="staged-boss-dad-image-url"
+                                      label="🔨 D.A.D. Class Image"
+                                      placeholder="https://.../dad_character.png"
+                                      value={staged.dad_image_url || ''}
+                                      onChange={(url) => setConfig('staged_boss_config', { ...staged, dad_image_url: url })}
+                                    />
+                                    <ImageUploader
+                                      id="staged-boss-kid-image-url"
+                                      label="⚡ K.I.D. Class Image"
+                                      placeholder="https://.../kid_character.png"
+                                      value={staged.kid_image_url || ''}
+                                      onChange={(url) => setConfig('staged_boss_config', { ...staged, kid_image_url: url })}
+                                    />
+                                  </div>
                                 </div>
                               )}
                             </div>
@@ -1867,17 +1867,8 @@ export default function GamingPage() {
                               />
                             </div>
 
-                            <ImageUploader
-                              id="boss-victory-url"
-                              label="🎉 Victory Celebration Image (Family Photo)"
-                              placeholder="https://.../victory_family_celebration.png"
-                              value={victoryImageUrl}
-                              onChange={(url) => setConfig('victory_image_url', url)}
-                              helpText="Family/celebration photo shown on Discord when the boss is defeated on Saturday."
-                            />
 
-
-                            {/* Player Class Custom Images — Advanced Setting */}
+                            {/* Active Advanced Images — Victory + Class Characters */}
                             <div style={{ marginBottom: '1.25rem' }}>
                               <button
                                 type="button"
@@ -1895,31 +1886,40 @@ export default function GamingPage() {
                                   gap: '0.4rem',
                                 }}
                               >
-                                {showClassImages ? '▾' : '▸'} Advanced — Class Character Images
+                                {showClassImages ? '▾' : '▸'} Advanced — Victory &amp; Class Character Images
                               </button>
                               {showClassImages && (
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem', marginTop: '0.75rem' }}>
+                                <div style={{ marginTop: '0.75rem' }}>
                                   <ImageUploader
-                                    id="boss-mom-image-url"
-                                    label="🛡️ M.O.M. Class Image"
-                                    placeholder="https://.../mom_character.png"
-                                    value={momImageUrl}
-                                    onChange={(url) => setConfig('mom_image_url', url)}
+                                    id="boss-victory-url"
+                                    label="🎉 Victory Celebration Image (Family Photo)"
+                                    placeholder="https://.../victory_family_celebration.png"
+                                    value={victoryImageUrl}
+                                    onChange={(url) => setConfig('victory_image_url', url)}
                                   />
-                                  <ImageUploader
-                                    id="boss-dad-image-url"
-                                    label="🔨 D.A.D. Class Image"
-                                    placeholder="https://.../dad_character.png"
-                                    value={dadImageUrl}
-                                    onChange={(url) => setConfig('dad_image_url', url)}
-                                  />
-                                  <ImageUploader
-                                    id="boss-kid-image-url"
-                                    label="⚡ K.I.D. Class Image"
-                                    placeholder="https://.../kid_character.png"
-                                    value={kidImageUrl}
-                                    onChange={(url) => setConfig('kid_image_url', url)}
-                                  />
+                                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem', marginTop: '0.75rem' }}>
+                                    <ImageUploader
+                                      id="boss-mom-image-url"
+                                      label="🛡️ M.O.M. Class Image"
+                                      placeholder="https://.../mom_character.png"
+                                      value={momImageUrl}
+                                      onChange={(url) => setConfig('mom_image_url', url)}
+                                    />
+                                    <ImageUploader
+                                      id="boss-dad-image-url"
+                                      label="🔨 D.A.D. Class Image"
+                                      placeholder="https://.../dad_character.png"
+                                      value={dadImageUrl}
+                                      onChange={(url) => setConfig('dad_image_url', url)}
+                                    />
+                                    <ImageUploader
+                                      id="boss-kid-image-url"
+                                      label="⚡ K.I.D. Class Image"
+                                      placeholder="https://.../kid_character.png"
+                                      value={kidImageUrl}
+                                      onChange={(url) => setConfig('kid_image_url', url)}
+                                    />
+                                  </div>
                                 </div>
                               )}
                             </div>
