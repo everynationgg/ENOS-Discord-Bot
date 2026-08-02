@@ -93,7 +93,7 @@ export async function GET(req: NextRequest) {
 
     function getDiscordAvatar(id: string) {
       try {
-        const idx = (BigInt(id) >> 22n) % 6n;
+        const idx = (BigInt(id) >> BigInt(22)) % BigInt(6);
         return `https://cdn.discordapp.com/embed/avatars/${idx}.png`;
       } catch (e) {
         return 'https://cdn.discordapp.com/embed/avatars/0.png';

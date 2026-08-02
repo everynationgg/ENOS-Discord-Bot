@@ -96,9 +96,23 @@ function initCrons(client) {
     }
   });
 
-  // ─── Initial Live Alert Checks on Startup ──────────────────────────────────────
+  // ─── Initial Live Alert & Free Game Deal Checks on Startup ────────────────────
   checkTwitchLive(client).catch((err) => logger.error('[CRON] Initial Twitch check failed:', err.message));
   checkTikTokLive(client).catch((err) => logger.error('[CRON] Initial TikTok check failed:', err.message));
+  (async () => {
+    try {
+      const { data: configs } = await supabase
+        .from('guild_config')
+        .select('guild_id')
+        .eq('feature_key', 'free_game_alerts')
+        .eq('enabled', true);
+      for (const c of configs || []) {
+        await checkAndDispatchDeals(client, c.guild_id);
+      }
+    } catch (err) {
+      logger.error('[CRON] Initial deals check failed:', err.message);
+    }
+  })();
 
   // ─── Daily Quest Reset: Every day at midnight ─────────────────────────────────
   cron.schedule(

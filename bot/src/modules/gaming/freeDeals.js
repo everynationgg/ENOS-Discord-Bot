@@ -27,43 +27,62 @@ function normalizeTitle(title) {
     .replace(/[^a-z0-9]/g, '');
 }
 
+const USER_AGENT = 'ENOS-Discord-Bot/1.0 (https://github.com/everynationgg/ENOS-Discord-Bot)';
+
 /**
  * Fetches deals from CheapShark REST API filtered by minimum savings percentage.
  */
 async function fetchCheapSharkDeals(minDiscountPercent = 50) {
   try {
     const storeIds = '1,2,7,11,15,25'; // Steam, GamersGate, GOG, Humble, Fanatical, Epic
-    const res = await fetch(`https://www.cheapshark.com/api/1.0/deals?upperPrice=50&sortBy=Savings&desc=1&pageSize=60&storeID=${storeIds}`);
-    if (!res.ok) return [];
-    const data = await res.json();
-    if (!Array.isArray(data)) return [];
+    const [resAll, resSteam] = await Promise.all([
+      fetch(`https://www.cheapshark.com/api/1.0/deals?upperPrice=50&sortBy=Savings&desc=1&pageSize=60&storeID=${storeIds}`, {
+        headers: { 'User-Agent': USER_AGENT },
+      }),
+      fetch(`https://www.cheapshark.com/api/1.0/deals?upperPrice=50&sortBy=Deal%20Rating&desc=1&pageSize=60&storeID=1`, {
+        headers: { 'User-Agent': USER_AGENT },
+      }),
+    ]);
 
-    return data
-      .filter((d) => {
-        const savings = parseFloat(d.savings || '0');
-        return savings >= minDiscountPercent;
-      })
-      .map((d) => {
-        const normal = parseFloat(d.normalPrice || '0');
-        const sale = parseFloat(d.salePrice || '0');
-        const savings = Math.round(parseFloat(d.savings || '0'));
-        const storeName = STORE_NAMES[d.storeID] || `Store #${d.storeID}`;
-        const isFree = sale === 0 || savings === 100;
-        const expiresAt = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString();
+    const dataAll = resAll.ok ? await resAll.json() : [];
+    const dataSteam = resSteam.ok ? await resSteam.json() : [];
 
-        return {
-          dealId: `cs_${d.dealID}`,
-          title: d.title,
-          storeName,
-          normalPrice: normal,
-          salePrice: sale,
-          savingsPercent: savings,
-          isFree,
-          dealUrl: `https://www.cheapshark.com/redirect?dealID=${d.dealID}`,
-          imageUrl: d.thumb ? d.thumb.replace('capsule_sm_120', 'header') : null,
-          expiresAt,
-        };
+    const combined = [
+      ...(Array.isArray(dataAll) ? dataAll : []),
+      ...(Array.isArray(dataSteam) ? dataSteam : []),
+    ];
+
+    const seen = new Set();
+    const results = [];
+
+    for (const d of combined) {
+      if (!d || !d.dealID || seen.has(d.dealID)) continue;
+      seen.add(d.dealID);
+
+      const savings = Math.round(parseFloat(d.savings || '0'));
+      if (savings < minDiscountPercent) continue;
+
+      const normal = parseFloat(d.normalPrice || '0');
+      const sale = parseFloat(d.salePrice || '0');
+      const storeName = STORE_NAMES[d.storeID] || `Store #${d.storeID}`;
+      const isFree = sale === 0 || savings === 100;
+      const expiresAt = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString();
+
+      results.push({
+        dealId: `cs_${d.dealID}`,
+        title: d.title,
+        storeName,
+        normalPrice: normal,
+        salePrice: sale,
+        savingsPercent: savings,
+        isFree,
+        dealUrl: `https://www.cheapshark.com/redirect?dealID=${d.dealID}`,
+        imageUrl: d.thumb ? d.thumb.replace('capsule_sm_120', 'header').replace('capsule_231x87', 'header') : null,
+        expiresAt,
       });
+    }
+
+    return results;
   } catch (err) {
     logger.error('[FREE DEALS] Error fetching CheapShark deals:', err.message);
     return [];
@@ -71,45 +90,115 @@ async function fetchCheapSharkDeals(minDiscountPercent = 50) {
 }
 
 /**
- * Fetches discounted/free games directly from Steam's Featured Categories API.
+ * Fetches discounted/free games directly from Steam's Featured Categories API and Store Specials search.
  */
 async function fetchSteamFeaturedDeals(minDiscountPercent = 50) {
-  try {
-    const res = await fetch('https://store.steampowered.com/api/featuredcategories/?cc=US&l=en');
-    if (!res.ok) return [];
-    const data = await res.json();
+  const deals = [];
+  const seenAppIds = new Set();
+  const expiresAt = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString();
 
-    const specials = data?.specials?.items || [];
-    return specials
-      .filter((d) => {
-        const discountPct = d.discount_percent || 0;
-        return discountPct >= minDiscountPercent;
-      })
-      .slice(0, 20)
-      .map((d) => {
-        const normal = (d.original_price || 0) / 100;
-        const sale = (d.final_price || 0) / 100;
-        const savings = d.discount_percent || 0;
-        const isFree = sale === 0 || savings >= 100;
-        const expiresAt = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString();
-        const appId = d.id;
-        return {
-          dealId: `steam_${appId}`,
-          title: d.name,
-          storeName: 'Steam',
-          normalPrice: normal,
-          salePrice: sale,
-          savingsPercent: savings,
-          isFree,
-          dealUrl: `https://store.steampowered.com/app/${appId}`,
-          imageUrl: d.header_image || `https://cdn.akamai.steamstatic.com/steam/apps/${appId}/header.jpg`,
-          expiresAt,
-        };
+  // 1. Scrape Steam Specials Storefront Search Pages 1..4 (captures Franchise Sales, Event Hubs like REAL-WORLD MAPS, 911/112 Operator, King's Orders)
+  for (let page = 1; page <= 4; page++) {
+    try {
+      const searchRes = await fetch(`https://store.steampowered.com/search/?specials=1&cc=US&l=english&page=${page}`, {
+        headers: { 'User-Agent': USER_AGENT },
       });
-  } catch (err) {
-    logger.error('[FREE DEALS] Error fetching Steam featured deals:', err.message);
-    return [];
+      if (searchRes.ok) {
+        const html = await searchRes.text();
+        const rowRegex = /<a href="https:\/\/store\.steampowered\.com\/app\/(\d+)\/([^/?"']+)\/[^"]*"[^>]*>([\s\S]*?)<\/a>/g;
+        let match;
+
+        while ((match = rowRegex.exec(html)) !== null) {
+          const appId = match[1];
+          if (seenAppIds.has(appId)) continue;
+
+          const titleSlug = decodeURIComponent(match[2]).replace(/_/g, ' ');
+          const innerHtml = match[3];
+
+          const titleMatch = /<span class="title">([^<]+)<\/span>/.exec(innerHtml);
+          const title = titleMatch ? titleMatch[1].trim() : titleSlug;
+
+          const discountMatch = /discount_pct">([^<]+)</.exec(innerHtml);
+          const discountText = discountMatch ? discountMatch[1].replace(/[-%\s]/g, '') : '0';
+          const savingsPercent = parseInt(discountText, 10) || 0;
+
+          if (savingsPercent < minDiscountPercent) continue;
+          seenAppIds.add(appId);
+
+          const origMatch = /discount_original_price">([^<]+)</.exec(innerHtml);
+          const normalPrice = origMatch ? parseFloat(origMatch[1].replace(/[^0-9.]/g, '')) || 0 : 0;
+
+          const finalMatch = /discount_final_price">([^<]+)</.exec(innerHtml);
+          const salePrice = finalMatch ? parseFloat(finalMatch[1].replace(/[^0-9.]/g, '')) || 0 : 0;
+          const isFree = salePrice === 0 || savingsPercent >= 100;
+
+          deals.push({
+            dealId: `steam_${appId}`,
+            title,
+            storeName: 'Steam',
+            normalPrice,
+            salePrice,
+            savingsPercent,
+            isFree,
+            dealUrl: `https://store.steampowered.com/app/${appId}`,
+            imageUrl: `https://cdn.akamai.steamstatic.com/steam/apps/${appId}/header.jpg`,
+            expiresAt,
+          });
+        }
+      }
+    } catch (err) {
+      logger.warn('[FREE DEALS] Steam Specials HTML scrape warning:', err.message);
+    }
   }
+
+  // 2. Fetch Featured Categories API as secondary fallback
+  try {
+    const res = await fetch('https://store.steampowered.com/api/featuredcategories/?cc=US&l=en', {
+      headers: { 'User-Agent': USER_AGENT },
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data && typeof data === 'object') {
+        const rawItems = [];
+        for (const key in data) {
+          const category = data[key];
+          if (category && Array.isArray(category.items)) {
+            rawItems.push(...category.items);
+          }
+        }
+
+        for (const d of rawItems) {
+          const appId = d.id;
+          if (!appId || !d.name || seenAppIds.has(String(appId))) continue;
+
+          const discountPct = d.discount_percent || 0;
+          if (discountPct < minDiscountPercent) continue;
+          seenAppIds.add(String(appId));
+
+          const normal = (d.original_price || 0) / 100;
+          const sale = (d.final_price || 0) / 100;
+          const isFree = sale === 0 || discountPct >= 100;
+
+          deals.push({
+            dealId: `steam_${appId}`,
+            title: d.name,
+            storeName: 'Steam',
+            normalPrice: normal,
+            salePrice: sale,
+            savingsPercent: discountPct,
+            isFree,
+            dealUrl: `https://store.steampowered.com/app/${appId}`,
+            imageUrl: d.header_image || `https://cdn.akamai.steamstatic.com/steam/apps/${appId}/header.jpg`,
+            expiresAt,
+          });
+        }
+      }
+    }
+  } catch (err) {
+    logger.warn('[FREE DEALS] Steam featured API warning:', err.message);
+  }
+
+  return deals;
 }
 
 /**
@@ -227,7 +316,12 @@ async function checkAndDispatchDeals(client, guildId) {
       continue;
     }
 
-    if (newlyPosted >= 5) break; // Cap at 5 new deal alerts per batch run to avoid spam
+    if (newlyPosted >= 20) break; // Cap at 20 new deal alerts per batch run (Discord anti-spam safe)
+
+    // 1.2s delay between posts to strictly comply with Discord's rate limit (5 msg / 5s)
+    if (newlyPosted > 0) {
+      await new Promise((r) => setTimeout(r, 1200));
+    }
 
     const is100Free = deal.isFree || deal.savingsPercent >= 100;
     const titleHeader = is100Free

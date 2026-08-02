@@ -67,25 +67,6 @@ async function postBossCardToDiscord(guildId: string, boss: any) {
   };
 
   let imageBuffer: Buffer | null = null;
-  try {
-    imageBuffer = await renderBossImage({
-      bossName: boss.boss_name,
-      bossTitle: boss.boss_title,
-      customImageUrl: boss.custom_image_url,
-      customBgUrl: featureRows?.[0]?.config?.custom_bg_url || null,
-      classImageUrls,
-      currentHp: Number(boss.current_hp),
-      maxHp: Number(boss.max_hp),
-      isOverkill: boss.is_overkill,
-      viewMode: 'spawn',
-      momBuff: boss.mom_buff,
-      dadDebuff: boss.dad_debuff,
-      classCounts,
-      lastAction: boss.last_action,
-    });
-  } catch (e) {
-    console.error('[BOSS POST] Error rendering boss canvas:', e);
-  }
 
   const hpPct = Math.round((Number(boss.current_hp) / Number(boss.max_hp)) * 100);
   const filled = Math.round(hpPct / 10);
