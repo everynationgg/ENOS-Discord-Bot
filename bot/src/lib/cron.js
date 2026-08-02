@@ -158,17 +158,18 @@ function initCrons(client) {
   cron.schedule(
     '0 0 * * 1',
     async () => {
-      logger.info('[CRON] Resetting Weekly Boss & generating AI lore for new week...');
+      logger.info('[CRON] Resetting Weekly Boss & posting new week card...');
       try {
-        const { getOrCreateActiveBoss } = require('../modules/gaming/boss');
+        const { spawnAndAnnounceWeeklyBoss } = require('../modules/gaming/boss');
         const { data: configs } = await supabase
           .from('guild_config')
           .select('guild_id')
+          .eq('feature_key', 'weekly_boss')
           .eq('enabled', true);
 
         for (const c of configs || []) {
           try {
-            await getOrCreateActiveBoss(c.guild_id);
+            await spawnAndAnnounceWeeklyBoss(client, c.guild_id);
           } catch (err) {
             logger.error(`[CRON] Weekly Boss spawn failed for guild ${c.guild_id}:`, err.message);
           }

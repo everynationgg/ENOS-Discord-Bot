@@ -765,6 +765,71 @@ async function concludeWeeklyBossBattle(guildId, client = null) {
   }
 }
 
+/**
+ * Spawns/retrieves the active weekly boss and posts/edits the public Boss Card in Discord.
+ */
+async function spawnAndAnnounceWeeklyBoss(client, guildId) {
+  const boss = await getOrCreateActiveBoss(guildId);
+  if (!boss) return null;
+
+  try {
+    const { buildPublicBossEmbedPayload } = require('../../commands/boss');
+    const { data: featureRow } = await supabase
+      .from('guild_config')
+      .select('config')
+      .eq('guild_id', guildId)
+      .eq('feature_key', 'weekly_boss')
+      .maybeSingle();
+
+    const channelId = featureRow?.config?.last_channel_id || featureRow?.config?.channel_id;
+    if (!channelId || !client) {
+      logger.warn(`[BOSS SPAWN] No channel ID configured for weekly_boss in guild ${guildId}`);
+      return boss;
+    }
+
+    const channel = await client.channels.fetch(channelId).catch(() => null);
+    if (!channel || !channel.isTextBased()) {
+      logger.warn(`[BOSS SPAWN] Configured boss channel ${channelId} not accessible in guild ${guildId}`);
+      return boss;
+    }
+
+    const payload = await buildPublicBossEmbedPayload(guildId);
+    let messageId = featureRow?.config?.last_message_id;
+    let publicMsg = messageId ? await channel.messages.fetch(messageId).catch(() => null) : null;
+
+    if (!publicMsg) {
+      const recent = await channel.messages.fetch({ limit: 15 }).catch(() => null);
+      if (recent) {
+        publicMsg = recent.find(
+          (m) =>
+            m.author.id === client.user.id &&
+            m.embeds.some((e) => e.title?.includes('Weekly Boss') || e.title?.includes('OVERKILL'))
+        );
+      }
+    }
+
+    if (publicMsg) {
+      await publicMsg.edit(payload);
+      logger.info(`[BOSS SPAWN] Updated existing Weekly Boss card in channel ${channelId}`);
+    } else {
+      const newMsg = await channel.send(payload);
+      if (newMsg?.id) {
+        await supabase.from('guild_config').upsert({
+          guild_id: guildId,
+          feature_key: 'weekly_boss',
+          config: { ...(featureRow?.config || {}), last_message_id: newMsg.id, last_channel_id: channelId },
+          updated_at: new Date().toISOString(),
+        });
+        logger.info(`[BOSS SPAWN] Posted new Weekly Boss card to channel ${channelId}`);
+      }
+    }
+  } catch (err) {
+    logger.error(`[BOSS SPAWN] Error announcing weekly boss for guild ${guildId}:`, err.message);
+  }
+
+  return boss;
+}
+
 module.exports = {
   getWeekIdentifier,
   getOrCreateActiveBoss,
@@ -775,4 +840,6 @@ module.exports = {
   executeCombatAction,
   generateGlitchBossLore,
   concludeWeeklyBossBattle,
+  spawnAndAnnounceWeeklyBoss,
 };
+
