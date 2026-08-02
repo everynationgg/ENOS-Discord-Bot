@@ -1574,10 +1574,34 @@ export default function GamingPage() {
                                     const res = await fetch('/api/gaming/boss/action', {
                                       method: 'POST',
                                       headers: { 'Content-Type': 'application/json' },
-                                      body: JSON.stringify({ action: 'spawn_staged' }),
+                                      body: JSON.stringify({
+                                        action: 'spawn_staged',
+                                        stagedConfig: staged,
+                                      }),
                                     });
                                     const data = await res.json();
-                                    setConfig('boss_status', data.error ? `error: ${data.error}` : 'spawned');
+                                    if (data.success) {
+                                      // Promote staged fields into active config state in frontend UI
+                                      if (staged.boss_name) setConfig('override_name', staged.boss_name);
+                                      if (staged.boss_title) setConfig('boss_title', staged.boss_title);
+                                      if (staged.lore) setConfig('lore', staged.lore);
+                                      if (staged.max_hp) setConfig('override_hp', staged.max_hp);
+                                      if (staged.custom_image_url) setConfig('custom_image_url', staged.custom_image_url);
+                                      if (staged.custom_bg_url) setConfig('custom_bg_url', staged.custom_bg_url);
+                                      if (staged.victory_image_url) setConfig('victory_image_url', staged.victory_image_url);
+                                      if (staged.mom_image_url) setConfig('mom_image_url', staged.mom_image_url);
+                                      if (staged.dad_image_url) setConfig('dad_image_url', staged.dad_image_url);
+                                      if (staged.kid_image_url) setConfig('kid_image_url', staged.kid_image_url);
+
+                                      // Wipe staged_boss_config clean in UI state
+                                      setConfig('staged_boss_config', {});
+
+                                      // Switch view to Active Boss tab
+                                      setBossSubTab('active');
+                                      setConfig('boss_status', 'spawned');
+                                    } else {
+                                      setConfig('boss_status', `error: ${data.error}`);
+                                    }
                                   } catch {
                                     setConfig('boss_status', 'error: request failed');
                                   }

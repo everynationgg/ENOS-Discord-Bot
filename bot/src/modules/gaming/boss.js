@@ -103,15 +103,22 @@ async function getOrCreateActiveBoss(guildId) {
   let finalMaxHp = bossHp;
   let finalCustomImageUrl = featureRow?.config?.custom_image_url || null;
 
+  let finalBgUrl = (stagedConfig && stagedConfig.custom_bg_url) ? stagedConfig.custom_bg_url : (featureRow?.config?.custom_bg_url || null);
+
   if (stagedConfig && stagedConfig.enabled) {
     if (stagedConfig.boss_name) finalBossName = stagedConfig.boss_name;
     if (stagedConfig.boss_title) finalBossTitle = stagedConfig.boss_title;
     if (stagedConfig.lore) finalLore = stagedConfig.lore;
     if (stagedConfig.max_hp) finalMaxHp = Number(stagedConfig.max_hp);
     if (stagedConfig.custom_image_url) finalCustomImageUrl = stagedConfig.custom_image_url;
+    if (stagedConfig.custom_bg_url) finalBgUrl = stagedConfig.custom_bg_url;
 
-    // Clear staged_boss_config so it doesn't re-trigger, and promote staged artwork to active config
+    // Clear staged_boss_config so it doesn't re-trigger, and promote staged artwork & fields to active config
     const updatedConfig = { ...(featureRow?.config || {}) };
+    if (stagedConfig.boss_name) updatedConfig.override_name = stagedConfig.boss_name;
+    if (stagedConfig.boss_title) updatedConfig.boss_title = stagedConfig.boss_title;
+    if (stagedConfig.lore) updatedConfig.lore = stagedConfig.lore;
+    if (stagedConfig.max_hp) updatedConfig.override_hp = stagedConfig.max_hp;
     if (stagedConfig.custom_image_url) updatedConfig.custom_image_url = stagedConfig.custom_image_url;
     if (stagedConfig.custom_bg_url) updatedConfig.custom_bg_url = stagedConfig.custom_bg_url;
     if (stagedConfig.victory_image_url) updatedConfig.victory_image_url = stagedConfig.victory_image_url;
@@ -139,6 +146,7 @@ async function getOrCreateActiveBoss(guildId) {
       boss_title: finalBossTitle,
       lore: finalLore,
       custom_image_url: finalCustomImageUrl,
+      custom_bg_url: finalBgUrl,
       max_hp: finalMaxHp,
       current_hp: finalMaxHp,
       is_overkill: false,

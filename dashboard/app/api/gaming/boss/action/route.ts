@@ -45,7 +45,7 @@ export async function POST(req: NextRequest) {
     const resolvedBgUrl = await resolveDirectImageUrl(rawBgUrl);
 
     if (action === 'spawn' || action === 'spawn_staged') {
-      // Check if Guild Admin pre-staged next week's boss config in guild_config
+      // Check if Guild Admin pre-staged next week's boss config in guild_config or passed in body
       const { data: featureRow } = await supabaseAdmin
         .from('guild_config')
         .select('config')
@@ -53,7 +53,7 @@ export async function POST(req: NextRequest) {
         .eq('feature_key', 'weekly_boss')
         .maybeSingle();
 
-      const stagedConfig = featureRow?.config?.staged_boss_config;
+      const stagedConfig = body.stagedConfig || featureRow?.config?.staged_boss_config;
 
       const charName = customName && customName.trim() ? customName.trim() : 'Corrupted Anomaly';
       const gameLabel = gameName && gameName.trim() ? gameName.trim() : 'Gaming Realm';
@@ -63,6 +63,7 @@ export async function POST(req: NextRequest) {
       let lore = `A space-time realm rift merged ${gameLabel} data with ENOS core protocols. ${charName} has manifested in the server! Coordinate your triad skills to neutralize!`;
       let hp = customHp ? parseInt(customHp, 10) : 150000;
       let finalImageUrl = resolvedImageUrl || null;
+      let finalBgUrl = resolvedBgUrl || featureRow?.config?.custom_bg_url || null;
 
       if (action === 'spawn_staged' || stagedConfig) {
         if (stagedConfig?.boss_name) bossName = stagedConfig.boss_name;
@@ -70,9 +71,14 @@ export async function POST(req: NextRequest) {
         if (stagedConfig?.lore) lore = stagedConfig.lore;
         if (stagedConfig?.max_hp) hp = Number(stagedConfig.max_hp);
         if (stagedConfig?.custom_image_url) finalImageUrl = await resolveDirectImageUrl(stagedConfig.custom_image_url);
+        if (stagedConfig?.custom_bg_url) finalBgUrl = await resolveDirectImageUrl(stagedConfig.custom_bg_url);
 
-        // Promote staged artwork into active config and clear staged_boss_config
+        // Promote staged artwork & fields into active config and clear staged_boss_config
         const updatedCfg = { ...(featureRow?.config || {}) };
+        if (stagedConfig?.boss_name) updatedCfg.override_name = stagedConfig.boss_name;
+        if (stagedConfig?.boss_title) updatedCfg.boss_title = stagedConfig.boss_title;
+        if (stagedConfig?.lore) updatedCfg.lore = stagedConfig.lore;
+        if (stagedConfig?.max_hp) updatedCfg.override_hp = stagedConfig.max_hp;
         if (stagedConfig?.custom_image_url) updatedCfg.custom_image_url = stagedConfig.custom_image_url;
         if (stagedConfig?.custom_bg_url) updatedCfg.custom_bg_url = stagedConfig.custom_bg_url;
         if (stagedConfig?.victory_image_url) updatedCfg.victory_image_url = stagedConfig.victory_image_url;
@@ -113,6 +119,7 @@ export async function POST(req: NextRequest) {
             mom_buff: false,
             dad_debuff: false,
             custom_image_url: finalImageUrl,
+            custom_bg_url: finalBgUrl,
             last_action: '⚡ Admin force spawned a new Weekly Boss!',
           })
           .eq('id', existingBoss.id)
@@ -140,6 +147,7 @@ export async function POST(req: NextRequest) {
             mom_buff: false,
             dad_debuff: false,
             custom_image_url: finalImageUrl,
+            custom_bg_url: finalBgUrl,
             last_action: '⚡ Admin force spawned a new Weekly Boss!',
           }, { onConflict: 'guild_id,week_identifier,is_overkill' })
           .select()
