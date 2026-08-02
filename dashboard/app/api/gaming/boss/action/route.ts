@@ -21,189 +21,12 @@ function getWeekIdentifier(date = new Date()) {
   return `${d.getUTCFullYear()}-W${String(weekNo).padStart(2, '0')}`;
 }
 
-async function postBossCardToDiscord(guildId: string, boss: any) {
-  const token = process.env.DISCORD_TOKEN || process.env.DISCORD_BOT_TOKEN;
-  if (!token) {
-    console.error('[BOSS POST] DISCORD_TOKEN is missing!');
-    return;
-  }
-
-  // Fetch all channel IDs configured for weekly_boss
-  const { data: featureRows } = await supabaseAdmin
-    .from('guild_config')
-    .select('config, guild_id')
-    .eq('feature_key', 'weekly_boss');
-
-  const channelIds: string[] = [];
-  if (featureRows && featureRows.length > 0) {
-    featureRows.forEach((r: any) => {
-      if (r.config?.channel_id && typeof r.config.channel_id === 'string' && r.config.channel_id.trim()) {
-        channelIds.push(r.config.channel_id.trim());
-      }
-    });
-  }
-
-  if (channelIds.length === 0) {
-    console.error('[BOSS POST] No channel ID configured in Weekly Boss panel!');
-    return;
-  }
-
-  const currentWeek = boss.week_identifier;
-
-  const { data: allPlayers } = await supabaseAdmin
-    .from('boss_player_states')
-    .select('class_key')
-    .eq('week_identifier', currentWeek);
-
-  const classCounts = { mom: 0, dad: 0, kid: 0 };
-  (allPlayers || []).forEach((p: any) => {
-    if (p.class_key && classCounts[p.class_key as keyof typeof classCounts] !== undefined) {
-      classCounts[p.class_key as keyof typeof classCounts]++;
-    }
-  });
-
-  const classImageUrls = {
-    mom: featureRows?.[0]?.config?.mom_image_url || null,
-    dad: featureRows?.[0]?.config?.dad_image_url || null,
-    kid: featureRows?.[0]?.config?.kid_image_url || null,
-  };
-
-  let imageBuffer: Buffer | null = null;
-
-  const hpPct = Math.round((Number(boss.current_hp) / Number(boss.max_hp)) * 100);
-  const filled = Math.round(hpPct / 10);
-  const hpBar = '🟩'.repeat(filled) + '⬛'.repeat(10 - filled);
-
-  const embed = {
-    title: `${boss.is_overkill ? '💀 OVERKILL MODE' : '⚔️ Weekly Boss Bounty'} — ${boss.boss_name}`,
-    description:
-      `**Lore**: ${boss.lore}\n\n` +
-      `**Last Action**: ${boss.last_action || 'None'}\n` +
-      `**M.O.M. Buff**: ${boss.mom_buff ? '✅ Active' : '❌ Inactive'}\n` +
-      `**D.A.D. Debuff**: ${boss.dad_debuff ? '✅ Active' : '❌ Inactive'}\n\n` +
-      `HP: **${Number(boss.current_hp).toLocaleString()} / ${Number(boss.max_hp).toLocaleString()}** (${hpPct}%)\n` +
-      `${hpBar}\n` +
-      `*Click a button below to pick your class and join the battle!*`,
-    color: boss.is_overkill ? 0xdc2626 : 0x6d28d9,
-    footer: {
-      text: `ENOS Weekly RPG System • Week ${boss.week_identifier} • Today at ${new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}`,
-    },
-    image: imageBuffer
-      ? { url: 'attachment://weekly_boss_arena.png' }
-      : boss.custom_image_url
-      ? { url: boss.custom_image_url }
-      : undefined,
-  };
-
-  const components = [
-    {
-      type: 1,
-      components: [
-        { type: 2, custom_id: 'boss_pick:mom', label: 'Pick M.O.M.', style: 1, emoji: { name: '🛡️' } },
-        { type: 2, custom_id: 'boss_pick:dad', label: 'Pick D.A.D.', style: 3, emoji: { name: '🔨' } },
-        { type: 2, custom_id: 'boss_pick:kid', label: 'Pick K.I.D.', style: 4, emoji: { name: '⚡' } },
-        { type: 2, custom_id: 'boss_info', label: 'Skills Info', style: 2, emoji: { name: '📖' } },
-      ],
-    },
-  ];
-
-  for (const chId of channelIds) {
-    let res: Response | null = null;
-    if (imageBuffer) {
-      const formData = new FormData();
-      formData.append(
-        'payload_json',
-        JSON.stringify({
-          embeds: [embed],
-          components,
-        })
-      );
-      formData.append('files[0]', new Blob([Uint8Array.from(imageBuffer)], { type: 'image/png' }), 'weekly_boss_arena.png');
-
-      res = await fetch(`https://discord.com/api/v10/channels/${chId}/messages`, {
-        method: 'POST',
-        headers: { Authorization: `Bot ${token}` },
-        body: formData,
-      }).catch((e) => {
-        console.error(`[BOSS POST] Error posting boss card to Discord channel ${chId}:`, e);
-        return null;
-      });
-    } else {
-      res = await fetch(`https://discord.com/api/v10/channels/${chId}/messages`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bot ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ embeds: [embed], components }),
-      }).catch((e) => {
-        console.error(`[BOSS POST] Error posting boss card to Discord channel ${chId}:`, e);
-        return null;
-      });
-    }
-
-    if (res && res.ok) {
-      const postedMsg = await res.json().catch(() => null);
-      if (postedMsg?.id) {
-        const { data: existingCfg } = await supabaseAdmin
-          .from('guild_config')
-          .select('config')
-          .eq('guild_id', guildId)
-          .eq('feature_key', 'weekly_boss')
-          .maybeSingle();
-
-        await supabaseAdmin.from('guild_config').upsert({
-          guild_id: guildId,
-          feature_key: 'weekly_boss',
-          config: {
-            ...(existingCfg?.config || {}),
-            channel_id: chId,
-            last_channel_id: chId,
-            last_message_id: postedMsg.id,
-          },
-          updated_at: new Date().toISOString(),
-        });
-      }
-    }
-  }
-}
+// NOTE: Discord posting is handled exclusively by the bot worker via Supabase Realtime
+// on the boss_seasons table. The dashboard only writes to the database.
 
 async function resolveDirectImageUrl(url: string | null | undefined): Promise<string | null> {
   if (!url || typeof url !== 'string' || !url.startsWith('http')) return null;
   if (url.includes('i.ibb.co/') || /\.(png|jpg|jpeg|gif|webp)(\?.*)?$/i.test(url)) return url;
-
-  try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 8000);
-    const res = await fetch(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.9',
-        'Cache-Control': 'max-age=0',
-        'Sec-Ch-Ua': '"Chromium";v="124", "Google Chrome";v="124", "Not-A.Brand";v="99"',
-        'Sec-Ch-Ua-Mobile': '?0',
-        'Sec-Ch-Ua-Platform': '"Windows"',
-        'Sec-Fetch-Dest': 'document',
-        'Sec-Fetch-Mode': 'navigate',
-        'Sec-Fetch-Site': 'none',
-        'Sec-Fetch-User': '?1',
-        'Upgrade-Insecure-Requests': '1'
-      },
-      signal: controller.signal,
-    });
-    clearTimeout(timeout);
-    if (res.ok) {
-      const html = await res.text();
-      const ogMatch = html.match(/<meta\s+property=["']og:image["']\s+content=["']([^"']+)["']/i) ||
-                      html.match(/<meta\s+name=["']twitter:image["']\s+content=["']([^"']+)["']/i) ||
-                      html.match(/<img\s+src=["'](https:\/\/i\.ibb\.co\/[^"']+)["']/i) ||
-                      html.match(/(https:\/\/i\.ibb\.co\/[a-zA-Z0-9_\-\.\/]+)/i);
-      if (ogMatch && ogMatch[1]) {
-        return ogMatch[1];
-      }
-    }
-  } catch (e) {}
   return url;
 }
 
@@ -328,9 +151,7 @@ export async function POST(req: NextRequest) {
         activeBoss = inserted;
       }
 
-      const targetGuildId = activeBoss.guild_id || guildId;
-      await postBossCardToDiscord(targetGuildId, activeBoss);
-
+      // Bot worker will detect this DB change via Realtime and post the full canvas card
       return NextResponse.json({ success: true, action: 'spawn', boss: activeBoss });
     }
 
@@ -361,9 +182,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: error?.message || 'Failed to update boss image' }, { status: 500 });
       }
 
-      const targetGuildId = updatedBoss.guild_id || guildId;
-      await postBossCardToDiscord(targetGuildId, updatedBoss);
-
+      // Bot worker will detect this DB change via Realtime and post the full canvas card
       return NextResponse.json({ success: true, action: 'update_image', boss: updatedBoss });
     }
 
@@ -426,9 +245,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: okErr.message }, { status: 500 });
       }
 
-      const targetGuildId = overkillBoss.guild_id || guildId;
-      await postBossCardToDiscord(targetGuildId, overkillBoss);
-
+      // Bot worker will detect this DB change via Realtime and post the full canvas card
       return NextResponse.json({ success: true, action: 'overkill', boss: overkillBoss });
     }
 
