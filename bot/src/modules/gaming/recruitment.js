@@ -327,11 +327,52 @@ function getRecruitmentRulesEmbed() {
     .setFooter({ text: 'ENOS Compliance & Rules' });
 }
 
+const ACHIEVEMENTS_CATALOG = [
+  {
+    key: 'recruitment',
+    title: 'Recruitment',
+    description: 'Track successful member invitations to Every Nation.',
+    image: 'recruitment.jpg',
+    embedColor: 0x8B5CF6,
+    tiers: [
+      { name: '💜 Enis (5 Invites)', title: 'They Who Herald the Nation', reward: '50 Vault Coins' },
+      { name: '🔥 Enara (50 Invites)', title: 'Those Who Exalt the Nation', reward: '1 Month Discord Nitro + Boost' },
+      { name: '👑 Enorium (100 Invites)', title: 'The One Who Ordains the Nation', reward: '1 Year Discord Nitro + Boost (Crown)' },
+    ],
+  },
+  {
+    key: 'boss_slayer',
+    title: 'Boss Slayer RPG',
+    description: 'Defeat Weekly World Bosses in M.O.M., D.A.D., and K.I.D. combat.',
+    image: 'recruitment.jpg',
+    embedColor: 0xEF4444,
+    tiers: [
+      { name: '💜 Enis (1,000 DMG)', title: 'Vanguard Strike Herald', reward: '100 Vault Coins' },
+      { name: '🔥 Enara (10,000 DMG)', title: 'Overkill Master Champion', reward: 'Special Discord Role + Badge' },
+      { name: '👑 Enorium (#1 DMG)', title: 'Slayer of the Nation', reward: 'Exclusive Boss Crown Title' },
+    ],
+  },
+  {
+    key: 'trivia_master',
+    title: 'Trivia Master',
+    description: 'Answer daily community trivia questions accurately.',
+    image: 'recruitment.jpg',
+    embedColor: 0x3B82F6,
+    tiers: [
+      { name: '💜 Enis (10 Correct)', title: 'Scholar of the Realm', reward: '50 Vault Coins' },
+      { name: '🔥 Enara (50 Correct)', title: 'Grand Archivist', reward: 'Custom Profile Frame' },
+      { name: '👑 Enorium (#1 Points)', title: 'The Omniscient Mind', reward: 'Exclusive Trivia Crown Title' },
+    ],
+  },
+];
+
 /**
  * Main interaction handler for achievement buttons & components
  */
 async function handleRecruitmentInteraction(interaction) {
   const { customId } = interaction;
+  const path = require('path');
+  const fs = require('fs');
 
   if (customId === 'achievement_progress') {
     const embed = await getRecruitmentProgressEmbed(interaction.guild, interaction.user.id);
@@ -341,6 +382,53 @@ async function handleRecruitmentInteraction(interaction) {
   if (customId === 'achievement_rules') {
     const embed = getRecruitmentRulesEmbed();
     return interaction.reply({ embeds: [embed], ephemeral: true });
+  }
+
+  if (customId === 'achievement_prev' || customId === 'achievement_next') {
+    let currentIndex = 0;
+    if (interaction.message && interaction.message.embeds.length > 0) {
+      const footerText = interaction.message.embeds[0].footer?.text || '';
+      const match = footerText.match(/Card (\d+) of (\d+)/);
+      if (match) {
+        currentIndex = parseInt(match[1], 10) - 1;
+      }
+    }
+
+    if (customId === 'achievement_prev') {
+      currentIndex = (currentIndex - 1 + ACHIEVEMENTS_CATALOG.length) % ACHIEVEMENTS_CATALOG.length;
+    } else {
+      currentIndex = (currentIndex + 1) % ACHIEVEMENTS_CATALOG.length;
+    }
+
+    const item = ACHIEVEMENTS_CATALOG[currentIndex];
+    const imagePath = path.join(__dirname, `../../assets/achievements/${item.image}`);
+    let fileBuffer;
+    if (fs.existsSync(imagePath)) {
+      fileBuffer = fs.readFileSync(imagePath);
+    }
+
+    const tierDesc = item.tiers.map((t) => `**${t.name}** → Title: **"${t.title}"** | *${t.reward}*`).join('\n');
+
+    const embed = new EmbedBuilder()
+      .setColor(item.embedColor)
+      .setTitle(`📜 Achievement: ${item.title} — Every Nation`)
+      .setDescription(`${item.description}\n\n${tierDesc}`)
+      .setImage(`attachment://${item.image}`)
+      .setFooter({ text: `ENOS Community Achievements System • Card ${currentIndex + 1} of ${ACHIEVEMENTS_CATALOG.length}` })
+      .setTimestamp();
+
+    const prevBtn = new ButtonBuilder().setCustomId('achievement_prev').setLabel('⬅ Previous').setStyle(ButtonStyle.Secondary);
+    const progressBtn = new ButtonBuilder().setCustomId('achievement_progress').setLabel('📊 Check Progress').setStyle(ButtonStyle.Primary);
+    const nextBtn = new ButtonBuilder().setCustomId('achievement_next').setLabel('➡ Next').setStyle(ButtonStyle.Secondary);
+    const rulesBtn = new ButtonBuilder().setCustomId('achievement_rules').setLabel('📜 Rules').setStyle(ButtonStyle.Secondary);
+    const row = new ActionRowBuilder().addComponents(prevBtn, progressBtn, nextBtn, rulesBtn);
+
+    const payload = { embeds: [embed], components: [row] };
+    if (fileBuffer) {
+      payload.files = [{ attachment: fileBuffer, name: item.image }];
+    }
+
+    return interaction.update(payload);
   }
 }
 

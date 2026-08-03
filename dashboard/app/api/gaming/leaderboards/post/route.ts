@@ -105,6 +105,23 @@ export async function POST(req: NextRequest) {
         footer: { text: 'ENOS Trivia System • 1 Point = ₱1 PHP' },
         timestamp: new Date().toISOString(),
       };
+    } else if (type === 'achievements') {
+      await supabaseAdmin.from('system_logs').insert({
+        event_type: 'achievement_dispatch_card',
+        payload: { channel_id, timestamp: new Date().toISOString() },
+      });
+
+      embed = {
+        title: '📜 Achievement: Recruitment — Every Nation',
+        description:
+          'Track successful member invitations to Every Nation.\n\n' +
+          '💜 **Enis (5 Invites)** → Title: **"They Who Herald the Nation"** | *50 Vault Coins*\n' +
+          '🔥 **Enara (50 Invites)** → Title: **"Those Who Exalt the Nation"** | *1 Month Discord Nitro + Boost*\n' +
+          '👑 **Enorium (100 Invites)** → Title: **"The One Who Ordains the Nation"** | *1 Year Discord Nitro + Boost*',
+        color: 0x8b5cf6,
+        footer: { text: 'ENOS Community Achievements System • Tracked via Gatekeeper' },
+        timestamp: new Date().toISOString(),
+      };
     } else {
       return NextResponse.json(
         { success: false, error: 'Invalid leaderboard type specified.' },
