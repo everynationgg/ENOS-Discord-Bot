@@ -69,10 +69,30 @@ client.once(Events.ClientReady, async () => {
           }
         }
       )
+    const { postMasterAchievementCard } = require('./modules/gaming/recruitment');
+
+    supabase
+      .channel('realtime_system_logs')
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'system_logs' },
+        async (payload) => {
+          if (payload.new?.event_type === 'achievement_dispatch_card') {
+            logger.info('[REALTIME LOGS] Dispatching Master Achievement Card to channel:', payload.new.payload?.channel_id);
+            const channelId = payload.new.payload?.channel_id;
+            const guildId = process.env.DISCORD_GUILD_ID;
+            if (channelId) {
+              await postMasterAchievementCard(client, guildId, channelId).catch((err) =>
+                logger.error('[REALTIME LOGS] Master card dispatch failed:', err)
+              );
+            }
+          }
+        }
+      )
       .subscribe();
-    logger.info('[REALTIME BOSS] Subscribed to real-time boss updates.');
+    logger.info('[REALTIME LOGS] Subscribed to system_logs dispatch events.');
   } catch (err) {
-    logger.error('[REALTIME BOSS] Realtime subscription warning:', err.message);
+    logger.error('[REALTIME] Realtime subscription warning:', err.message);
   }
 
   logger.info(`[READY] Logged in as ${client.user.tag}`);
