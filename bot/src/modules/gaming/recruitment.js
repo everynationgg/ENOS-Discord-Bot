@@ -355,24 +355,32 @@ async function postMasterAchievementCard(client, guildId, channelId) {
     throw new Error(`Channel ${channelId} not found or not text-based`);
   }
 
-  const { renderAchievementDetailCanvas } = require('./achievementCanvas');
+  const path = require('path');
+  const fs = require('fs');
 
-  const achievementDef = {
-    icon_emoji: '📜',
-    title: 'Recruitment',
-    description: 'Track successful member invitations to Every Nation.',
-    tier1_title: 'They Who Herald the Nation',
-    tier1_goal: 5,
-    tier1_reward_coins: 50,
-    tier2_title: 'Those Who Exalt the Nation',
-    tier2_goal: 50,
-    tier2_reward_coins: '1 Month Nitro + Boost',
-    tier3_title: 'The One Who Ordains the Nation',
-    tier3_goal: 100,
-    tier3_reward_coins: '1 Year Nitro + Boost',
-  };
+  const imagePath = path.join(__dirname, '../../assets/achievements/recruitment.jpg');
+  let fileBuffer;
 
-  const buffer = await renderAchievementDetailCanvas(achievementDef, 1, 1);
+  if (fs.existsSync(imagePath)) {
+    fileBuffer = fs.readFileSync(imagePath);
+  } else {
+    const { renderAchievementDetailCanvas } = require('./achievementCanvas');
+    const achievementDef = {
+      icon_emoji: '📜',
+      title: 'Recruitment',
+      description: 'Track successful member invitations to Every Nation.',
+      tier1_title: 'They Who Herald the Nation',
+      tier1_goal: 5,
+      tier1_reward_coins: 50,
+      tier2_title: 'Those Who Exalt the Nation',
+      tier2_goal: 50,
+      tier2_reward_coins: '1 Month Nitro + Boost',
+      tier3_title: 'The One Who Ordains the Nation',
+      tier3_goal: 100,
+      tier3_reward_coins: '1 Year Nitro + Boost',
+    };
+    fileBuffer = await renderAchievementDetailCanvas(achievementDef, 1, 1);
+  }
 
   const embed = new EmbedBuilder()
     .setColor(0x8B5CF6)
@@ -383,7 +391,7 @@ async function postMasterAchievementCard(client, guildId, channelId) {
       '🔥 **Enara (50 Invites)** → Title: **"Those Who Exalt the Nation"** | *1 Month Discord Nitro + Boost*\n' +
       '👑 **Enorium (100 Invites)** → Title: **"The One Who Ordains the Nation"** | *1 Year Discord Nitro + Boost*'
     )
-    .setImage('attachment://achievement.png')
+    .setImage('attachment://achievement.jpg')
     .setFooter({ text: 'ENOS Community Achievements System • Interactive Buttons Below' })
     .setTimestamp();
 
@@ -411,7 +419,7 @@ async function postMasterAchievementCard(client, guildId, channelId) {
 
   await channel.send({
     embeds: [embed],
-    files: [{ attachment: buffer, name: 'achievement.png' }],
+    files: [{ attachment: fileBuffer, name: 'achievement.jpg' }],
     components: [row],
   });
 
