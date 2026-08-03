@@ -117,9 +117,12 @@ export async function POST(req: Request) {
             timestamp: new Date().toISOString(),
           };
 
-          if (activeCard?.image_url && activeCard.image_url.startsWith('http')) {
-            embed.image = { url: activeCard.image_url };
+          let finalImageUrl = activeCard?.image_url;
+          if (!finalImageUrl || !finalImageUrl.startsWith('http')) {
+            finalImageUrl = 'https://raw.githubusercontent.com/everynationgg/ENOS-Discord-Bot/main/dashboard/public/images/achievements-card-preview.png';
           }
+
+          embed.image = { url: finalImageUrl };
 
           const components = [
             {

@@ -529,9 +529,14 @@ async function postMasterAchievementCard(client, guildId, channelId) {
     .setColor(activeItem.embedColor || activeItem.color || 0x8B5CF6)
     .setTitle(`📜 Achievement: ${activeItem.title || activeItem.name || 'Recruitment'} — Every Nation`)
     .setDescription(`${activeItem.description || 'Track community progress and achievements.'}\n\n${tierDesc}`)
-    .setImage('attachment://achievement.jpg')
     .setFooter({ text: `ENOS Community Achievements System • Card 1 of ${catalog.length}` })
     .setTimestamp();
+
+  if (activeItem.image_url && activeItem.image_url.startsWith('http')) {
+    embed.setImage(activeItem.image_url);
+  } else {
+    embed.setImage('attachment://achievement.jpg');
+  }
 
   const prevBtn = new ButtonBuilder()
     .setCustomId('achievement_prev')
