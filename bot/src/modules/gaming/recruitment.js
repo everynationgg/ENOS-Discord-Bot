@@ -375,16 +375,20 @@ async function handleRecruitmentInteraction(interaction) {
   const fs = require('fs');
 
   if (customId === 'achievement_progress') {
+    await interaction.deferReply({ ephemeral: true }).catch(() => {});
     const embed = await getRecruitmentProgressEmbed(interaction.guild, interaction.user.id);
-    return interaction.reply({ embeds: [embed], ephemeral: true });
+    return interaction.editReply({ embeds: [embed] }).catch((e) => console.error('[INTERACTION PROGRESS ERROR]:', e));
   }
 
   if (customId === 'achievement_rules') {
+    await interaction.deferReply({ ephemeral: true }).catch(() => {});
     const embed = getRecruitmentRulesEmbed();
-    return interaction.reply({ embeds: [embed], ephemeral: true });
+    return interaction.editReply({ embeds: [embed] }).catch((e) => console.error('[INTERACTION RULES ERROR]:', e));
   }
 
   if (customId === 'achievement_prev' || customId === 'achievement_next') {
+    await interaction.deferUpdate().catch(() => {});
+
     const catalog = await getAchievementsCatalog(interaction.guild?.id);
     let currentIndex = 0;
     if (interaction.message && interaction.message.embeds.length > 0) {
@@ -441,9 +445,14 @@ async function handleRecruitmentInteraction(interaction) {
       .setColor(item.embedColor || item.color || 0x8B5CF6)
       .setTitle(`📜 Achievement: ${item.title || item.name || 'Recruitment'} — Every Nation`)
       .setDescription(`${item.description || ''}\n\n${tierDesc}`)
-      .setImage('attachment://achievement.jpg')
       .setFooter({ text: `ENOS Community Achievements System • Card ${currentIndex + 1} of ${catalog.length}` })
       .setTimestamp();
+
+    if (item.image_url && item.image_url.startsWith('http')) {
+      embed.setImage(item.image_url);
+    } else {
+      embed.setImage('attachment://achievement.jpg');
+    }
 
     const prevBtn = new ButtonBuilder().setCustomId('achievement_prev').setLabel('⬅ Previous').setStyle(ButtonStyle.Secondary);
     const progressBtn = new ButtonBuilder().setCustomId('achievement_progress').setLabel('📊 Check Progress').setStyle(ButtonStyle.Primary);
@@ -452,11 +461,11 @@ async function handleRecruitmentInteraction(interaction) {
     const row = new ActionRowBuilder().addComponents(prevBtn, progressBtn, nextBtn, rulesBtn);
 
     const payload = { embeds: [embed], components: [row] };
-    if (fileBuffer) {
+    if (fileBuffer && (!item.image_url || !item.image_url.startsWith('http'))) {
       payload.files = [{ attachment: fileBuffer, name: 'achievement.jpg' }];
     }
 
-    return interaction.update(payload);
+    return interaction.editReply(payload).catch((e) => console.error('[INTERACTION EDIT ERROR]:', e));
   }
 }
 
