@@ -22,7 +22,7 @@ export async function GET(req: NextRequest) {
     const guildId = searchParams.get('guild_id') || process.env.DISCORD_GUILD_ID || '';
     const currentWeek = getWeekIdentifier();
 
-    const [vaultRes, bossRes, triviaRes] = await Promise.all([
+    const [vaultRes, bossRes, triviaRes, invitesRes] = await Promise.all([
       // Unified Vault Leaderboard
       supabaseAdmin
         .from('vault_balances')
@@ -48,11 +48,13 @@ export async function GET(req: NextRequest) {
         .order('points', { ascending: false })
         .limit(10),
 
-      // Recruitment Invites Leaderboard
+      // Recruitment Invites Leaderboard (graceful fallback)
       supabaseAdmin
         .from('member_invites')
         .select('inviter_id')
-        .eq('status', 'valid'),
+        .eq('status', 'valid')
+        .then((r) => r)
+        .catch(() => ({ data: [] })),
     ]);
 
     const token = process.env.DISCORD_TOKEN || process.env.DISCORD_BOT_TOKEN;
