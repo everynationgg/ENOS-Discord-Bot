@@ -160,6 +160,10 @@ module.exports = {
           const { handleShowcaseFeedbackButton } = require('../modules/moderation/showcase');
           return handleShowcaseFeedbackButton(interaction);
         }
+        if (interaction.customId.startsWith('achievement_')) {
+          const { handleRecruitmentInteraction } = require('../modules/gaming/recruitment');
+          return handleRecruitmentInteraction(interaction);
+        }
         if (interaction.customId.startsWith('tts_')) {
           const { handleTtsComponent } = require('../commands/tts');
           return handleTtsComponent(interaction);
