@@ -385,6 +385,7 @@ async function handleRecruitmentInteraction(interaction) {
   }
 
   if (customId === 'achievement_prev' || customId === 'achievement_next') {
+    const catalog = await getAchievementsCatalog(interaction.guild?.id);
     let currentIndex = 0;
     if (interaction.message && interaction.message.embeds.length > 0) {
       const footerText = interaction.message.embeds[0].footer?.text || '';
@@ -395,26 +396,53 @@ async function handleRecruitmentInteraction(interaction) {
     }
 
     if (customId === 'achievement_prev') {
-      currentIndex = (currentIndex - 1 + ACHIEVEMENTS_CATALOG.length) % ACHIEVEMENTS_CATALOG.length;
+      currentIndex = (currentIndex - 1 + catalog.length) % catalog.length;
     } else {
-      currentIndex = (currentIndex + 1) % ACHIEVEMENTS_CATALOG.length;
+      currentIndex = (currentIndex + 1) % catalog.length;
     }
 
-    const item = ACHIEVEMENTS_CATALOG[currentIndex];
-    const imagePath = path.join(__dirname, `../../assets/achievements/${item.image}`);
+    const item = catalog[currentIndex] || catalog[0];
     let fileBuffer;
-    if (fs.existsSync(imagePath)) {
-      fileBuffer = fs.readFileSync(imagePath);
+
+    if (item.image_url && item.image_url.startsWith('http')) {
+      try {
+        const res = await fetch(item.image_url);
+        if (res.ok) {
+          fileBuffer = Buffer.from(await res.arrayBuffer());
+        }
+      } catch (e) {
+        console.warn('[INTERACTION IMAGE FETCH ERROR]:', e);
+      }
     }
 
-    const tierDesc = item.tiers.map((t) => `**${t.name}** → Title: **"${t.title}"** | *${t.reward}*`).join('\n');
+    if (!fileBuffer) {
+      const localImgName = item.image || 'recruitment.jpg';
+      const imagePath = path.join(__dirname, `../../assets/achievements/${localImgName}`);
+      if (fs.existsSync(imagePath)) {
+        fileBuffer = fs.readFileSync(imagePath);
+      } else {
+        const fallbackPath = path.join(__dirname, '../../assets/achievements/recruitment.jpg');
+        if (fs.existsSync(fallbackPath)) fileBuffer = fs.readFileSync(fallbackPath);
+      }
+    }
+
+    let tierDesc = '';
+    if (Array.isArray(item.tiers)) {
+      tierDesc = item.tiers.map((t) => `**${t.name}** → Title: **"${t.title}"** | *${t.reward}*`).join('\n');
+    } else if (item.tiers && typeof item.tiers === 'object') {
+      const t = item.tiers;
+      tierDesc =
+        `💜 **Enis (${t.enis?.threshold || 5} Required)** → Title: **"${t.enis?.title || 'They Who Herald the Nation'}"** | *${t.enis?.reward_val || '50 Vault Coins'}*\n` +
+        `🔥 **Enara (${t.enara?.threshold || 50} Required)** → Title: **"${t.enara?.title || 'Those Who Exalt the Nation'}"** | *${t.enara?.reward_val || '1 Month Nitro + Boost'}*\n` +
+        `👑 **Enorium (${t.enorium?.threshold || 100} Required)** → Title: **"${t.enorium?.title || 'The One Who Ordains the Nation'}"** | *${t.enorium?.reward_val || '1 Year Nitro + Boost'}*`;
+    }
 
     const embed = new EmbedBuilder()
-      .setColor(item.embedColor)
-      .setTitle(`📜 Achievement: ${item.title} — Every Nation`)
-      .setDescription(`${item.description}\n\n${tierDesc}`)
-      .setImage(`attachment://${item.image}`)
-      .setFooter({ text: `ENOS Community Achievements System • Card ${currentIndex + 1} of ${ACHIEVEMENTS_CATALOG.length}` })
+      .setColor(item.embedColor || item.color || 0x8B5CF6)
+      .setTitle(`📜 Achievement: ${item.title || item.name || 'Recruitment'} — Every Nation`)
+      .setDescription(`${item.description || ''}\n\n${tierDesc}`)
+      .setImage('attachment://achievement.jpg')
+      .setFooter({ text: `ENOS Community Achievements System • Card ${currentIndex + 1} of ${catalog.length}` })
       .setTimestamp();
 
     const prevBtn = new ButtonBuilder().setCustomId('achievement_prev').setLabel('⬅ Previous').setStyle(ButtonStyle.Secondary);
@@ -425,11 +453,26 @@ async function handleRecruitmentInteraction(interaction) {
 
     const payload = { embeds: [embed], components: [row] };
     if (fileBuffer) {
-      payload.files = [{ attachment: fileBuffer, name: item.image }];
+      payload.files = [{ attachment: fileBuffer, name: 'achievement.jpg' }];
     }
 
     return interaction.update(payload);
   }
+}
+
+/**
+ * Helper to fetch dynamic achievement catalog from DB or fallback
+ */
+async function getAchievementsCatalog(guildId) {
+  try {
+    const configData = await getFeatureConfig(guildId, 'recruitment_achievement');
+    if (configData?.config?.custom_achievements && Array.isArray(configData.config.custom_achievements) && configData.config.custom_achievements.length > 0) {
+      return configData.config.custom_achievements;
+    }
+  } catch (e) {
+    console.warn('[ACHIEVEMENTS CATALOG LOAD]: using default catalog', e?.message);
+  }
+  return ACHIEVEMENTS_CATALOG;
 }
 
 /**
@@ -445,42 +488,49 @@ async function postMasterAchievementCard(client, guildId, channelId) {
 
   const path = require('path');
   const fs = require('fs');
+  const catalog = await getAchievementsCatalog(guildId);
+  const activeItem = catalog[0] || ACHIEVEMENTS_CATALOG[0];
 
-  const imagePath = path.join(__dirname, '../../assets/achievements/recruitment.jpg');
   let fileBuffer;
+  if (activeItem.image_url && activeItem.image_url.startsWith('http')) {
+    try {
+      const res = await fetch(activeItem.image_url);
+      if (res.ok) {
+        fileBuffer = Buffer.from(await res.arrayBuffer());
+      }
+    } catch (e) {
+      console.warn('[ACHIEVEMENT IMAGE FETCH ERROR]:', e);
+    }
+  }
 
-  if (fs.existsSync(imagePath)) {
-    fileBuffer = fs.readFileSync(imagePath);
-  } else {
-    const { renderAchievementDetailCanvas } = require('./achievementCanvas');
-    const achievementDef = {
-      icon_emoji: '📜',
-      title: 'Recruitment',
-      description: 'Track successful member invitations to Every Nation.',
-      tier1_title: 'They Who Herald the Nation',
-      tier1_goal: 5,
-      tier1_reward_coins: 50,
-      tier2_title: 'Those Who Exalt the Nation',
-      tier2_goal: 50,
-      tier2_reward_coins: '1 Month Nitro + Boost',
-      tier3_title: 'The One Who Ordains the Nation',
-      tier3_goal: 100,
-      tier3_reward_coins: '1 Year Nitro + Boost',
-    };
-    fileBuffer = await renderAchievementDetailCanvas(achievementDef, 1, 1);
+  if (!fileBuffer) {
+    const localImgName = activeItem.image || 'recruitment.jpg';
+    const imagePath = path.join(__dirname, `../../assets/achievements/${localImgName}`);
+    if (fs.existsSync(imagePath)) {
+      fileBuffer = fs.readFileSync(imagePath);
+    } else {
+      const fallbackPath = path.join(__dirname, '../../assets/achievements/recruitment.jpg');
+      if (fs.existsSync(fallbackPath)) fileBuffer = fs.readFileSync(fallbackPath);
+    }
+  }
+
+  let tierDesc = '';
+  if (Array.isArray(activeItem.tiers)) {
+    tierDesc = activeItem.tiers.map((t) => `**${t.name}** → Title: **"${t.title}"** | *${t.reward}*`).join('\n');
+  } else if (activeItem.tiers && typeof activeItem.tiers === 'object') {
+    const t = activeItem.tiers;
+    tierDesc =
+      `💜 **Enis (${t.enis?.threshold || 5} Required)** → Title: **"${t.enis?.title || 'They Who Herald the Nation'}"** | *${t.enis?.reward_val || '50 Vault Coins'}*\n` +
+      `🔥 **Enara (${t.enara?.threshold || 50} Required)** → Title: **"${t.enara?.title || 'Those Who Exalt the Nation'}"** | *${t.enara?.reward_val || '1 Month Nitro + Boost'}*\n` +
+      `👑 **Enorium (${t.enorium?.threshold || 100} Required)** → Title: **"${t.enorium?.title || 'The One Who Ordains the Nation'}"** | *${t.enorium?.reward_val || '1 Year Nitro + Boost'}*`;
   }
 
   const embed = new EmbedBuilder()
-    .setColor(0x8B5CF6)
-    .setTitle('📜 Achievement: Recruitment')
-    .setDescription(
-      'Track successful member invitations to Every Nation.\n\n' +
-      '💜 **Enis (5 Invites)** → Title: **"They Who Herald the Nation"** | *50 Vault Coins*\n' +
-      '🔥 **Enara (50 Invites)** → Title: **"Those Who Exalt the Nation"** | *1 Month Discord Nitro + Boost*\n' +
-      '👑 **Enorium (100 Invites)** → Title: **"The One Who Ordains the Nation"** | *1 Year Discord Nitro + Boost*'
-    )
+    .setColor(activeItem.embedColor || activeItem.color || 0x8B5CF6)
+    .setTitle(`📜 Achievement: ${activeItem.title || activeItem.name || 'Recruitment'} — Every Nation`)
+    .setDescription(`${activeItem.description || 'Track community progress and achievements.'}\n\n${tierDesc}`)
     .setImage('attachment://achievement.jpg')
-    .setFooter({ text: 'ENOS Community Achievements System • Interactive Buttons Below' })
+    .setFooter({ text: `ENOS Community Achievements System • Card 1 of ${catalog.length}` })
     .setTimestamp();
 
   const prevBtn = new ButtonBuilder()
@@ -505,12 +555,16 @@ async function postMasterAchievementCard(client, guildId, channelId) {
 
   const row = new ActionRowBuilder().addComponents(prevBtn, progressBtn, nextBtn, rulesBtn);
 
-  await channel.send({
+  const payload = {
     embeds: [embed],
-    files: [{ attachment: fileBuffer, name: 'achievement.jpg' }],
     components: [row],
-  });
+  };
 
+  if (fileBuffer) {
+    payload.files = [{ attachment: fileBuffer, name: 'achievement.jpg' }];
+  }
+
+  await channel.send(payload);
   return true;
 }
 

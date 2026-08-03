@@ -111,17 +111,10 @@ export async function POST(req: NextRequest) {
         payload: { channel_id, timestamp: new Date().toISOString() },
       });
 
-      embed = {
-        title: '📜 Achievement: Recruitment — Every Nation',
-        description:
-          'Track successful member invitations to Every Nation.\n\n' +
-          '💜 **Enis (5 Invites)** → Title: **"They Who Herald the Nation"** | *50 Vault Coins*\n' +
-          '🔥 **Enara (50 Invites)** → Title: **"Those Who Exalt the Nation"** | *1 Month Discord Nitro + Boost*\n' +
-          '👑 **Enorium (100 Invites)** → Title: **"The One Who Ordains the Nation"** | *1 Year Discord Nitro + Boost*',
-        color: 0x8b5cf6,
-        footer: { text: 'ENOS Community Achievements System • Tracked via Gatekeeper' },
-        timestamp: new Date().toISOString(),
-      };
+      return NextResponse.json({
+        success: true,
+        message: 'Master Achievement Card dispatch requested! The bot is posting the interactive graphic card to your channel.',
+      });
     } else {
       return NextResponse.json(
         { success: false, error: 'Invalid leaderboard type specified.' },
