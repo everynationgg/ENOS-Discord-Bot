@@ -3,6 +3,7 @@
 import { useSession } from 'next-auth/react';
 import { useEffect, useState, useCallback } from 'react';
 import DiscordEmbedPreview from '@/components/DiscordEmbedPreview';
+import AchievementsCardForm from '@/components/AchievementsCardForm';
 
 interface Channel {
   id: string;
@@ -64,11 +65,26 @@ export default function LeaderboardsDashboard() {
     }
   }, [selectedChannelId]);
 
+  const [achievementsConfig, setAchievementsConfig] = useState<any>({});
+
+  const fetchAchievementsConfig = useCallback(async () => {
+    try {
+      const res = await fetch('/api/gaming/achievements/action');
+      const json = await res.json();
+      if (json.success && json.config) {
+        setAchievementsConfig(json.config);
+      }
+    } catch (e) {
+      console.error('Failed to fetch achievements config', e);
+    }
+  }, []);
+
   useEffect(() => {
     if (status !== 'authenticated') return;
     fetchLeaderboards();
     fetchChannels();
-  }, [status, fetchLeaderboards, fetchChannels]);
+    fetchAchievementsConfig();
+  }, [status, fetchLeaderboards, fetchChannels, fetchAchievementsConfig]);
 
   const handleForcePost = async () => {
     if (!selectedChannelId) {
@@ -640,11 +656,30 @@ export default function LeaderboardsDashboard() {
                   presetType="showcase"
                   title={embedTitle}
                   bodyMarkdown={embedDescription}
-                  bannerUrl={activeTab === 'achievements' ? '/images/achievements-card-preview.png' : undefined}
+                  bannerUrl={activeTab === 'achievements' ? (achievementsConfig.custom_achievements?.[0]?.image_url || '/images/achievements-card-preview.png') : undefined}
                 />
               </div>
             </div>
           </div>
+
+          {/* Achievement System Manager & Graphic Image Upload Panel */}
+          {activeTab === 'achievements' && (
+            <div
+              style={{
+                marginTop: '1.5rem',
+                background: 'var(--bg-card)',
+                borderRadius: '12px',
+                border: '1px solid var(--border-color)',
+                padding: '1.5rem',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+              }}
+            >
+              <AchievementsCardForm
+                config={achievementsConfig}
+                setConfig={(key, val) => setAchievementsConfig((prev: any) => ({ ...prev, [key]: val }))}
+              />
+            </div>
+          )}
         </div>
       </div>
     </div>
