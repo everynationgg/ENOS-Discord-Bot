@@ -78,6 +78,8 @@ client.once(Events.ClientReady, async () => {
           }
         }
       )
+      .subscribe();
+    logger.info('[REALTIME BOSS] Subscribed to boss_seasons changes.');
     const { postMasterAchievementCard } = require('./modules/gaming/recruitment');
 
     supabase
