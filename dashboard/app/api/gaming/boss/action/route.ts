@@ -251,6 +251,13 @@ export async function POST(req: NextRequest) {
     }
 
     if (action === 'refresh') {
+      const { data: featureRow } = await supabaseAdmin
+        .from('guild_config')
+        .select('config')
+        .eq('guild_id', guildId)
+        .eq('feature_key', 'weekly_boss')
+        .maybeSingle();
+
       const { data: existingBoss } = await supabaseAdmin
         .from('boss_seasons')
         .select('*')
