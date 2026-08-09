@@ -72,17 +72,39 @@ export async function DELETE(req: NextRequest) {
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const id = req.nextUrl.searchParams.get('id');
-  if (!id) {
-    return NextResponse.json({ error: 'Missing alert id parameter' }, { status: 400 });
+  const handleParam = req.nextUrl.searchParams.get('handle');
+  const guildId = req.nextUrl.searchParams.get('guild_id') || process.env.DISCORD_GUILD_ID!;
+
+  if (!id && !handleParam) {
+    return NextResponse.json({ error: 'Missing alert id or handle parameter' }, { status: 400 });
   }
 
   try {
-    const { error } = await supabaseAdmin
-      .from('live_alerts')
-      .delete()
-      .eq('id', id);
+    if (id) {
+      const { data: record } = await supabaseAdmin
+        .from('live_alerts')
+        .select('handle, guild_id')
+        .eq('id', id)
+        .maybeSingle();
 
-    if (error) throw error;
+      if (record?.handle) {
+        const cleanHandle = record.handle.replace(/^@/, '').trim();
+        await supabaseAdmin
+          .from('live_alerts')
+          .delete()
+          .ilike('handle', cleanHandle)
+          .eq('guild_id', record.guild_id || guildId);
+      }
+      await supabaseAdmin.from('live_alerts').delete().eq('id', id);
+    } else if (handleParam) {
+      const cleanHandle = handleParam.replace(/^@/, '').trim();
+      await supabaseAdmin
+        .from('live_alerts')
+        .delete()
+        .ilike('handle', cleanHandle)
+        .eq('guild_id', guildId);
+    }
+
     return NextResponse.json({ success: true });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });

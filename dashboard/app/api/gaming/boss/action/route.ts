@@ -66,19 +66,23 @@ export async function POST(req: NextRequest) {
       let finalBgUrl = resolvedBgUrl || featureRow?.config?.custom_bg_url || null;
 
       if (action === 'spawn_staged' || stagedConfig) {
-        if (stagedConfig?.boss_name) bossName = stagedConfig.boss_name;
-        if (stagedConfig?.boss_title) bossTitle = stagedConfig.boss_title;
-        if (stagedConfig?.lore) lore = stagedConfig.lore;
-        if (stagedConfig?.max_hp) hp = Number(stagedConfig.max_hp);
+        const sName = stagedConfig?.boss_name || stagedConfig?.override_name;
+        const sTitle = stagedConfig?.boss_title;
+        const sLore = stagedConfig?.lore;
+        const sHp = stagedConfig?.max_hp || stagedConfig?.override_hp;
+        if (sName) bossName = sName;
+        if (sTitle) bossTitle = sTitle;
+        if (sLore) lore = sLore;
+        if (sHp) hp = Number(sHp);
         if (stagedConfig?.custom_image_url) finalImageUrl = await resolveDirectImageUrl(stagedConfig.custom_image_url);
         if (stagedConfig?.custom_bg_url) finalBgUrl = await resolveDirectImageUrl(stagedConfig.custom_bg_url);
 
         // Promote staged artwork & fields into active config and clear staged_boss_config
         const updatedCfg = { ...(featureRow?.config || {}) };
-        if (stagedConfig?.boss_name) updatedCfg.override_name = stagedConfig.boss_name;
-        if (stagedConfig?.boss_title) updatedCfg.boss_title = stagedConfig.boss_title;
-        if (stagedConfig?.lore) updatedCfg.lore = stagedConfig.lore;
-        if (stagedConfig?.max_hp) updatedCfg.override_hp = stagedConfig.max_hp;
+        if (sName) updatedCfg.override_name = sName;
+        if (sTitle) updatedCfg.boss_title = sTitle;
+        if (sLore) updatedCfg.lore = sLore;
+        if (sHp) updatedCfg.override_hp = sHp;
         if (stagedConfig?.custom_image_url) updatedCfg.custom_image_url = stagedConfig.custom_image_url;
         if (stagedConfig?.custom_bg_url) updatedCfg.custom_bg_url = stagedConfig.custom_bg_url;
         if (stagedConfig?.victory_image_url) updatedCfg.victory_image_url = stagedConfig.victory_image_url;

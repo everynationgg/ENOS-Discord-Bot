@@ -236,6 +236,15 @@ async function renderBossImage(data) {
       const bgImg = await loadImage(bgBuf);
       ctx.drawImage(bgImg, 0, 0, width, height);
       customBgLoaded = true;
+
+      if (isOverkill) {
+        const perkOverlay = ctx.createRadialGradient(width / 2, height / 2, 100, width / 2, height / 2, 420);
+        perkOverlay.addColorStop(0, 'rgba(239, 68, 68, 0.12)');
+        perkOverlay.addColorStop(0.7, 'rgba(185, 28, 28, 0.40)');
+        perkOverlay.addColorStop(1, 'rgba(127, 29, 29, 0.70)');
+        ctx.fillStyle = perkOverlay;
+        ctx.fillRect(0, 0, width, height);
+      }
     } catch (e) {}
   }
 

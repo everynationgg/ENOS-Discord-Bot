@@ -15,6 +15,19 @@ module.exports = {
     const userId = member.user.id;
 
     try {
+      // Delete member birthdays & queue records if they exist
+      await supabase
+        .from('member_birthdays')
+        .delete()
+        .eq('user_id', userId)
+        .eq('guild_id', guildId);
+
+      await supabase
+        .from('birthday_queue')
+        .delete()
+        .eq('user_id', userId)
+        .eq('guild_id', guildId);
+
       // Delete the verified member record if it exists
       const { data, error } = await supabase
         .from('verified_members')

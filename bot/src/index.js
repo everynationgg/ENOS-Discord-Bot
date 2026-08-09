@@ -56,12 +56,21 @@ client.once(Events.ClientReady, async () => {
     const { supabase } = require('./lib/supabase');
     const { spawnAndAnnounceWeeklyBoss } = require('./modules/gaming/boss');
 
+    let lastBossRealtimeTrigger = 0;
+
     supabase
       .channel('realtime_boss_updates')
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'boss_seasons' },
         async (payload) => {
+          const now = Date.now();
+          if (now - lastBossRealtimeTrigger < 5000) {
+            logger.info('[REALTIME BOSS] Debouncing rapid realtime event...');
+            return;
+          }
+          lastBossRealtimeTrigger = now;
+
           logger.info('[REALTIME BOSS] Detected boss season change:', payload.new?.boss_name);
           const guildId = payload.new?.guild_id || process.env.DISCORD_GUILD_ID;
           if (guildId) {

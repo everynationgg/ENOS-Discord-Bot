@@ -95,6 +95,8 @@ function chooseWeightedChannel(allowedChannels) {
   return pool[Math.floor(Math.random() * pool.length)];
 }
 
+let isTriviaDropInProgress = false;
+
 /**
  * Triggers a trivia drop for a guild.
  * @param {import('discord.js').Client} client
@@ -102,6 +104,12 @@ function chooseWeightedChannel(allowedChannels) {
  * @returns {Promise<boolean>}
  */
 async function triggerTriviaDrop(client, guildId) {
+  if (isTriviaDropInProgress) {
+    logger.warn('[TRIVIA] Drop trigger already in progress, skipping concurrent call.');
+    return false;
+  }
+  isTriviaDropInProgress = true;
+
   try {
     const featureConfig = await getFeatureConfig(guildId, 'trivia');
     if (!featureConfig?.enabled) {
@@ -215,8 +223,8 @@ async function triggerTriviaDrop(client, guildId) {
 
     await logBotEvent(guildId, 'trivia_drop', null, { dropId: drop.id, channelId: channel.id });
 
-    // Send notification alert to the designated notification channel if configured
-    if (config.notification_channel_id) {
+    // Send notification alert ONLY if notification channel is configured AND different from current drop channel
+    if (config.notification_channel_id && config.notification_channel_id !== channel.id) {
       const notifChannel = await guild.channels.fetch(config.notification_channel_id).catch(() => null);
       if (notifChannel && notifChannel.isTextBased()) {
         // Delete any existing notification message first
@@ -252,6 +260,8 @@ async function triggerTriviaDrop(client, guildId) {
   } catch (err) {
     logger.error('[TRIVIA] Error in triggerTriviaDrop:', err.message);
     return false;
+  } finally {
+    isTriviaDropInProgress = false;
   }
 }
 

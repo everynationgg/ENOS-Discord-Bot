@@ -10,6 +10,7 @@ interface ImageUploaderProps {
   placeholder?: string;
   helpText?: string;
   maxDimension?: number; // Optional max width/height to auto-resize (default 1200)
+  previewHeight?: string;
 }
 
 /**

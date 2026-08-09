@@ -105,20 +105,24 @@ async function getOrCreateActiveBoss(guildId) {
 
   let finalBgUrl = (stagedConfig && stagedConfig.custom_bg_url) ? stagedConfig.custom_bg_url : (featureRow?.config?.custom_bg_url || null);
 
-  if (stagedConfig && stagedConfig.enabled) {
-    if (stagedConfig.boss_name) finalBossName = stagedConfig.boss_name;
-    if (stagedConfig.boss_title) finalBossTitle = stagedConfig.boss_title;
-    if (stagedConfig.lore) finalLore = stagedConfig.lore;
-    if (stagedConfig.max_hp) finalMaxHp = Number(stagedConfig.max_hp);
+  if (stagedConfig && (stagedConfig.enabled || stagedConfig.enabled === undefined)) {
+    const sName = stagedConfig.boss_name || stagedConfig.override_name;
+    const sTitle = stagedConfig.boss_title;
+    const sLore = stagedConfig.lore;
+    const sHp = stagedConfig.max_hp || stagedConfig.override_hp;
+    if (sName) finalBossName = sName;
+    if (sTitle) finalBossTitle = sTitle;
+    if (sLore) finalLore = sLore;
+    if (sHp) finalMaxHp = Number(sHp);
     if (stagedConfig.custom_image_url) finalCustomImageUrl = stagedConfig.custom_image_url;
     if (stagedConfig.custom_bg_url) finalBgUrl = stagedConfig.custom_bg_url;
 
     // Clear staged_boss_config so it doesn't re-trigger, and promote staged artwork & fields to active config
     const updatedConfig = { ...(featureRow?.config || {}) };
-    if (stagedConfig.boss_name) updatedConfig.override_name = stagedConfig.boss_name;
-    if (stagedConfig.boss_title) updatedConfig.boss_title = stagedConfig.boss_title;
-    if (stagedConfig.lore) updatedConfig.lore = stagedConfig.lore;
-    if (stagedConfig.max_hp) updatedConfig.override_hp = stagedConfig.max_hp;
+    if (sName) updatedConfig.override_name = sName;
+    if (sTitle) updatedConfig.boss_title = sTitle;
+    if (sLore) updatedConfig.lore = sLore;
+    if (sHp) updatedConfig.override_hp = sHp;
     if (stagedConfig.custom_image_url) updatedConfig.custom_image_url = stagedConfig.custom_image_url;
     if (stagedConfig.custom_bg_url) updatedConfig.custom_bg_url = stagedConfig.custom_bg_url;
     if (stagedConfig.victory_image_url) updatedConfig.victory_image_url = stagedConfig.victory_image_url;
@@ -520,7 +524,6 @@ async function executeCombatAction(guildId, userId, actionType) {
   if (isCrit) actionText += ' 💥 (CRITICAL STRIKE! 2x DMG)';
   if (apConserved) actionText += ' ⚡ (0 AP SPENT!)';
   if (isSynergy) actionText += ` 🔥 (${synergyType.toUpperCase()} COMBO!)`;
-  if (newLevel > profile.level) actionText += ` 🎉 (LEVEL UP to Lv.${newLevel}!)`;
 
   const { data: updatedBoss, error: bossErr } = await supabase
     .from('boss_seasons')
@@ -785,11 +788,19 @@ async function concludeWeeklyBossBattle(guildId, client = null) {
  *   boss cards in the channel and always posts a brand new message. When false (Realtime live update):
  *   edits the existing card in place, or posts if none found.
  */
+let isBossSpawnInProgress = false;
+
 async function spawnAndAnnounceWeeklyBoss(client, guildId, { forceNewPost = false } = {}) {
-  const boss = await getOrCreateActiveBoss(guildId);
-  if (!boss) return null;
+  if (isBossSpawnInProgress) {
+    logger.warn('[BOSS SPAWN] Spawn/announce already in progress, skipping concurrent call.');
+    return null;
+  }
+  isBossSpawnInProgress = true;
 
   try {
+    const boss = await getOrCreateActiveBoss(guildId);
+    if (!boss) return null;
+
     const { buildPublicBossEmbedPayload } = require('../../commands/boss');
     const { data: featureRow } = await supabase
       .from('guild_config')
@@ -891,6 +902,8 @@ async function spawnAndAnnounceWeeklyBoss(client, guildId, { forceNewPost = fals
     }
   } catch (err) {
     logger.error(`[BOSS SPAWN] Error announcing weekly boss for guild ${guildId}:`, err.message);
+  } finally {
+    isBossSpawnInProgress = false;
   }
 
   return boss;

@@ -53,8 +53,10 @@ export async function GET(req: NextRequest) {
         .from('member_invites')
         .select('inviter_id')
         .eq('status', 'valid')
-        .then((r) => r)
-        .catch(() => ({ data: [] })),
+        .then(
+          (r) => r,
+          () => ({ data: [] as any[], error: null })
+        ),
     ]);
 
     const token = process.env.DISCORD_TOKEN || process.env.DISCORD_BOT_TOKEN;
@@ -82,9 +84,9 @@ export async function GET(req: NextRequest) {
     // Collect all unique Discord user IDs
     const userIds = Array.from(
       new Set([
-        ...rawVault.map((v) => v.discord_id),
-        ...rawBoss.map((b) => b.user_id),
-        ...rawTrivia.map((t) => t.discord_id),
+        ...rawVault.map((v: any) => v.discord_id),
+        ...rawBoss.map((b: any) => b.user_id),
+        ...rawTrivia.map((t: any) => t.discord_id),
         ...sortedAchievers.map((a) => a.inviter_id),
       ])
     ).filter(Boolean);
@@ -123,19 +125,19 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    const vault = rawVault.map((v) => ({
+    const vault = rawVault.map((v: any) => ({
       ...v,
       username: userProfiles[v.discord_id]?.username || `Member (${v.discord_id.slice(-4)})`,
       avatar_url: userProfiles[v.discord_id]?.avatar_url || getDiscordAvatar(v.discord_id),
     }));
 
-    const boss = rawBoss.map((b) => ({
+    const boss = rawBoss.map((b: any) => ({
       ...b,
       username: userProfiles[b.user_id]?.username || `Member (${b.user_id.slice(-4)})`,
       avatar_url: userProfiles[b.user_id]?.avatar_url || getDiscordAvatar(b.user_id),
     }));
 
-    const trivia = rawTrivia.map((t) => ({
+    const trivia = rawTrivia.map((t: any) => ({
       ...t,
       username: userProfiles[t.discord_id]?.username || `Member (${t.discord_id.slice(-4)})`,
       avatar_url: userProfiles[t.discord_id]?.avatar_url || getDiscordAvatar(t.discord_id),

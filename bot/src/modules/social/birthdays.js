@@ -64,6 +64,18 @@ async function loadBirthdayQueue(client) {
       if (!birthdays || birthdays.length === 0) continue;
 
       for (const bday of birthdays) {
+        // Verify member is still in the Discord server
+        const discordGuild = await client.guilds.fetch(guildId).catch(() => null);
+        if (discordGuild) {
+          const member = await discordGuild.members.fetch(bday.user_id).catch(() => null);
+          if (!member) {
+            logger.info(`[BIRTHDAYS] Member ${bday.user_id} has left guild ${guildId}. Pruning birthday record.`);
+            await supabase.from('member_birthdays').delete().eq('guild_id', guildId).eq('user_id', bday.user_id);
+            await supabase.from('birthday_queue').delete().eq('guild_id', guildId).eq('user_id', bday.user_id);
+            continue;
+          }
+        }
+
         // Insert into birthday_queue if not already exists
         const { error: insertError } = await supabase
           .from('birthday_queue')
@@ -86,6 +98,59 @@ async function loadBirthdayQueue(client) {
           }
         } else {
           logger.info(`[BIRTHDAYS] Queued upcoming birthday for user ${bday.user_id} in guild ${guildId} on ${yyyyMmDd}`);
+        }
+      }
+    }
+
+    // 3. 1-Day-Ahead Admin Birthday Notification Alert
+    const { mmDd: mmDdTomorrow, yyyyMmDd: yyyyMmDdTomorrow } = getTargetDates(1);
+    for (const guild of activeGuilds) {
+      const guildId = guild.guild_id;
+      const { data: bdaysTomorrow } = await supabase
+        .from('member_birthdays')
+        .select('user_id, ign')
+        .eq('guild_id', guildId)
+        .eq('birth_date', mmDdTomorrow);
+
+      if (!bdaysTomorrow || bdaysTomorrow.length === 0) continue;
+
+      const { data: gSetting } = await supabase
+        .from('guild_settings')
+        .select('birthday_channel_id')
+        .eq('guild_id', guildId)
+        .maybeSingle();
+
+      const { data: gConfig } = await supabase
+        .from('guild_config')
+        .select('config')
+        .eq('guild_id', guildId)
+        .eq('feature_key', 'birthday')
+        .maybeSingle();
+
+      const adminChannelId = gConfig?.config?.admin_channel_id || gConfig?.config?.notification_channel_id || gSetting?.birthday_channel_id;
+
+      if (adminChannelId) {
+        const discordGuild = await client.guilds.fetch(guildId).catch(() => null);
+        const adminChan = discordGuild ? await discordGuild.channels.fetch(adminChannelId).catch(() => null) : null;
+
+        if (adminChan && adminChan.isTextBased()) {
+          const { EmbedBuilder } = require('discord.js');
+          for (const bday of bdaysTomorrow) {
+            const alertEmbed = new EmbedBuilder()
+              .setColor(0xF43F5E)
+              .setTitle('🎂 Upcoming Birthday Tomorrow!')
+              .setDescription(
+                `🎉 **Tomorrow (${yyyyMmDdTomorrow})** is <@${bday.user_id}>'s birthday!\n\n` +
+                `Please review and approve their custom greeting message on the ENOS Dashboard.`
+              )
+              .setFooter({ text: 'ENOS Birthday System • Admin Alert' })
+              .setTimestamp();
+
+            await adminChan.send({ embeds: [alertEmbed] }).catch((e) =>
+              logger.error(`[BIRTHDAYS] Failed to send 1-day birthday admin alert: ${e.message}`)
+            );
+            logger.info(`[BIRTHDAYS] Sent 1-day ahead admin birthday alert for ${bday.user_id} in channel ${adminChannelId}`);
+          }
         }
       }
     }

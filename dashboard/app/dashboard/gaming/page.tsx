@@ -1850,6 +1850,16 @@ function BossCardForm({ config, setConfig }: { config: any; setConfig: (key: str
             />
           </div>
 
+          <div style={{ marginTop: '0.75rem' }}>
+            <ImageUploader
+              id="staged-boss-bg-image"
+              label="Staged Arena Background Image URL"
+              value={staged.custom_bg_url || ''}
+              onChange={(url) => setConfig('staged_boss_config', { ...staged, custom_bg_url: url })}
+              previewHeight="120px"
+            />
+          </div>
+
           <div style={{ marginTop: '1rem', paddingTop: '0.75rem', borderTop: '1px solid var(--border-subtle)' }}>
             <button
               type="button"
