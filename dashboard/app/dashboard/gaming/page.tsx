@@ -1732,6 +1732,33 @@ function BossCardForm({ config, setConfig }: { config: any; setConfig: (key: str
             </div>
           </div>
 
+          <div style={{ marginTop: '0.75rem', display: 'flex', gap: '0.5rem' }}>
+            <button
+              type="button"
+              className="btn btn-secondary btn-sm"
+              style={{ backgroundColor: 'rgba(59, 130, 246, 0.15)', color: '#60a5fa', border: '1px solid rgba(59, 130, 246, 0.3)', fontWeight: 600, width: '100%' }}
+              onClick={async () => {
+                try {
+                  const res = await fetch('/api/gaming/boss/action', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'refresh' }),
+                  });
+                  const data = await res.json();
+                  if (res.ok) {
+                    alert(`✅ ${data.message || 'Discord Weekly Boss Card refreshed and updated with active Name, Title & Lore!'}`);
+                  } else {
+                    alert(`❌ Refresh failed: ${data.error || 'Unknown error'}`);
+                  }
+                } catch (e: any) {
+                  alert(`❌ Request error: ${e.message}`);
+                }
+              }}
+            >
+              🔄 Refresh Discord Boss Card Now
+            </button>
+          </div>
+
           {/* Collapsible Advanced Settings (Class Cards & Custom Images) */}
           <div style={{ marginTop: '1rem', borderTop: '1px solid var(--border-subtle)', paddingTop: '0.75rem' }}>
             <button

@@ -250,6 +250,56 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: true, action: 'update_image', boss: updatedBoss });
     }
 
+    if (action === 'refresh') {
+      const { data: existingBoss } = await supabaseAdmin
+        .from('boss_seasons')
+        .select('*')
+        .eq('guild_id', guildId)
+        .eq('week_identifier', currentWeek)
+        .eq('is_overkill', false)
+        .maybeSingle();
+
+      if (!existingBoss) {
+        return NextResponse.json({ error: 'No active boss season found to refresh' }, { status: 400 });
+      }
+
+      const cfgName = featureRow?.config?.override_name || featureRow?.config?.boss_name;
+      const cfgTitle = featureRow?.config?.boss_title;
+      const cfgLore = featureRow?.config?.lore;
+      const cfgHp = featureRow?.config?.override_hp || featureRow?.config?.max_hp;
+      const cfgImg = featureRow?.config?.custom_image_url;
+      const cfgBg = featureRow?.config?.custom_bg_url;
+
+      const newBossName = cfgName || existingBoss.boss_name;
+      const newBossTitle = cfgTitle || existingBoss.boss_title;
+      const newLore = cfgLore || existingBoss.lore;
+      const newMaxHp = cfgHp ? Number(cfgHp) : existingBoss.max_hp;
+      const newImg = cfgImg ? await resolveDirectImageUrl(cfgImg) : existingBoss.custom_image_url;
+      const newBg = cfgBg ? await resolveDirectImageUrl(cfgBg) : existingBoss.custom_bg_url;
+
+      const { data: updatedBoss, error } = await supabaseAdmin
+        .from('boss_seasons')
+        .update({
+          boss_name: newBossName,
+          boss_title: newBossTitle,
+          lore: newLore,
+          max_hp: newMaxHp,
+          custom_image_url: newImg,
+          custom_bg_url: newBg,
+          last_action: '🔄 Boss Card refreshed from Admin Dashboard!',
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', existingBoss.id)
+        .select()
+        .single();
+
+      if (error) {
+        return NextResponse.json({ error: error.message }, { status: 500 });
+      }
+
+      return NextResponse.json({ success: true, action: 'refresh', boss: updatedBoss });
+    }
+
     if (action === 'end') {
       await supabaseAdmin
         .from('boss_seasons')

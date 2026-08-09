@@ -1060,7 +1060,7 @@ export default function SocialPage() {
                       </div>
 
                       <div className="form-group">
-                        <label className="form-label">Optional Member Log Channel</label>
+                        <label className="form-label">Admin Reminder & Log Channel (1-Day Ahead Birthday Alerts)</label>
                         <select
                           id="birthday-log-channel"
                           className="form-select"
@@ -1070,13 +1070,13 @@ export default function SocialPage() {
                         >
                           <option value="">-- Disabled --</option>
                           {logChannelId && !channels.some((c) => c.id === logChannelId) && (
-                            <option value={logChannelId}># member-logs ({logChannelId})</option>
+                            <option value={logChannelId}># admin-reminders ({logChannelId})</option>
                           )}
                           {channels.map((c) => (
                             <option key={c.id} value={c.id}>{c.name}</option>
                           ))}
                         </select>
-                        <span className="form-hint">Channel to log verification entries when new users set their birthday.</span>
+                        <span className="form-hint">Target channel to receive 1-day-ahead birthday admin alerts and birthday verification logs.</span>
                       </div>
 
                       <div className="form-group">

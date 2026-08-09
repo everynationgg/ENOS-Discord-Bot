@@ -156,9 +156,10 @@ async function buildPublicBossEmbedPayload(guildId) {
   const filledBlocks = Math.round(hpPct / 10);
   const hpBar = '🟩'.repeat(filledBlocks) + '⬛'.repeat(10 - filledBlocks);
 
+  const displayTitle = boss.boss_title ? ` [${boss.boss_title}]` : '';
   const embed = new EmbedBuilder()
     .setColor(isVictorious ? 0xfacc15 : (boss.is_overkill ? 0xef4444 : 0x6366f1))
-    .setTitle(isVictorious ? `🏆 VICTORY! WEEKLY BOSS CLEARED — ${boss.boss_name}` : `${boss.is_overkill ? '🔥 OVERKILL MODE' : '⚔️ Weekly Boss Bounty'} — ${boss.boss_name}`)
+    .setTitle(isVictorious ? `🏆 VICTORY! WEEKLY BOSS CLEARED — ${boss.boss_name}${displayTitle}` : `${boss.is_overkill ? '🔥 OVERKILL MODE' : '⚔️ Weekly Boss Bounty'} — ${boss.boss_name}${displayTitle}`)
     .setDescription(
       isVictorious
         ? `🎉 **CONGRATULATIONS! Server Threat Neutralized!**\n\n` +
