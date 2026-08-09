@@ -54,7 +54,9 @@ module.exports = {
     // Auto-Reactions: react to trigger words
     const reactionsEnabled = await isFeatureEnabled(guildId, 'auto_reactions');
     if (reactionsEnabled) {
-      await handleMessageAutoReactions(message).catch(() => {});
+      await handleMessageAutoReactions(message).catch((err) => {
+        logger.error(`[AUTO-REACTIONS] handleMessageAutoReactions error: ${err.message}`);
+      });
     }
 
     // EN TTS: Queue text message for voice playback if active in VC text chat
