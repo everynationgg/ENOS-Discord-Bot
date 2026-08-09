@@ -96,6 +96,44 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // Auto-sync active boss_seasons row when saving Weekly Boss configuration
+    if (feature_key === 'weekly_boss') {
+      try {
+        const now = new Date();
+        const year = now.getUTCFullYear();
+        const firstDayOfYear = new Date(Date.UTC(year, 0, 1));
+        const pastDaysOfYear = (now.getTime() - firstDayOfYear.getTime()) / 86400000;
+        const weekNum = Math.ceil((pastDaysOfYear + firstDayOfYear.getUTCDay() + 1) / 7);
+        const currentWeek = `${year}-W${String(weekNum).padStart(2, '0')}`;
+
+        const rawName = config?.override_name || config?.boss_name;
+        const gameLabel = config?.game_name || 'Gaming Realm';
+        const charName = rawName || 'Anomaly';
+
+        const bossName = rawName ? (rawName.startsWith('ERROR-MOD:') ? rawName : `ERROR-MOD: Corrupted ${rawName}`) : undefined;
+        const bossTitle = config?.boss_title || (config?.game_name ? `System Threat (${gameLabel})` : undefined);
+        const lore = config?.lore || (config?.override_name || config?.game_name ? `A space-time realm rift merged ${gameLabel} data with ENOS core protocols. ${charName} has manifested in the server! Coordinate your triad skills to neutralize!` : undefined);
+        const maxHp = config?.override_hp || config?.max_hp;
+
+        const updatePayload: any = { updated_at: new Date().toISOString() };
+        if (bossName) updatePayload.boss_name = bossName;
+        if (bossTitle) updatePayload.boss_title = bossTitle;
+        if (lore) updatePayload.lore = lore;
+        if (maxHp) updatePayload.max_hp = Number(maxHp);
+        if (config?.custom_image_url) updatePayload.custom_image_url = config.custom_image_url;
+        if (config?.custom_bg_url) updatePayload.custom_bg_url = config.custom_bg_url;
+
+        await supabaseAdmin
+          .from('boss_seasons')
+          .update(updatePayload)
+          .eq('guild_id', guildId)
+          .eq('week_identifier', currentWeek)
+          .eq('is_overkill', false);
+      } catch (e) {
+        console.error('[CONFIG API] Failed to auto-sync boss_seasons:', e);
+      }
+    }
+
     return NextResponse.json({ success: true });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });

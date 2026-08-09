@@ -259,45 +259,72 @@ export async function POST(req: NextRequest) {
         .eq('is_overkill', false)
         .maybeSingle();
 
-      if (!existingBoss) {
-        return NextResponse.json({ error: 'No active boss season found to refresh' }, { status: 400 });
-      }
-
       const cfgName = featureRow?.config?.override_name || featureRow?.config?.boss_name;
+      const cfgGame = featureRow?.config?.game_name;
       const cfgTitle = featureRow?.config?.boss_title;
       const cfgLore = featureRow?.config?.lore;
       const cfgHp = featureRow?.config?.override_hp || featureRow?.config?.max_hp;
       const cfgImg = featureRow?.config?.custom_image_url;
       const cfgBg = featureRow?.config?.custom_bg_url;
 
-      const newBossName = cfgName || existingBoss.boss_name;
-      const newBossTitle = cfgTitle || existingBoss.boss_title;
-      const newLore = cfgLore || existingBoss.lore;
-      const newMaxHp = cfgHp ? Number(cfgHp) : existingBoss.max_hp;
-      const newImg = cfgImg ? await resolveDirectImageUrl(cfgImg) : existingBoss.custom_image_url;
-      const newBg = cfgBg ? await resolveDirectImageUrl(cfgBg) : existingBoss.custom_bg_url;
+      const rawCharName = cfgName || (existingBoss ? existingBoss.boss_name.replace(/^ERROR-MOD:\s*Corrupted\s*/i, '') : 'Anomaly');
+      const gameLabel = cfgGame || 'Gaming Realm';
 
-      const { data: updatedBoss, error } = await supabaseAdmin
-        .from('boss_seasons')
-        .update({
-          boss_name: newBossName,
-          boss_title: newBossTitle,
-          lore: newLore,
-          max_hp: newMaxHp,
-          custom_image_url: newImg,
-          custom_bg_url: newBg,
-          last_action: '🔄 Boss Card refreshed from Admin Dashboard!',
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', existingBoss.id)
-        .select()
-        .single();
+      const newBossName = cfgName ? (cfgName.startsWith('ERROR-MOD:') ? cfgName : `ERROR-MOD: Corrupted ${cfgName}`) : (existingBoss?.boss_name || `ERROR-MOD: Corrupted ${rawCharName}`);
+      const newBossTitle = cfgTitle || (cfgGame ? `System Threat (${gameLabel})` : (existingBoss?.boss_title || `System Threat (${gameLabel})`));
+      const newLore = cfgLore || (existingBoss?.lore || `A space-time realm rift merged ${gameLabel} data with ENOS core protocols. ${rawCharName} has manifested in the server! Coordinate your triad skills to neutralize!`);
+      const newMaxHp = cfgHp ? Number(cfgHp) : (existingBoss?.max_hp || 150000);
+      const newImg = cfgImg ? await resolveDirectImageUrl(cfgImg) : existingBoss?.custom_image_url;
+      const newBg = cfgBg ? await resolveDirectImageUrl(cfgBg) : existingBoss?.custom_bg_url;
 
-      if (error) {
-        return NextResponse.json({ error: error.message }, { status: 500 });
+      if (existingBoss) {
+        const { data: updatedBoss, error } = await supabaseAdmin
+          .from('boss_seasons')
+          .update({
+            boss_name: newBossName,
+            boss_title: newBossTitle,
+            lore: newLore,
+            max_hp: newMaxHp,
+            custom_image_url: newImg,
+            custom_bg_url: newBg,
+            last_action: '🔄 Boss Card refreshed from Admin Dashboard!',
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', existingBoss.id)
+          .select()
+          .single();
+
+        if (error) {
+          return NextResponse.json({ error: error.message }, { status: 500 });
+        }
+        return NextResponse.json({ success: true, action: 'refresh', boss: updatedBoss });
+      } else {
+        const { data: newBoss, error } = await supabaseAdmin
+          .from('boss_seasons')
+          .insert({
+            guild_id: guildId,
+            week_identifier: currentWeek,
+            boss_name: newBossName,
+            boss_title: newBossTitle,
+            lore: newLore,
+            max_hp: newMaxHp,
+            current_hp: newMaxHp,
+            is_defeated: false,
+            is_overkill: false,
+            mom_buff: false,
+            dad_debuff: false,
+            custom_image_url: newImg,
+            custom_bg_url: newBg,
+            last_action: '⚡ Admin initialized Weekly Boss from Dashboard!',
+          })
+          .select()
+          .single();
+
+        if (error) {
+          return NextResponse.json({ error: error.message }, { status: 500 });
+        }
+        return NextResponse.json({ success: true, action: 'refresh', boss: newBoss });
       }
-
-      return NextResponse.json({ success: true, action: 'refresh', boss: updatedBoss });
     }
 
     if (action === 'end') {

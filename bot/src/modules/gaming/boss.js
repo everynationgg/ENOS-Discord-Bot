@@ -97,10 +97,14 @@ async function getOrCreateActiveBoss(guildId) {
 
   const stagedConfig = featureRow?.config?.staged_boss_config;
 
-  let finalBossName = bossData.bossName;
-  let finalBossTitle = bossData.bossTitle;
-  let finalLore = bossData.lore;
-  let finalMaxHp = bossHp;
+  const rawOverrideName = featureRow?.config?.override_name || featureRow?.config?.boss_name;
+  const gameLabel = featureRow?.config?.game_name || 'Gaming Realm';
+  const charName = rawOverrideName || bossData.bossName;
+
+  let finalBossName = rawOverrideName ? (rawOverrideName.startsWith('ERROR-MOD:') ? rawOverrideName : `ERROR-MOD: Corrupted ${rawOverrideName}`) : bossData.bossName;
+  let finalBossTitle = featureRow?.config?.boss_title || `System Threat (${gameLabel})`;
+  let finalLore = featureRow?.config?.lore || (rawOverrideName ? `A space-time realm rift merged ${gameLabel} data with ENOS core protocols. ${charName} has manifested in the server! Coordinate your triad skills to neutralize!` : bossData.lore);
+  let finalMaxHp = featureRow?.config?.override_hp || featureRow?.config?.max_hp || bossHp;
   let finalCustomImageUrl = featureRow?.config?.custom_image_url || null;
 
   let finalBgUrl = (stagedConfig && stagedConfig.custom_bg_url) ? stagedConfig.custom_bg_url : (featureRow?.config?.custom_bg_url || null);

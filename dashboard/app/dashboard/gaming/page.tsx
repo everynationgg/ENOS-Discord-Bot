@@ -1708,6 +1708,17 @@ function BossCardForm({ config, setConfig }: { config: any; setConfig: (key: str
             </div>
 
             <div className="form-group">
+              <label className="form-label">Boss Subtitle / Class Title</label>
+              <input
+                id="boss-title-input"
+                className="form-input"
+                placeholder="e.g. System Threat (Where Winds Meet)"
+                value={config.boss_title || ''}
+                onChange={(e) => setConfig('boss_title', e.target.value)}
+              />
+            </div>
+
+            <div className="form-group">
               <label className="form-label">Base Max HP</label>
               <input
                 id="boss-override-hp"
@@ -1717,10 +1728,21 @@ function BossCardForm({ config, setConfig }: { config: any; setConfig: (key: str
                 value={baseHP}
                 onChange={(e) => setConfig('override_hp', parseInt(e.target.value) || '')}
               />
-              <span className="form-hint">Scaled automatically based on total weekly participants</span>
             </div>
 
-            <div className="form-group">
+            <div className="form-group" style={{ gridColumn: 'span 2' }}>
+              <label className="form-label">Custom Boss Lore & Story Background</label>
+              <textarea
+                id="boss-lore-input"
+                className="form-textarea"
+                rows={3}
+                placeholder="Describe the boss lore and story background..."
+                value={config.lore || ''}
+                onChange={(e) => setConfig('lore', e.target.value)}
+              />
+            </div>
+
+            <div className="form-group" style={{ gridColumn: 'span 2' }}>
               <label className="form-label">Announcement Channel ID</label>
               <input
                 id="boss-announcement-channel"
@@ -1855,6 +1877,16 @@ function BossCardForm({ config, setConfig }: { config: any; setConfig: (key: str
               />
             </div>
             <div className="form-group">
+              <label className="form-label">Staged Boss Subtitle / Class Title</label>
+              <input
+                id="staged-boss-title"
+                className="form-input"
+                placeholder="e.g. System Threat (Palworld)"
+                value={staged.boss_title || ''}
+                onChange={(e) => setConfig('staged_boss_config', { ...staged, boss_title: e.target.value })}
+              />
+            </div>
+            <div className="form-group">
               <label className="form-label">Staged Base Max HP</label>
               <input
                 id="staged-boss-hp"
@@ -1863,6 +1895,17 @@ function BossCardForm({ config, setConfig }: { config: any; setConfig: (key: str
                 placeholder="e.g. 600000"
                 value={staged.override_hp || ''}
                 onChange={(e) => setConfig('staged_boss_config', { ...staged, override_hp: parseInt(e.target.value) || '' })}
+              />
+            </div>
+            <div className="form-group" style={{ gridColumn: 'span 2' }}>
+              <label className="form-label">Staged Custom Boss Lore</label>
+              <textarea
+                id="staged-boss-lore"
+                className="form-textarea"
+                rows={3}
+                placeholder="Describe next week's boss lore..."
+                value={staged.lore || ''}
+                onChange={(e) => setConfig('staged_boss_config', { ...staged, lore: e.target.value })}
               />
             </div>
           </div>
