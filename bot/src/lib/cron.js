@@ -12,6 +12,7 @@ const { expireOldLFGSessions } = require('../modules/gaming/lfg');
 const { loadBirthdayQueue, dispatchBirthdays } = require('../modules/social/birthdays');
 const { checkAndProcessTrivia } = require('../modules/gaming/trivia');
 const { checkAndDispatchDeals, cleanExpiredDeals } = require('../modules/gaming/freeDeals');
+const { checkAndDispatchNewsroom } = require('../modules/newsroom/engine');
 
 /**
  * Initializes all scheduled cron jobs.
@@ -19,6 +20,15 @@ const { checkAndDispatchDeals, cleanExpiredDeals } = require('../modules/gaming/
  */
 function initCrons(client) {
   const tz = process.env.BOT_TIMEZONE || 'Asia/Manila';
+
+  // ─── Newsroom Aggregator Check: Every 15 minutes ──────────────────────────────
+  cron.schedule('*/15 * * * *', async () => {
+    try {
+      await checkAndDispatchNewsroom(client);
+    } catch (err) {
+      logger.error('[CRON] Newsroom aggregator check failed:', err.message);
+    }
+  });
 
   // ─── Free Game & Deal Alerts: Every 30 minutes ────────────────────────────────
   cron.schedule('*/30 * * * *', async () => {

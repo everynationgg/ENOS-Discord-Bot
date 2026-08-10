@@ -21,10 +21,11 @@ export async function GET(req: NextRequest) {
       if (res.ok) {
         const channels = await res.json();
         const textChannels = channels
-          .filter((c: any) => c.type === 0 || c.type === 5)
+          .filter((c: any) => c.type === 0 || c.type === 5 || c.type === 15)
           .map((c: any) => ({
             id: c.id,
-            name: `# ${c.name}`,
+            name: c.type === 15 ? `💬 Forum: ${c.name}` : `# ${c.name}`,
+            type: c.type,
           }))
           .sort((a: any, b: any) => a.name.localeCompare(b.name));
 
