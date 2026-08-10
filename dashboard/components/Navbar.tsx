@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { signOut, useSession } from 'next-auth/react';
-import Image from 'next/image';
+import GuildSelector from './GuildSelector';
 
 const NAV_ITEMS = [
   { href: '/dashboard', label: 'Home', icon: '🏠' },
@@ -27,6 +27,8 @@ export default function Navbar() {
           <span style={{ color: 'var(--accent-primary)' }}>Every</span><span style={{ color: 'var(--accent-secondary)' }}>Nation</span>
         </span>
       </Link>
+
+      <GuildSelector />
 
       <div className="navbar-sep" />
 

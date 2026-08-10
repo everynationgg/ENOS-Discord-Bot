@@ -41,7 +41,7 @@ module.exports = {
     if (sub === 'run-digest') {
       await interaction.deferReply({ ephemeral: true });
       await interaction.editReply('⏳ Running digest... this may take a few seconds.');
-      await runDailyDigest(client);
+      await runDailyDigest(client, interaction.guild.id);
       return interaction.editReply('✅ Daily digest generated and posted.');
     }
 

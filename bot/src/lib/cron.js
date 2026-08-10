@@ -116,9 +116,12 @@ function initCrons(client) {
   (async () => {
     try {
       const { spawnAndAnnounceWeeklyBoss } = require('../modules/gaming/boss');
-      const guildId = process.env.DISCORD_GUILD_ID;
-      if (guildId) {
-        await spawnAndAnnounceWeeklyBoss(client, guildId);
+      const guilds = client.guilds.cache.map((g) => g.id);
+      if (guilds.length === 0 && process.env.DISCORD_GUILD_ID) {
+        guilds.push(process.env.DISCORD_GUILD_ID);
+      }
+      for (const guildId of guilds) {
+        await spawnAndAnnounceWeeklyBoss(client, guildId).catch(() => {});
       }
     } catch (err) {
       logger.error('[CRON] Initial boss canvas sync failed:', err.message);

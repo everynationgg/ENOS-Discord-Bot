@@ -94,8 +94,8 @@ client.once(Events.ClientReady, async () => {
           if (payload.new?.event_type === 'achievement_dispatch_card') {
             logger.info('[REALTIME LOGS] Dispatching Master Achievement Card to channel:', payload.new.payload?.channel_id);
             const channelId = payload.new.payload?.channel_id;
-            const guildId = process.env.DISCORD_GUILD_ID;
-            if (channelId) {
+            const guildId = payload.new.guild_id || process.env.DISCORD_GUILD_ID;
+            if (channelId && guildId) {
               await postMasterAchievementCard(client, guildId, channelId).catch((err) =>
                 logger.error('[REALTIME LOGS] Master card dispatch failed:', err)
               );
