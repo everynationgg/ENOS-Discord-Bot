@@ -30,7 +30,7 @@ module.exports = {
 
     // 1. Fetch translation configs from database
     const featureConfig = await getFeatureConfig(guildId, 'translator');
-    const isEnabled = featureConfig?.enabled || false;
+    const isEnabled = featureConfig ? (featureConfig.enabled ?? true) : true;
 
     if (!isEnabled) {
       return interaction.reply({

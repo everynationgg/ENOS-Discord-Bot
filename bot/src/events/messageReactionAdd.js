@@ -49,6 +49,36 @@ module.exports = {
       await handleReactionQuest(user.id, guild.id, guild).catch(() => {});
     } catch (e) {}
 
+    // Flag Emoji Auto-Translation
+    const FLAG_LANG_MAP = {
+      '🇺🇸': 'English', '🇬🇧': 'English', '🇨🇦': 'English', '🇦🇺': 'English',
+      '🇨🇳': 'Chinese', '🇹🇼': 'Chinese', '🇭🇰': 'Chinese',
+      '🇮🇩': 'Indonesian', '🇵🇭': 'Filipino', '🇩🇪': 'German',
+      '🇵🇱': 'Polish', '🇹🇭': 'Thai', '🇯🇵': 'Japanese',
+      '🇲🇾': 'Malaysian', '🇹🇷': 'Turkish', '🇪🇸': 'Spanish',
+      '🇫🇷': 'French', '🇰🇷': 'Korean', '🇷🇺': 'Russian',
+      '🇮🇹': 'Italian', '🇻🇳': 'Vietnamese',
+    };
+
+    const targetLanguage = FLAG_LANG_MAP[reaction.emoji.name];
+    if (targetLanguage && message.content && message.content.trim()) {
+      try {
+        const { isFeatureEnabled } = require('../lib/supabase');
+        const translatorEnabled = await isFeatureEnabled(guild.id, 'translator');
+        if (translatorEnabled) {
+          const { translateText } = require('../modules/utility/translator');
+          const translated = await translateText(message.content, targetLanguage);
+          
+          // Send translation DM to user who reacted (or fallback to channel reply if DMs are closed)
+          await user.send(`🌐 **Translation to ${targetLanguage}:**\n${translated}\n\n*Source message in #${message.channel.name || 'channel'}*`).catch(async () => {
+            await message.reply({ content: `🌐 **Translation to ${targetLanguage}** (for <@${user.id}>):\n${translated}`, allowedMentions: { users: [user.id] } }).catch(() => {});
+          });
+        }
+      } catch (e) {
+        logger.error('[FLAG TRANSLATION ERROR]:', e.message);
+      }
+    }
+
     try {
       // Rule 2 (Database Check): Check if 'reaction_mirroring' is set to True for that server. If False, return.
       const featureConfig = await getFeatureConfig(guild.id, 'auto_reactions');
