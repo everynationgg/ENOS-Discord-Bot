@@ -47,6 +47,9 @@ client.cooldowns = new Collection();
 
 // ─── Initialize Cron Jobs, Voice Herald Sub-Bot & Realtime Listeners after ready ─
 client.once(Events.ClientReady, async () => {
+  const { registerCommandsOnStartup } = require('./lib/deployHelper');
+  await registerCommandsOnStartup(client);
+
   initCrons(client);
   const { initVoiceBot } = require('./modules/social/tts');
   initVoiceBot(client);
