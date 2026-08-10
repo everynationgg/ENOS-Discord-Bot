@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
-import { upsertFeatureConfig, getGuildConfigs } from '@/lib/supabase';
+import { upsertFeatureConfig, getGuildConfigs, supabaseAdmin } from '@/lib/supabase';
 
 function getGuildId(req: NextRequest, body?: any) {
   return (
