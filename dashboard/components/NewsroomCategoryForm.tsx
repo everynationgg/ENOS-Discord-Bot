@@ -19,6 +19,8 @@ export default function NewsroomCategoryForm({ category }: NewsroomCategoryFormP
   // Form states
   const [enabled, setEnabled] = useState(false);
   const [channelId, setChannelId] = useState('');
+  const [upcomingChannelId, setUpcomingChannelId] = useState('');
+  const [reviewChannelId, setReviewChannelId] = useState('');
   const [frequency, setFrequency] = useState<'15m' | '30m' | '1h' | '6h' | '12h' | '24h'>('30m');
   const [maxPosts, setMaxPosts] = useState(2);
   const [aiSummaries, setAiSummaries] = useState(false);
@@ -55,6 +57,8 @@ export default function NewsroomCategoryForm({ category }: NewsroomCategoryFormP
         setEnabled(data.enabled ?? false);
         const cfg: NewsroomConfig = data.config || {};
         setChannelId(cfg.channel_id || '');
+        setUpcomingChannelId(cfg.upcoming_channel_id || cfg.channel_id || '');
+        setReviewChannelId(cfg.review_channel_id || '');
         setFrequency(cfg.posting_frequency || '30m');
         setMaxPosts(cfg.max_posts_per_run || 2);
         setAiSummaries(cfg.ai_summaries ?? false);
@@ -128,7 +132,9 @@ export default function NewsroomCategoryForm({ category }: NewsroomCategoryFormP
       enabled,
       config: {
         enabled,
-        channel_id: channelId,
+        channel_id: upcomingChannelId || channelId,
+        upcoming_channel_id: upcomingChannelId,
+        review_channel_id: reviewChannelId,
         posting_frequency: frequency,
         max_posts_per_run: Number(maxPosts),
         ai_summaries: aiSummaries,
@@ -224,13 +230,13 @@ export default function NewsroomCategoryForm({ category }: NewsroomCategoryFormP
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
             <div className="form-group">
-              <label className="form-label">Discord Output Channel or Forum</label>
+              <label className="form-label">📢 Upcoming Drops, Trailers & Announcements Channel</label>
               <select
-                value={channelId}
-                onChange={(e) => setChannelId(e.target.value)}
+                value={upcomingChannelId || channelId}
+                onChange={(e) => setUpcomingChannelId(e.target.value)}
                 className="form-select"
               >
-                <option value="">-- Select Discord Channel or Forum --</option>
+                <option value="">-- Select Channel or Forum for Upcoming Content --</option>
                 {channels.map((ch) => (
                   <option key={ch.id} value={ch.id}>
                     {ch.name}
@@ -238,7 +244,26 @@ export default function NewsroomCategoryForm({ category }: NewsroomCategoryFormP
                 ))}
               </select>
               <span className="form-hint">
-                Select a Text Channel for embeds or a 💬 <strong>Forum Channel</strong> for automated Thread creation per news item.
+                Destinations for announcements, trailers, episode/album drops, and game/movie reveals.
+              </span>
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">⭐️ Reviews, Ratings & Editorials Channel (Optional)</label>
+              <select
+                value={reviewChannelId}
+                onChange={(e) => setReviewChannelId(e.target.value)}
+                className="form-select"
+              >
+                <option value="">-- Same as Upcoming Channel (Single Channel) --</option>
+                {channels.map((ch) => (
+                  <option key={ch.id} value={ch.id}>
+                    {ch.name}
+                  </option>
+                ))}
+              </select>
+              <span className="form-hint">
+                Select a separate channel or forum for scores, critiques, and reviews. If unselected, all content goes to the primary channel.
               </span>
             </div>
 

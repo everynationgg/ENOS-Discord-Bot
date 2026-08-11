@@ -138,6 +138,27 @@ async function generateAiSummary(title, summary) {
 }
 
 /**
+ * Classifies an article as 'review' vs 'upcoming' based on title and summary keywords.
+ */
+function classifyArticleType(article) {
+  const text = `${article.title} ${article.summary} ${article.source_name}`.toLowerCase();
+  const reviewKeywords = [
+    'review',
+    'rating',
+    'score',
+    'verdict',
+    'recap',
+    'critique',
+    'breakdown',
+    'thoughts on',
+    'worth watching',
+    'worth playing',
+    'rotten tomatoes',
+  ];
+  return reviewKeywords.some((k) => text.includes(k)) ? 'review' : 'upcoming';
+}
+
+/**
  * Processes a single newsroom category for a guild.
  */
 async function processNewsroomCategory(client, guildId, categoryId) {
@@ -239,15 +260,28 @@ async function processNewsroomCategory(client, guildId, categoryId) {
         aiSummaryText = await generateAiSummary(article.title, article.summary);
       }
 
+      const articleType = classifyArticleType(article);
+      const targetChannelId = (articleType === 'review' && config.review_channel_id)
+        ? config.review_channel_id
+        : (config.upcoming_channel_id || config.channel_id);
+
+      if (!targetChannelId) continue;
+
+      const effectiveConfig = {
+        ...config,
+        channel_id: targetChannelId,
+      };
+
       const fullArticlePayload = {
         ...article,
         category: categoryId.toLowerCase(),
         ai_summary: aiSummaryText,
+        article_type: articleType,
       };
 
       // 5. Dispatch to Discord
       try {
-        const dispatchRes = await dispatchArticleToDiscord(client, guildId, config, fullArticlePayload);
+        const dispatchRes = await dispatchArticleToDiscord(client, guildId, effectiveConfig, fullArticlePayload);
 
         // 6. Record in Supabase database
         await supabase.from('newsroom_posts').insert({

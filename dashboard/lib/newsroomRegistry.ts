@@ -18,7 +18,9 @@ export interface NewsroomCategoryDef {
 
 export interface NewsroomConfig {
   enabled: boolean;
-  channel_id: string;
+  channel_id: string; // primary / fallback channel
+  upcoming_channel_id?: string; // channel for upcoming drops, announcements, trailers
+  review_channel_id?: string; // channel for reviews, ratings, editorials
   posting_frequency: '15m' | '30m' | '1h' | '6h' | '12h' | '24h';
   max_posts_per_run: number;
   ai_summaries: boolean;
@@ -97,6 +99,8 @@ export function getDefaultNewsroomConfig(categoryId: string): NewsroomConfig {
   return {
     enabled: false,
     channel_id: '',
+    upcoming_channel_id: '',
+    review_channel_id: '',
     posting_frequency: '30m',
     max_posts_per_run: 2,
     ai_summaries: false,
