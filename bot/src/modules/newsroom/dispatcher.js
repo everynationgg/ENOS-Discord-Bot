@@ -50,10 +50,24 @@ async function dispatchArticleToDiscord(client, guildId, config, article) {
     embed.setImage(imageUrl);
   }
 
-  // Check if channel is a Discord Forum Channel (type 15)
+  // Check channel type
+  const isThread = channel.isThread();
   const isForum = channel.type === ChannelType.GuildForum;
 
-  if (isForum) {
+  if (isThread) {
+    // Unarchive thread if archived
+    if (channel.archived) {
+      await channel.setArchived(false).catch(() => {});
+    }
+
+    logger.info(`[NEWSROOM DISPATCHER] Sending embed directly inside thread "${channel.name}"`);
+    const msg = await channel.send({ embeds: [embed] });
+    return {
+      channel_id: channel.parentId || channel.id,
+      thread_id: channel.id,
+      message_id: msg.id,
+    };
+  } else if (isForum) {
     // Create new Forum Thread
     const threadTitle = article.title.length > 100 ? article.title.substring(0, 97) + '...' : article.title;
     logger.info(`[NEWSROOM DISPATCHER] Creating forum thread "${threadTitle}" in channel ${channel.name}`);

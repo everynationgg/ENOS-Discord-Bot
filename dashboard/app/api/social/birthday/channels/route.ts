@@ -12,25 +12,65 @@ export async function GET(req: NextRequest) {
 
   if (token) {
     try {
-      const res = await fetch(`https://discord.com/api/v10/guilds/${guildId}/channels`, {
-        headers: {
-          Authorization: `Bot ${token}`,
-        },
-      });
+      const [chanRes, threadRes] = await Promise.all([
+        fetch(`https://discord.com/api/v10/guilds/${guildId}/channels`, {
+          headers: { Authorization: `Bot ${token}` },
+        }),
+        fetch(`https://discord.com/api/v10/guilds/${guildId}/threads/active`, {
+          headers: { Authorization: `Bot ${token}` },
+        }),
+      ]);
 
-      if (res.ok) {
-        const channels = await res.json();
-        const textChannels = channels
+      if (chanRes.ok) {
+        const channels = await chanRes.json();
+        const threadData = threadRes.ok ? await threadRes.json() : { threads: [] };
+        const threads = threadData.threads || [];
+
+        const channelNameMap = new Map<string, string>();
+        channels.forEach((c: any) => channelNameMap.set(c.id, c.name));
+
+        const channelList: any[] = [];
+
+        const topChannels = channels
           .filter((c: any) => c.type === 0 || c.type === 5 || c.type === 15)
-          .map((c: any) => ({
-            id: c.id,
-            name: c.type === 15 ? `💬 Forum: ${c.name}` : `# ${c.name}`,
-            type: c.type,
-          }))
           .sort((a: any, b: any) => a.name.localeCompare(b.name));
 
-        if (textChannels.length > 0) {
-          return NextResponse.json(textChannels);
+        for (const c of topChannels) {
+          channelList.push({
+            id: c.id,
+            name: c.type === 15 ? `💬 Forum: ${c.name} (Creates New Threads)` : `# ${c.name}`,
+            type: c.type,
+          });
+
+          const childThreads = threads
+            .filter((t: any) => t.parent_id === c.id)
+            .sort((a: any, b: any) => a.name.localeCompare(b.name));
+
+          for (const t of childThreads) {
+            channelList.push({
+              id: t.id,
+              name: `    └ 🧵 Thread: ${t.name}`,
+              type: t.type,
+              parent_id: t.parent_id,
+            });
+          }
+        }
+
+        const matchedThreadIds = new Set(channelList.filter((x) => x.parent_id).map((x) => x.id));
+        threads.forEach((t: any) => {
+          if (!matchedThreadIds.has(t.id)) {
+            const parentName = channelNameMap.get(t.parent_id) || 'channel';
+            channelList.push({
+              id: t.id,
+              name: `🧵 Thread: ${t.name} (in #${parentName})`,
+              type: t.type,
+              parent_id: t.parent_id,
+            });
+          }
+        });
+
+        if (channelList.length > 0) {
+          return NextResponse.json(channelList);
         }
       }
     } catch (e) {}
