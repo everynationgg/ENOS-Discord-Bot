@@ -1,13 +1,14 @@
-const { EmbedBuilder, ChannelType } = require('discord.js');
+const { ChannelType } = require('discord.js');
 const logger = require('../../lib/logger');
 const { getCategoryDef } = require('./registry');
 
 /**
- * Creates and dispatches a Newsroom article embed to a Discord text or forum channel.
+ * Creates and dispatches a Newsroom article message to a Discord text or forum channel.
+ * Uses standard Discord text messages to allow native media player unfurls (e.g. YouTube trailers).
  * @param {import('discord.js').Client} client
  * @param {string} guildId
  * @param {object} config - Category config from database
- * @param {object} article - Parsed article { guid, title, summary, url, source_name, image_url, category, ai_summary }
+ * @param {object} article - Parsed article { guid, title, summary, url, source_name, category, ai_caption, content_type, video_url }
  */
 async function dispatchArticleToDiscord(client, guildId, config, article) {
   if (!config.channel_id) {
@@ -20,63 +21,55 @@ async function dispatchArticleToDiscord(client, guildId, config, article) {
   }
 
   const categoryDef = getCategoryDef(article.category);
-  const colorHex = categoryDef?.colorHex || 0x8b5cf6;
-  const fallbackImg = categoryDef?.fallbackImage;
+  const emoji = categoryDef?.emoji || '📰';
 
-  // Build Embed
-  const embed = new EmbedBuilder()
-    .setTitle(article.title.length > 256 ? article.title.substring(0, 253) + '...' : article.title)
-    .setURL(article.url)
-    .setColor(colorHex)
-    .setAuthor({
-      name: `${categoryDef?.name || article.category.toUpperCase()} NEWSROOM • ${article.source_name}`,
-      iconURL: client.user.displayAvatarURL(),
-    })
-    .setTimestamp(article.published_at ? new Date(article.published_at) : new Date())
-    .setFooter({
-      text: `ENOS Newsroom • ${article.source_name}`,
-    });
+  const contentTypeLabel = article.content_type || (article.article_type === 'review' ? 'Review' : 'News');
+  const headerLine = `${emoji} **${article.title}** • *${contentTypeLabel}*`;
 
-  // Description / Summary logic
-  let descriptionText = article.ai_summary || article.summary || 'Read the full update on the official source website.';
-  if (descriptionText.length > 2000) {
-    descriptionText = descriptionText.substring(0, 1997) + '...';
+  let captionText = article.ai_caption || article.ai_summary || article.summary || '';
+  if (captionText.length > 500) {
+    captionText = captionText.substring(0, 497) + '...';
   }
-  embed.setDescription(descriptionText);
 
-  // Set Banner Image
-  const imageUrl = article.image_url || fallbackImg;
-  if (imageUrl) {
-    embed.setImage(imageUrl);
+  // Direct media link (YouTube/Vimeo) is preferred over article URL for native Discord video player rendering
+  const primaryUrl = article.video_url || article.url;
+
+  // Build clean standard text message
+  const messageParts = [headerLine];
+  if (captionText) {
+    messageParts.push(captionText);
   }
+  if (primaryUrl) {
+    messageParts.push(primaryUrl);
+  }
+
+  const messageContent = messageParts.join('\n\n');
 
   // Check channel type
   const isThread = channel.isThread();
   const isForum = channel.type === ChannelType.GuildForum;
 
   if (isThread) {
-    // Unarchive thread if archived
     if (channel.archived) {
       await channel.setArchived(false).catch(() => {});
     }
 
-    logger.info(`[NEWSROOM DISPATCHER] Sending embed directly inside thread "${channel.name}"`);
-    const msg = await channel.send({ embeds: [embed] });
+    logger.info(`[NEWSROOM DISPATCHER] Sending message directly inside thread "${channel.name}"`);
+    const msg = await channel.send({ content: messageContent });
     return {
       channel_id: channel.parentId || channel.id,
       thread_id: channel.id,
       message_id: msg.id,
     };
   } else if (isForum) {
-    // Create new Forum Thread
     const threadTitle = article.title.length > 100 ? article.title.substring(0, 97) + '...' : article.title;
     logger.info(`[NEWSROOM DISPATCHER] Creating forum thread "${threadTitle}" in channel ${channel.name}`);
 
     const thread = await channel.threads.create({
       name: threadTitle,
-      autoArchiveDuration: 1440, // 24 hours default archive duration
+      autoArchiveDuration: 1440,
       message: {
-        embeds: [embed],
+        content: messageContent,
       },
     });
 
@@ -86,9 +79,8 @@ async function dispatchArticleToDiscord(client, guildId, config, article) {
       message_id: thread.lastMessageId || null,
     };
   } else {
-    // Post to standard Text/Announcement Channel
-    logger.info(`[NEWSROOM DISPATCHER] Sending embed to text channel ${channel.name}`);
-    const msg = await channel.send({ embeds: [embed] });
+    logger.info(`[NEWSROOM DISPATCHER] Sending native message to text channel ${channel.name}`);
+    const msg = await channel.send({ content: messageContent });
     return {
       channel_id: channel.id,
       thread_id: null,

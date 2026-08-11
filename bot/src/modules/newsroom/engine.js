@@ -99,10 +99,11 @@ async function fetchRssFeed(feedUrl, sourceName) {
           guid: guid || url,
           title,
           url,
-          summary: summary.substring(0, 400),
+          summary: summary.substring(0, 500),
           published_at: publishedAt,
           image_url: imageUrl,
           source_name: sourceName,
+          raw_item_block: itemBlock,
         });
       }
     }
@@ -116,29 +117,129 @@ async function fetchRssFeed(feedUrl, sourceName) {
 }
 
 /**
- * Generates a 2-bullet TL;DR summary using Gemini 2.5 Flash with fallback to gemini-flash-latest.
+ * Extracts direct YouTube / Vimeo video URLs from RSS XML item blocks, title, or summary.
  */
-async function generateAiSummary(title, summary) {
-  if (!genAI) return null;
+function extractVideoUrl(itemBlock = '', title = '', summary = '') {
+  const combinedStr = `${itemBlock} ${title} ${summary}`;
 
-  const prompt = `Write a short 2-bullet point TL;DR summary for this news headline and excerpt:\nHeadline: ${title}\nExcerpt: ${summary}\nKeep it concise and punchy for Discord news alerts. Format with bullet points: • `;
+  // 1. YouTube watch or share URL
+  const ytWatchMatch = combinedStr.match(/https?:\/\/(?:www\.)?youtube\.com\/watch\?v=([a-zA-Z0-9_-]{11})/i);
+  if (ytWatchMatch) return `https://www.youtube.com/watch?v=${ytWatchMatch[1]}`;
+
+  const ytShortMatch = combinedStr.match(/https?:\/\/youtu\.be\/([a-zA-Z0-9_-]{11})/i);
+  if (ytShortMatch) return `https://www.youtube.com/watch?v=${ytShortMatch[1]}`;
+
+  const ytEmbedMatch = combinedStr.match(/https?:\/\/(?:www\.)?youtube\.com\/embed\/([a-zA-Z0-9_-]{11})/i);
+  if (ytEmbedMatch) return `https://www.youtube.com/watch?v=${ytEmbedMatch[1]}`;
+
+  // 2. Vimeo video URL
+  const vimeoMatch = combinedStr.match(/https?:\/\/(?:www\.)?vimeo\.com\/([0-9]+)/i);
+  if (vimeoMatch) return `https://vimeo.com/${vimeoMatch[1]}`;
+
+  return null;
+}
+
+/**
+ * Heuristic fallback check if AI fails or API key is unconfigured.
+ */
+function heuristicRelevanceCheck(article, categoryId, videoUrl) {
+  const text = `${article.title} ${article.summary}`.toLowerCase();
+  const hardwareTerms = [
+    'keyboard', 'mouse', 'gpu', 'graphics card', 'rtx 50', 'rtx 40', 'rx 7', 'headset',
+    'gaming pc', 'monitor', 'pc build', 'affiliate', 'deal on', 'best price', 'discount code',
+    'laptop deal', 'prebuilt', 'motherboard', 'ram deal', 'ssd deal', 'hardware review'
+  ];
+
+  const hasHardware = hardwareTerms.some((t) => text.includes(t));
+  if (hasHardware && categoryId.toLowerCase() === 'games') {
+    return {
+      is_relevant: false,
+      rejection_reason: 'Hardware or shopping ad detected in Games category',
+      content_type: 'Ad',
+      caption: article.summary,
+      video_url: videoUrl,
+    };
+  }
+
+  return {
+    is_relevant: true,
+    rejection_reason: null,
+    content_type: classifyArticleType(article) === 'review' ? 'Review' : 'News',
+    caption: article.summary,
+    video_url: videoUrl,
+  };
+}
+
+/**
+ * Uses Gemini AI as a Content Bouncer & Enricher:
+ * 1. Validates relevance to category (rejecting ads, hardware, keyboards, mice, GPUs, shopping deals).
+ * 2. Classifies content type (Trailer, Patch Notes, Release, Announcement, Review, Dev Blog, etc.).
+ * 3. Generates concise summary caption without repeating headline title.
+ * 4. Extracts or verifies direct video URL.
+ */
+async function evaluateArticleWithAi(article, categoryId) {
+  const extractedVideo = extractVideoUrl(article.raw_item_block, article.title, article.summary);
+
+  if (!genAI) {
+    return heuristicRelevanceCheck(article, categoryId, extractedVideo);
+  }
+
+  const prompt = `You are the ENOS Newsroom Content Quality Bouncer & Curator for category "${categoryId}".
+Analyze this news item:
+Title: "${article.title}"
+Source: "${article.source_name}"
+Excerpt: "${article.summary}"
+
+Quality Rules for "${categoryId}":
+- "games": Must be genuine video game news, announcements, patch notes, DLC, release dates, gameplay trailers, dev blogs, or official store free games (e.g. Epic Games Free Games). REJECT ALL hardware (keyboards, mice, headsets, GPUs, PCs, monitors, hardware reviews, PC builds), merchandise, store ads, sponsored shopping content, affiliate deals, or buying guides.
+- "anime": Must be anime news, episode releases, manga announcements, or animation trailers. REJECT hardware, tech sales, and shopping ads.
+- "movies": Must be film news, trailers, casting, release dates, or movie reviews. REJECT tech ads and hardware sales.
+- "music": Must be music news, album drops, music videos, artist announcements, or tour dates. REJECT audio equipment buying guides and hardware.
+
+Respond ONLY with a JSON object in this exact format (no markdown tags):
+{
+  "is_relevant": true,
+  "rejection_reason": null,
+  "content_type": "Trailer",
+  "caption": "Concise 1-2 sentence summary caption without repeating headline title unnecessarily.",
+  "video_url": null
+}`;
 
   try {
     let model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
     let result = await model.generateContent(prompt);
-    let text = result.response.text().trim();
-    return text;
+    let rawText = result.response.text().trim();
+
+    const cleanJson = rawText.replace(/```json/gi, '').replace(/```/g, '').trim();
+    const parsed = JSON.parse(cleanJson);
+
+    return {
+      is_relevant: Boolean(parsed.is_relevant),
+      rejection_reason: parsed.rejection_reason || null,
+      content_type: parsed.content_type || 'News',
+      caption: parsed.caption || article.summary,
+      video_url: parsed.video_url || extractedVideo,
+    };
   } catch (err) {
     if (err.message?.includes('429') || err.message?.includes('quota')) {
       try {
         let fallbackModel = genAI.getGenerativeModel({ model: 'gemini-flash-latest' });
         let fallbackResult = await fallbackModel.generateContent(prompt);
-        return fallbackResult.response.text().trim();
+        let rawText = fallbackResult.response.text().trim();
+        const cleanJson = rawText.replace(/```json/gi, '').replace(/```/g, '').trim();
+        const parsed = JSON.parse(cleanJson);
+        return {
+          is_relevant: Boolean(parsed.is_relevant),
+          rejection_reason: parsed.rejection_reason || null,
+          content_type: parsed.content_type || 'News',
+          caption: parsed.caption || article.summary,
+          video_url: parsed.video_url || extractedVideo,
+        };
       } catch (e) {
-        return null;
+        return heuristicRelevanceCheck(article, categoryId, extractedVideo);
       }
     }
-    return null;
+    return heuristicRelevanceCheck(article, categoryId, extractedVideo);
   }
 }
 
@@ -292,10 +393,11 @@ async function processNewsroomCategory(client, guildId, categoryId) {
         continue;
       }
 
-      // 4. Generate AI summary if configured
-      let aiSummaryText = null;
-      if (config.ai_summaries) {
-        aiSummaryText = await generateAiSummary(article.title, article.summary);
+      // 4. AI Quality Bouncer & Content Enrichment
+      const aiEval = await evaluateArticleWithAi(article, categoryId);
+      if (!aiEval || !aiEval.is_relevant) {
+        logger.info(`[NEWSROOM BOUNCER] Filtered out non-relevant content: "${article.title}" (${aiEval?.rejection_reason || 'Filtered by AI'})`);
+        continue;
       }
 
       const articleType = classifyArticleType(article);
@@ -313,7 +415,9 @@ async function processNewsroomCategory(client, guildId, categoryId) {
       const fullArticlePayload = {
         ...article,
         category: categoryId.toLowerCase(),
-        ai_summary: aiSummaryText,
+        ai_caption: aiEval.caption,
+        content_type: aiEval.content_type,
+        video_url: aiEval.video_url,
         article_type: articleType,
       };
 

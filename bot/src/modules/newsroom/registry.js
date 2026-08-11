@@ -7,6 +7,7 @@ const NEWSROOM_CATEGORIES = [
   {
     id: 'games',
     name: 'Games',
+    emoji: '🎮',
     defaultSources: [
       { id: 'ign_games', name: 'IGN Games', feedUrl: 'https://feeds.feedburner.com/ign/all' },
       { id: 'gamespot', name: 'GameSpot', feedUrl: 'https://www.gamespot.com/feeds/news/' },
@@ -19,6 +20,7 @@ const NEWSROOM_CATEGORIES = [
   {
     id: 'anime',
     name: 'Anime',
+    emoji: '⛩️',
     defaultSources: [
       { id: 'ann_news', name: 'Anime News Network', feedUrl: 'https://www.animenewsnetwork.com/all/rss.xml' },
       { id: 'mal_news', name: 'MyAnimeList News', feedUrl: 'https://myanimelist.net/rss/news.xml' },
@@ -30,6 +32,7 @@ const NEWSROOM_CATEGORIES = [
   {
     id: 'movies',
     name: 'Movies',
+    emoji: '🍿',
     defaultSources: [
       { id: 'variety_film', name: 'Variety Film', feedUrl: 'https://variety.com/v/film/feed/' },
       { id: 'deadline_movies', name: 'Deadline Hollywood', feedUrl: 'https://deadline.com/category/movies/feed/' },
@@ -41,6 +44,7 @@ const NEWSROOM_CATEGORIES = [
   {
     id: 'music',
     name: 'Music',
+    emoji: '🎵',
     defaultSources: [
       { id: 'pitchfork', name: 'Pitchfork News', feedUrl: 'https://pitchfork.com/rss/news/' },
       { id: 'billboard', name: 'Billboard News', feedUrl: 'https://www.billboard.com/c/music/feed/' },
