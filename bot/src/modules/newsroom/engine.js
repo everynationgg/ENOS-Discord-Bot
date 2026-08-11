@@ -183,15 +183,23 @@ async function processNewsroomCategory(client, guildId, categoryId) {
 
     // Check execution frequency interval according to setting (15m, 30m, 1h, 6h, 12h, 24h)
     const lastRunKey = `${guildId}_${categoryId.toLowerCase()}`;
-    const lastRunTime = categoryLastRunMap.get(lastRunKey) || 0;
+    const now = Date.now();
+
+    if (!categoryLastRunMap.has(lastRunKey)) {
+      // First check on process start: initialize to NOW so it does not fire immediately on boot
+      categoryLastRunMap.set(lastRunKey, now);
+      return;
+    }
+
+    const lastRunTime = categoryLastRunMap.get(lastRunKey);
     const freqMinutesMap = { '15m': 15, '30m': 30, '1h': 60, '6h': 360, '12h': 720, '24h': 1440 };
     const requiredIntervalMs = (freqMinutesMap[config.posting_frequency || '12h'] || 720) * 60 * 1000;
 
-    if (lastRunTime > 0 && Date.now() - lastRunTime < requiredIntervalMs) {
+    if (now - lastRunTime < requiredIntervalMs) {
       return; // Skip — waiting for posting_frequency schedule
     }
 
-    categoryLastRunMap.set(lastRunKey, Date.now());
+    categoryLastRunMap.set(lastRunKey, now);
 
     const categoryDef = getCategoryDef(categoryId);
     if (!categoryDef) return;
@@ -218,7 +226,7 @@ async function processNewsroomCategory(client, guildId, categoryId) {
 
     if (!activeSources.length) return;
 
-    // Fetch posted article history from Supabase
+    // Fetch posted article history from Supabase (or fallback to persistent config.posted_guids)
     const { data: postedRows } = await supabase
       .from('newsroom_posts')
       .select('article_guid, title')
@@ -227,7 +235,12 @@ async function processNewsroomCategory(client, guildId, categoryId) {
       .order('posted_at', { ascending: false })
       .limit(200);
 
-    const postedGuids = new Set((postedRows || []).map((r) => r.article_guid));
+    const configPostedGuids = Array.isArray(config.posted_guids) ? config.posted_guids : [];
+    const postedGuids = new Set([
+      ...configPostedGuids,
+      ...inMemoryPostedGuids,
+      ...(postedRows || []).map((r) => r.article_guid),
+    ]);
     const postedTitles = (postedRows || []).map((r) => r.title.toLowerCase());
 
     // Fetch all active feeds concurrently
@@ -335,6 +348,16 @@ async function processNewsroomCategory(client, guildId, categoryId) {
         inMemoryPostedGuids.add(article.url);
         inMemoryPostedTitles.add(lowerTitle);
         postedCount++;
+
+        // Persist updated posted_guids back to guild_config in Supabase (keeps last 200 items permanently)
+        const updatedGuids = Array.from(postedGuids).slice(-200);
+        const updatedConfig = { ...config, posted_guids: updatedGuids };
+        await supabase
+          .from('guild_config')
+          .update({ config: updatedConfig })
+          .eq('guild_id', guildId)
+          .eq('feature_key', featureKey)
+          .catch(() => {});
 
         // Stagger posts by 1.5s to prevent Discord API rate limiting
         await new Promise((resolve) => setTimeout(resolve, 1500));
