@@ -283,18 +283,24 @@ async function processNewsroomCategory(client, guildId, categoryId) {
       try {
         const dispatchRes = await dispatchArticleToDiscord(client, guildId, effectiveConfig, fullArticlePayload);
 
-        // 6. Record in Supabase database
-        await supabase.from('newsroom_posts').insert({
-          guild_id: guildId,
-          category: categoryId.toLowerCase(),
-          article_guid: article.guid,
-          title: article.title,
-          url: article.url,
-          source_name: article.source_name,
-          channel_id: dispatchRes.channel_id,
-          thread_id: dispatchRes.thread_id,
-          message_id: dispatchRes.message_id,
-        });
+        // 6. Record in Supabase database (non-blocking fallback)
+        try {
+          await supabase
+            .from('newsroom_posts')
+            .insert({
+              guild_id: guildId,
+              category: categoryId.toLowerCase(),
+              article_guid: article.guid,
+              title: article.title,
+              url: article.url,
+              source_name: article.source_name,
+              channel_id: dispatchRes.channel_id,
+              thread_id: dispatchRes.thread_id,
+              message_id: dispatchRes.message_id,
+            });
+        } catch (dbErr) {
+          logger.warn(`[NEWSROOM ENGINE] DB record notice: ${dbErr.message}`);
+        }
 
         postedGuids.add(article.guid);
         postedTitles.push(lowerTitle);
