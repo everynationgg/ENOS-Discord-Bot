@@ -7,6 +7,11 @@ const { dispatchArticleToDiscord } = require('./dispatcher');
 // Gemini AI Setup
 const genAI = process.env.GEMINI_API_KEY ? new GoogleGenerativeAI(process.env.GEMINI_API_KEY) : null;
 
+// In-Memory Caches to prevent duplicate posting even if database history table is missing
+const inMemoryPostedGuids = new Set();
+const inMemoryPostedTitles = new Set();
+const categoryLastRunMap = new Map();
+
 /**
  * Strips HTML tags and unescapes common HTML entities from RSS content.
  */
@@ -176,6 +181,18 @@ async function processNewsroomCategory(client, guildId, categoryId) {
     const config = configRow.config || {};
     if (!config.channel_id) return;
 
+    // Check execution frequency interval according to setting (15m, 30m, 1h, 6h, 12h, 24h)
+    const lastRunKey = `${guildId}_${categoryId.toLowerCase()}`;
+    const lastRunTime = categoryLastRunMap.get(lastRunKey) || 0;
+    const freqMinutesMap = { '15m': 15, '30m': 30, '1h': 60, '6h': 360, '12h': 720, '24h': 1440 };
+    const requiredIntervalMs = (freqMinutesMap[config.posting_frequency || '12h'] || 720) * 60 * 1000;
+
+    if (lastRunTime > 0 && Date.now() - lastRunTime < requiredIntervalMs) {
+      return; // Skip — waiting for posting_frequency schedule
+    }
+
+    categoryLastRunMap.set(lastRunKey, Date.now());
+
     const categoryDef = getCategoryDef(categoryId);
     if (!categoryDef) return;
 
@@ -229,14 +246,22 @@ async function processNewsroomCategory(client, guildId, categoryId) {
     for (const article of allArticles) {
       if (postedCount >= maxPosts) break;
 
-      // 1. Check if already posted by GUID/URL
-      if (postedGuids.has(article.guid) || postedGuids.has(article.url)) continue;
+      // 1. Check if already posted by GUID/URL (Database + In-Memory protection)
+      if (
+        postedGuids.has(article.guid) ||
+        postedGuids.has(article.url) ||
+        inMemoryPostedGuids.has(article.guid) ||
+        inMemoryPostedGuids.has(article.url)
+      ) {
+        continue;
+      }
 
       // 2. Check title similarity to avoid duplicate breaking news spam
       const lowerTitle = article.title.toLowerCase();
+      if (inMemoryPostedTitles.has(lowerTitle)) continue;
+
       const isDuplicateTitle = postedTitles.some((t) => {
         if (t === lowerTitle) return true;
-        // Simple 80% word overlap check
         const wordsA = t.split(/\s+/).filter((w) => w.length > 3);
         const wordsB = lowerTitle.split(/\s+/).filter((w) => w.length > 3);
         if (wordsA.length < 3 || wordsB.length < 3) return false;
@@ -303,7 +328,12 @@ async function processNewsroomCategory(client, guildId, categoryId) {
         }
 
         postedGuids.add(article.guid);
+        postedGuids.add(article.url);
         postedTitles.push(lowerTitle);
+
+        inMemoryPostedGuids.add(article.guid);
+        inMemoryPostedGuids.add(article.url);
+        inMemoryPostedTitles.add(lowerTitle);
         postedCount++;
 
         // Stagger posts by 1.5s to prevent Discord API rate limiting
