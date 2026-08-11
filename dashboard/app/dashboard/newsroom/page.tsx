@@ -1,22 +1,13 @@
-import React from 'react';
-import { notFound } from 'next/navigation';
-import { getNewsroomCategory, NEWSROOM_CATEGORIES } from '@/lib/newsroomRegistry';
+'use client';
+
+import React, { useState } from 'react';
+import { NEWSROOM_CATEGORIES, getNewsroomCategory } from '@/lib/newsroomRegistry';
 import NewsroomCategoryForm from '@/components/NewsroomCategoryForm';
 
-interface PageProps {
-  params: Promise<{
-    category: string;
-  }>;
-}
+export default function NewsroomPage() {
+  const [activeCategoryId, setActiveCategoryId] = useState('games');
 
-export default async function NewsroomCategoryPage({ params }: PageProps) {
-  const resolvedParams = await params;
-  const categoryId = resolvedParams.category;
-  const category = getNewsroomCategory(categoryId);
-
-  if (!category) {
-    notFound();
-  }
+  const activeCategory = getNewsroomCategory(activeCategoryId) || NEWSROOM_CATEGORIES[0];
 
   return (
     <div className="page-wrapper">
@@ -30,24 +21,24 @@ export default async function NewsroomCategoryPage({ params }: PageProps) {
         <aside className="sidebar-master">
           <div className="sidebar-title">Newsroom Categories</div>
           {NEWSROOM_CATEGORIES.map((cat) => {
-            const isActive = cat.id === category.id;
+            const isActive = cat.id === activeCategory.id;
             return (
-              <a
+              <button
                 key={cat.id}
-                href={`/dashboard/newsroom/${cat.id}`}
                 className={`sidebar-item ${isActive ? 'active' : ''}`}
+                onClick={() => setActiveCategoryId(cat.id)}
                 id={`sidebar-newsroom-${cat.id}`}
               >
                 <span>{cat.icon}</span>
                 <span>{cat.name}</span>
-              </a>
+              </button>
             );
           })}
         </aside>
 
         {/* Right Detail Content Area */}
         <div className="detail-content">
-          <NewsroomCategoryForm category={category} />
+          <NewsroomCategoryForm category={activeCategory} />
         </div>
       </div>
     </div>

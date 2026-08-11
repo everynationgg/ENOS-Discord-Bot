@@ -161,207 +161,206 @@ export default function NewsroomCategoryForm({ category }: NewsroomCategoryFormP
 
   if (loading) {
     return (
-      <div className="p-8 text-center text-slate-400 animate-pulse">
-        Loading {category.name} Newsroom settings...
+      <div className="empty-state">
+        <div className="spinner" style={{ width: 36, height: 36 }} />
+        <p style={{ marginTop: '1rem', color: 'var(--text-secondary)' }}>
+          Loading {category.name} Newsroom configuration...
+        </p>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      {/* Category Header Card */}
-      <div className={`p-6 rounded-2xl bg-gradient-to-r ${category.color} text-white shadow-xl flex items-center justify-between`}>
-        <div className="flex items-center gap-4">
-          <span className="text-4xl">{category.icon}</span>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+      {/* Category Card Header */}
+      <div className="newsroom-header-card">
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          <div className="feature-card-icon" style={{ fontSize: '1.75rem', width: 48, height: 48 }}>
+            {category.icon}
+          </div>
           <div>
-            <div className="flex items-center gap-3">
-              <h2 className="text-2xl font-bold">{category.name} Newsroom</h2>
-              <span className="px-3 py-0.5 rounded-full text-xs font-semibold bg-white/20 backdrop-blur-md">
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+              <h2 style={{ fontSize: '1.35rem', fontWeight: 700, margin: 0 }}>{category.name} Newsroom</h2>
+              <span className="badge" style={{ background: 'var(--accent-primary-dim)', color: 'var(--accent-primary)', border: '1px solid var(--border-subtle)' }}>
                 {category.badge}
               </span>
             </div>
-            <p className="text-white/80 text-sm mt-1">{category.description}</p>
+            <p style={{ margin: '0.25rem 0 0', fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
+              {category.description}
+            </p>
           </div>
         </div>
 
         {/* Master Enable/Disable Toggle */}
-        <label className="relative inline-flex items-center cursor-pointer">
-          <input
-            type="checkbox"
-            checked={enabled}
-            onChange={(e) => setEnabled(e.target.checked)}
-            className="sr-only peer"
-          />
-          <div className="w-14 h-8 bg-black/30 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[4px] after:left-[4px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-emerald-400"></div>
-          <span className="ml-3 text-sm font-semibold uppercase tracking-wider">
+        <div className="toggle-wrap">
+          <span className={`toggle-label ${enabled ? 'on' : ''}`}>
             {enabled ? 'Active' : 'Disabled'}
           </span>
-        </label>
+          <label className="toggle">
+            <input
+              type="checkbox"
+              checked={enabled}
+              onChange={(e) => setEnabled(e.target.checked)}
+            />
+            <span className="toggle-track" />
+            <span className="toggle-thumb" />
+          </label>
+        </div>
       </div>
 
       {statusMsg && (
-        <div
-          className={`p-4 rounded-xl text-sm font-medium ${
-            statusMsg.type === 'success'
-              ? 'bg-emerald-950/60 border border-emerald-500/30 text-emerald-300'
-              : 'bg-rose-950/60 border border-rose-500/30 text-rose-300'
-          }`}
-        >
+        <div className={statusMsg.type === 'success' ? 'toast-success' : 'toast-error'} style={{ padding: '0.875rem 1.25rem', borderRadius: 'var(--radius-md)' }}>
           {statusMsg.text}
         </div>
       )}
 
-      {/* Main Settings Panel */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Destination & Frequency Settings */}
-        <div className="p-6 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-5">
-          <h3 className="text-lg font-semibold text-slate-200 flex items-center gap-2">
+      {/* Main Settings Split Grid */}
+      <div className="split-layout-detail">
+        {/* Left Column: Post Destination & Timing */}
+        <div className="feature-form-card" style={{ padding: '1.5rem' }}>
+          <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '1.25rem' }}>
             ⚙️ Post Destination & Timing
           </h3>
 
-          <div>
-            <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
-              Discord Output Channel or Forum
-            </label>
-            <select
-              value={channelId}
-              onChange={(e) => setChannelId(e.target.value)}
-              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-slate-200 focus:outline-none focus:border-indigo-500"
-            >
-              <option value="">-- Select Discord Channel or Forum --</option>
-              {channels.map((ch) => (
-                <option key={ch.id} value={ch.id}>
-                  {ch.name}
-                </option>
-              ))}
-            </select>
-            <p className="text-xs text-slate-500 mt-1">
-              Select a Text Channel for embeds or a 💬 **Forum Channel** for automated Thread creation per news item.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
-                Check Frequency
-              </label>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+            <div className="form-group">
+              <label className="form-label">Discord Output Channel or Forum</label>
               <select
-                value={frequency}
-                onChange={(e) => setFrequency(e.target.value as any)}
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-slate-200 focus:outline-none focus:border-indigo-500"
+                value={channelId}
+                onChange={(e) => setChannelId(e.target.value)}
+                className="form-select"
               >
-                <option value="15m">Every 15 minutes</option>
-                <option value="30m">Every 30 minutes</option>
-                <option value="1h">Every 1 hour</option>
-                <option value="6h">Every 6 hours</option>
-                <option value="12h">Every 12 hours</option>
-                <option value="24h">Daily (24h)</option>
+                <option value="">-- Select Discord Channel or Forum --</option>
+                {channels.map((ch) => (
+                  <option key={ch.id} value={ch.id}>
+                    {ch.name}
+                  </option>
+                ))}
               </select>
+              <span className="form-hint">
+                Select a Text Channel for embeds or a 💬 <strong>Forum Channel</strong> for automated Thread creation per news item.
+              </span>
             </div>
 
-            <div>
-              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
-                Max Posts / Run
-              </label>
-              <input
-                type="number"
-                min="1"
-                max="5"
-                value={maxPosts}
-                onChange={(e) => setMaxPosts(Number(e.target.value))}
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-slate-200 focus:outline-none focus:border-indigo-500"
-              />
-            </div>
-          </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+              <div className="form-group">
+                <label className="form-label">Check Frequency</label>
+                <select
+                  value={frequency}
+                  onChange={(e) => setFrequency(e.target.value as any)}
+                  className="form-select"
+                >
+                  <option value="15m">Every 15 minutes</option>
+                  <option value="30m">Every 30 minutes</option>
+                  <option value="1h">Every 1 hour</option>
+                  <option value="6h">Every 6 hours</option>
+                  <option value="12h">Every 12 hours</option>
+                  <option value="24h">Daily (24h)</option>
+                </select>
+              </div>
 
-          {/* AI Summaries Toggle */}
-          <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between">
-            <div>
-              <p className="text-sm font-semibold text-slate-200">AI Article TL;DR (Gemini)</p>
-              <p className="text-xs text-slate-500">Auto-generate 2 key bullet points for news posts.</p>
+              <div className="form-group">
+                <label className="form-label">Max Posts / Run</label>
+                <input
+                  type="number"
+                  min="1"
+                  max="5"
+                  value={maxPosts}
+                  onChange={(e) => setMaxPosts(Number(e.target.value))}
+                  className="form-input"
+                />
+              </div>
             </div>
-            <label className="relative inline-flex items-center cursor-pointer">
-              <input
-                type="checkbox"
-                checked={aiSummaries}
-                onChange={(e) => setAiSummaries(e.target.checked)}
-                className="sr-only peer"
-              />
-              <div className="w-11 h-6 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
-            </label>
+
+            {/* AI Summaries Toggle */}
+            <div style={{ paddingTop: '1rem', borderTop: '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div>
+                <p style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>
+                  AI Article TL;DR (Gemini)
+                </p>
+                <span className="form-hint">Auto-generate 2 key bullet points for news posts.</span>
+              </div>
+              <div className="toggle-wrap">
+                <label className="toggle">
+                  <input
+                    type="checkbox"
+                    checked={aiSummaries}
+                    onChange={(e) => setAiSummaries(e.target.checked)}
+                  />
+                  <span className="toggle-track" />
+                  <span className="toggle-thumb" />
+                </label>
+              </div>
+            </div>
           </div>
         </div>
 
-        {/* Content Filters & Keyword Blacklists */}
-        <div className="p-6 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-5">
-          <h3 className="text-lg font-semibold text-slate-200 flex items-center gap-2">
+        {/* Right Column: Content Filters & Keywords */}
+        <div className="feature-form-card" style={{ padding: '1.5rem' }}>
+          <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '1.25rem' }}>
             🛡️ Content Filters & Keywords
           </h3>
 
-          <div>
-            <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
-              Keyword Blacklist (Comma separated)
-            </label>
-            <input
-              type="text"
-              placeholder="e.g. spoiler, rumor, leaked, nsfw"
-              value={keywordBlacklist}
-              onChange={(e) => setKeywordBlacklist(e.target.value)}
-              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-slate-200 text-sm focus:outline-none focus:border-indigo-500"
-            />
-            <p className="text-xs text-slate-500 mt-1">Skip articles matching any blacklisted words in title or description.</p>
-          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+            <div className="form-group">
+              <label className="form-label">Keyword Blacklist (Comma separated)</label>
+              <input
+                type="text"
+                placeholder="e.g. spoiler, rumor, leaked, nsfw"
+                value={keywordBlacklist}
+                onChange={(e) => setKeywordBlacklist(e.target.value)}
+                className="form-input"
+              />
+              <span className="form-hint">Skip articles matching any blacklisted words in title or description.</span>
+            </div>
 
-          <div>
-            <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
-              Keyword Whitelist (Optional)
-            </label>
-            <input
-              type="text"
-              placeholder="e.g. trailer, official, announcement"
-              value={keywordWhitelist}
-              onChange={(e) => setKeywordWhitelist(e.target.value)}
-              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-slate-200 text-sm focus:outline-none focus:border-indigo-500"
-            />
-            <p className="text-xs text-slate-500 mt-1">If set, only post articles matching at least one whitelisted word.</p>
+            <div className="form-group">
+              <label className="form-label">Keyword Whitelist (Optional)</label>
+              <input
+                type="text"
+                placeholder="e.g. trailer, official, announcement"
+                value={keywordWhitelist}
+                onChange={(e) => setKeywordWhitelist(e.target.value)}
+                className="form-input"
+              />
+              <span className="form-hint">If set, only post articles matching at least one whitelisted word.</span>
+            </div>
           </div>
         </div>
       </div>
 
       {/* Built-in & Custom News Feeds Provider Manager */}
-      <div className="p-6 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h3 className="text-lg font-semibold text-slate-200 flex items-center gap-2">
-              📡 Active News Outlets & Feeds
-            </h3>
-            <p className="text-xs text-slate-400">Toggle built-in RSS sources or add your own custom RSS feed URLs below.</p>
-          </div>
-        </div>
+      <div className="feature-form-card" style={{ padding: '1.5rem' }}>
+        <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '0.375rem' }}>
+          📡 Active News Outlets & Feeds
+        </h3>
+        <p style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', marginBottom: '1.25rem' }}>
+          Toggle built-in RSS sources or add your own custom RSS feed URLs below.
+        </p>
 
-        {/* Built-in Sources List */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Built-in Sources Grid */}
+        <div className="newsroom-source-grid">
           {category.defaultSources.map((source) => {
             const isChecked = enabledSources.includes(source.id);
             return (
               <div
                 key={source.id}
                 onClick={() => handleToggleSource(source.id)}
-                className={`p-4 rounded-xl border cursor-pointer transition-all flex items-center justify-between ${
-                  isChecked
-                    ? 'bg-indigo-950/40 border-indigo-500/50 text-slate-100'
-                    : 'bg-slate-950/60 border-slate-800 text-slate-400 hover:border-slate-700'
-                }`}
+                className={`newsroom-source-card ${isChecked ? 'active' : ''}`}
               >
-                <div>
-                  <p className="font-semibold text-sm">{source.name}</p>
-                  <p className="text-xs text-slate-500 truncate max-w-[280px]">{source.feedUrl}</p>
+                <div style={{ overflow: 'hidden' }}>
+                  <p style={{ fontWeight: 600, fontSize: '0.875rem', color: 'var(--text-primary)', margin: 0 }}>
+                    {source.name}
+                  </p>
+                  <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: '0.15rem 0 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {source.feedUrl}
+                  </p>
                 </div>
                 <input
                   type="checkbox"
                   checked={isChecked}
-                  onChange={() => {}} // handled by parent div onClick
-                  className="h-5 w-5 rounded border-slate-700 text-indigo-600 focus:ring-indigo-500"
+                  onChange={() => {}} // Handled by parent div click
+                  style={{ width: 18, height: 18, accentColor: 'var(--accent-primary)', cursor: 'pointer' }}
                 />
               </div>
             );
@@ -370,35 +369,38 @@ export default function NewsroomCategoryForm({ category }: NewsroomCategoryFormP
 
         {/* Custom Sources Section */}
         {customSources.length > 0 && (
-          <div className="space-y-3 pt-4 border-t border-slate-800">
-            <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-400">Custom RSS Outlets</h4>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div style={{ marginTop: '1.5rem', paddingTop: '1.25rem', borderTop: '1px solid var(--border-subtle)' }}>
+            <h4 style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-secondary)', marginBottom: '0.875rem' }}>
+              Custom RSS Outlets
+            </h4>
+            <div className="newsroom-source-grid">
               {customSources.map((cs) => {
                 const isChecked = enabledSources.includes(cs.id);
                 return (
                   <div
                     key={cs.id}
-                    className={`p-4 rounded-xl border transition-all flex items-center justify-between ${
-                      isChecked
-                        ? 'bg-emerald-950/30 border-emerald-500/40 text-slate-100'
-                        : 'bg-slate-950/60 border-slate-800 text-slate-400'
-                    }`}
+                    className={`newsroom-source-card ${isChecked ? 'custom-active' : ''}`}
                   >
-                    <div className="cursor-pointer" onClick={() => handleToggleSource(cs.id)}>
-                      <p className="font-semibold text-sm text-emerald-400">🔗 {cs.name}</p>
-                      <p className="text-xs text-slate-500 truncate max-w-[240px]">{cs.feedUrl}</p>
+                    <div style={{ overflow: 'hidden', cursor: 'pointer' }} onClick={() => handleToggleSource(cs.id)}>
+                      <p style={{ fontWeight: 600, fontSize: '0.875rem', color: 'var(--success)', margin: 0 }}>
+                        🔗 {cs.name}
+                      </p>
+                      <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: '0.15rem 0 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {cs.feedUrl}
+                      </p>
                     </div>
-                    <div className="flex items-center gap-3">
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                       <input
                         type="checkbox"
                         checked={isChecked}
                         onChange={() => handleToggleSource(cs.id)}
-                        className="h-5 w-5 rounded border-slate-700 text-emerald-600 focus:ring-emerald-500"
+                        style={{ width: 18, height: 18, accentColor: 'var(--success)', cursor: 'pointer' }}
                       />
                       <button
                         type="button"
                         onClick={() => handleRemoveCustomSource(cs.id)}
-                        className="text-slate-500 hover:text-rose-400 text-xs font-semibold"
+                        className="btn btn-sm btn-danger"
+                        style={{ padding: '0.2rem 0.5rem', fontSize: '0.75rem' }}
                       >
                         Remove
                       </button>
@@ -411,38 +413,40 @@ export default function NewsroomCategoryForm({ category }: NewsroomCategoryFormP
         )}
 
         {/* Add Custom Feed Form */}
-        <form onSubmit={handleAddCustomSource} className="pt-4 border-t border-slate-800 grid grid-cols-1 md:grid-cols-3 gap-4">
+        <form onSubmit={handleAddCustomSource} style={{ marginTop: '1.5rem', paddingTop: '1.25rem', borderTop: '1px solid var(--border-subtle)', display: 'grid', gridTemplateColumns: '1fr 1.5fr auto', gap: '0.75rem', alignItems: 'center' }}>
           <input
             type="text"
             placeholder="Custom Source Name (e.g. Polygon)"
             value={newCustomName}
             onChange={(e) => setNewCustomName(e.target.value)}
-            className="bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-indigo-500"
+            className="form-input"
           />
           <input
             type="text"
             placeholder="RSS Feed URL (https://.../feed.xml)"
             value={newCustomUrl}
             onChange={(e) => setNewCustomUrl(e.target.value)}
-            className="bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-indigo-500"
+            className="form-input"
           />
           <button
             type="submit"
-            className="bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-sm rounded-xl px-4 py-2.5 transition-all"
+            className="btn btn-secondary"
+            style={{ whiteSpace: 'nowrap' }}
           >
-            + Add Custom RSS Feed
+            + Add Custom Feed
           </button>
         </form>
       </div>
 
-      {/* Action Bar */}
-      <div className="flex justify-end pt-4">
+      {/* Bottom Save Action Bar */}
+      <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: '0.5rem' }}>
         <button
           onClick={handleSave}
           disabled={saving}
-          className="px-8 py-3.5 rounded-xl font-bold bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-600/30 transition-all disabled:opacity-50"
+          className="btn btn-primary"
+          style={{ padding: '0.875rem 2rem', fontSize: '1rem', fontWeight: 700 }}
         >
-          {saving ? 'Saving Settings...' : 'Save Category Settings'}
+          {saving ? 'Saving Settings...' : `Save ${category.name} Settings`}
         </button>
       </div>
     </div>
