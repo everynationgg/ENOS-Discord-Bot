@@ -193,7 +193,7 @@ Excerpt: "${article.summary}"
 Quality Rules for "${categoryId}":
 - "games": Must be genuine video game news, announcements, patch notes, DLC, release dates, gameplay trailers, dev blogs, or official store free games (e.g. Epic Games Free Games). REJECT ALL hardware (keyboards, mice, headsets, GPUs, PCs, monitors, hardware reviews, PC builds), merchandise, store ads, sponsored shopping content, affiliate deals, or buying guides.
 - "anime": Must be anime news, episode releases, manga announcements, or animation trailers. REJECT hardware, tech sales, and shopping ads.
-- "movies": Must be film news, trailers, casting, release dates, or movie reviews. REJECT tech ads and hardware sales.
+- "movies": Must be film/movie news, trailers, casting, release dates, or movie reviews. REJECT TV show listicles/guides, television series news, tech ads, and hardware sales.
 - "music": Must be music news, album drops, music videos, artist announcements, or tour dates. REJECT audio equipment buying guides and hardware.
 
 Respond ONLY with a JSON object in this exact format (no markdown tags):
@@ -494,4 +494,7 @@ async function checkAndDispatchNewsroom(client) {
 module.exports = {
   checkAndDispatchNewsroom,
   processNewsroomCategory,
+  evaluateArticleWithAi,
+  extractVideoUrl,
+  classifyArticleType,
 };
