@@ -17,16 +17,47 @@ const categoryLastRunMap = new Map();
  */
 function cleanHtmlText(rawHtml) {
   if (!rawHtml) return '';
-  return String(rawHtml)
+  let text = String(rawHtml)
     .replace(/<!\[CDATA\[(.*?)\]\]>/gs, '$1')
-    .replace(/<[^>]+>/g, ' ')
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/\s+/g, ' ')
-    .trim();
+    .replace(/<[^>]+>/g, ' ');
+
+  // Decode numeric HTML entities &#8216;, &#8217;, &#8220;, &#8221;, &#8211;, &#8212;, &#8230;, &#39;, etc.
+  text = text.replace(/&#(\d+);/g, (_, dec) => {
+    try {
+      return String.fromCharCode(parseInt(dec, 10));
+    } catch (e) {
+      return '';
+    }
+  });
+  text = text.replace(/&#x([0-9a-fA-F]+);/g, (_, hex) => {
+    try {
+      return String.fromCharCode(parseInt(hex, 16));
+    } catch (e) {
+      return '';
+    }
+  });
+
+  // Common named HTML entities
+  const entityMap = {
+    '&amp;': '&',
+    '&lt;': '<',
+    '&gt;': '>',
+    '&quot;': '"',
+    '&#39;': "'",
+    '&apos;': "'",
+    '&nbsp;': ' ',
+    '&mdash;': '—',
+    '&ndash;': '–',
+    '&lsquo;': '‘',
+    '&rsquo;': '’',
+    '&ldquo;': '“',
+    '&rdquo;': '”',
+    '&hellip;': '…',
+  };
+
+  text = text.replace(/&(?:amp|lt|gt|quot|apos|nbsp|mdash|ndash|lsquo|rsquo|ldquo|rdquo|hellip);/gi, (m) => entityMap[m.toLowerCase()] || m);
+
+  return text.replace(/\s+/g, ' ').trim();
 }
 
 /**
