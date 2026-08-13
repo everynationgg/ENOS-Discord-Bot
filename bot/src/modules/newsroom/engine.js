@@ -226,13 +226,14 @@ function heuristicRelevanceCheck(article, categoryId, videoUrl) {
     'beginner guide', 'tips and tricks', 'how to get', 'buying guide', 'gift guide',
     'editorial', 'opinion:', 'opinion —', 'why we', 'the case for', 'streaming deal',
     'tv show', 'streaming series', 'netflix series', 'hbo series', 'disney+ series',
+    'rotten tomatoes app', 'download the app', 'app store', 'google play', 'mobile app',
   ];
 
   const hasHardware = hardwareTerms.some((t) => text.includes(t));
   if (hasHardware && (categoryId.toLowerCase() === 'games' || categoryId.toLowerCase() === 'movies')) {
     return {
       is_relevant: false,
-      rejection_reason: 'Hardware, editorial, or shopping ad detected',
+      rejection_reason: 'Hardware, editorial, app ad, or shopping promo detected',
       content_type: 'Ad',
       caption: article.summary,
       video_url: videoUrl,
@@ -250,9 +251,9 @@ function heuristicRelevanceCheck(article, categoryId, videoUrl) {
 
 /**
  * Uses Gemini AI as a Content Bouncer & Enricher:
- * 1. Validates relevance to category (rejecting ads, hardware, keyboards, mice, GPUs, shopping deals).
+ * 1. Validates relevance to category (rejecting ads, hardware, app promos, keyboards, GPUs, shopping deals).
  * 2. Classifies content type (Trailer, Patch Notes, Release, Announcement, Review, Dev Blog, etc.).
- * 3. Generates concise summary caption without repeating headline title.
+ * 3. Generates concise summary caption without repeating headline title or including URLs.
  * 4. Extracts or verifies direct video URL.
  */
 async function evaluateArticleWithAi(article, categoryId) {
@@ -269,9 +270,10 @@ Source: "${article.source_name}"
 Excerpt: "${article.summary}"
 
 Strict Quality Rules for "${categoryId}":
-- "games": ONLY accept: patch notes, game updates, DLC releases, new game announcements, gameplay trailers, release date reveals, dev blogs, store free game drops (e.g. Epic Free Games). REJECT: hardware (keyboards, mice, headsets, GPUs, monitors, PCs), opinion/editorial pieces, listicles ("best games of...", "games you should play"), buying guides, deals, affiliate content, streaming service news, TV show tie-ins, merchandise.
-- "anime": ONLY accept: anime episode releases (e.g. "Title — Episode N" listings are ALWAYS valid Episode Release content — do NOT reject these), new season announcements, manga adaptation news, anime film announcements, trailer drops for anime titles. REJECT: hardware, shopping ads, general pop culture news, live-action adaptations, non-anime video games.
-- "movies": ONLY accept: film trailers (YouTube video sources always qualify as Trailer), movie release announcements, casting news, box office results, and film reviews (not TV or streaming series). If the source is a YouTube channel, the item IS a video — set video_url to the article URL. REJECT: TV show news, streaming series recaps, tech ads, hardware sales, listicles.
+- REJECT ALL: app promotions (e.g. "The Rotten Tomatoes App", "Download our app"), store ads, merchandise, hardware, buying guides, affiliate content.
+- "games": ONLY accept: patch notes, game updates, DLC releases, new game announcements, gameplay trailers, release date reveals, dev blogs, store free game drops (e.g. Epic Free Games). REJECT: hardware, opinion/editorial pieces, listicles, buying guides, deals, affiliate content.
+- "anime": ONLY accept: anime episode releases (e.g. "Title — Episode N" listings are ALWAYS valid Episode Release content), new season announcements, manga adaptation news, anime film announcements, trailer drops for anime titles. REJECT: hardware, shopping ads, general pop culture news, live-action adaptations, non-anime video games.
+- "movies": ONLY accept: film trailers (YouTube video sources always qualify as Trailer), movie release announcements, casting news, box office results, and film reviews (not TV or streaming series). If the source is a YouTube channel, the item IS a video — set video_url to the article URL. REJECT: TV show news, streaming series recaps, tech ads, hardware sales, listicles, app download promos.
 - "music": ONLY accept: album drops, single releases, music videos, artist tour announcements. REJECT: audio equipment guides, hardware.
 
 content_type must be one of: Trailer, Patch Notes, Update, Release, Announcement, Review, Dev Blog, Free Game, Episode Release, Box Office, Casting
@@ -281,7 +283,7 @@ Respond ONLY with a JSON object in this exact format (no markdown, no code fence
   "is_relevant": true,
   "rejection_reason": null,
   "content_type": "Trailer",
-  "caption": "Concise 1-2 sentence summary without repeating the headline title.",
+  "caption": "Concise 1-2 sentence summary without repeating the title and NEVER containing any http/https links or URLs.",
   "video_url": null
 }`;
 

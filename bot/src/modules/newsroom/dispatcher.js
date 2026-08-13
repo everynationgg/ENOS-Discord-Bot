@@ -35,6 +35,8 @@ async function dispatchArticleToDiscord(client, guildId, config, article) {
   const headerLine = `${emoji} **${article.title}** • *${contentTypeLabel}*`;
 
   let captionText = article.ai_caption || article.ai_summary || article.summary || '';
+  // Strip any URLs from captionText to prevent Discord from unfurls/displaying secondary ad/website cards
+  captionText = captionText.replace(/https?:\/\/\S+/gi, '').replace(/\s+/g, ' ').trim();
   if (captionText.length > 500) {
     captionText = captionText.substring(0, 497) + '...';
   }
