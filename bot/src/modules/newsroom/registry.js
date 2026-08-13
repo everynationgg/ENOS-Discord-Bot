@@ -35,10 +35,13 @@ const NEWSROOM_CATEGORIES = [
     emoji: '🍿',
     defaultSources: [
       // YouTube studio/trailer channels — items come with direct youtube.com/watch URLs
-      { id: 'yt_movieclips',  name: 'Movieclips Trailers',    feedUrl: 'https://www.youtube.com/feeds/videos.xml?channel_id=UC3gNmTGu-TTJFPpfSsCl-qA' },
-      { id: 'yt_warnerbros',  name: 'Warner Bros. Pictures',  feedUrl: 'https://www.youtube.com/feeds/videos.xml?channel_id=UCi8e0iOVk1fEOogdfu4YgfA' },
-      { id: 'yt_sony',        name: 'Sony Pictures',          feedUrl: 'https://www.youtube.com/feeds/videos.xml?channel_id=UC_A-VCqy2P5C5-Vn4W1587w' },
+      // All channel IDs below verified live (HTTP 200, entries confirmed)
+      { id: 'yt_movieclips',  name: 'Movieclips Trailers',    feedUrl: 'https://www.youtube.com/feeds/videos.xml?channel_id=UCi8e0iOVk1fEOogdfu4YgfA' },
+      { id: 'yt_warnerbros',  name: 'Warner Bros. Pictures',  feedUrl: 'https://www.youtube.com/feeds/videos.xml?channel_id=UCjmJDM5pRKbUlVIzDYYWb6g' },
       { id: 'yt_universal',   name: 'Universal Pictures',     feedUrl: 'https://www.youtube.com/feeds/videos.xml?channel_id=UCq-Fj5jknLsUf-MWSy4_brA' },
+      { id: 'yt_paramount',   name: 'Paramount Pictures',     feedUrl: 'https://www.youtube.com/feeds/videos.xml?channel_id=UCF9IOB2TExg3QIBupFtBDxg' },
+      { id: 'yt_marvel',      name: 'Marvel Entertainment',   feedUrl: 'https://www.youtube.com/feeds/videos.xml?channel_id=UCvC4D8onUfXzvjTOM-dBfEA' },
+      { id: 'yt_20thcentury', name: '20th Century Studios',   feedUrl: 'https://www.youtube.com/feeds/videos.xml?channel_id=UCzWQYUVCpZqtN93H8RR44Qw' },
       // News fallback for non-trailer movie content (casting, box office, release dates)
       { id: 'deadline_movies', name: 'Deadline Hollywood',    feedUrl: 'https://deadline.com/category/movies/feed/' },
     ],
