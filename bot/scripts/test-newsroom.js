@@ -124,16 +124,10 @@ async function main() {
       continue;
     }
 
-    // Load posted history to avoid re-posting
-    const { data: postedRows } = await supabase
-      .from('newsroom_posts')
-      .select('article_guid, title')
-      .eq('guild_id', guildId)
-      .eq('category', categoryId)
-      .order('posted_at', { ascending: false })
-      .limit(200);
-    const postedGuids = new Set((postedRows || []).map(r => r.article_guid));
-    const postedTitles = (postedRows || []).map(r => r.title.toLowerCase());
+    // Load posted history from config.posted_guids to avoid re-posting
+    const configPostedGuids = Array.isArray(config.posted_guids) ? config.posted_guids : [];
+    const postedGuids = new Set(configPostedGuids);
+    const postedTitles = [];
 
     // Fetch feeds
     const enabledSourceIds = config.enabled_sources || cat.defaultSources.map(s => s.id);
@@ -182,17 +176,19 @@ async function main() {
         const dispatchRes = await dispatchArticleToDiscord(client, guildId, { ...config, channel_id: targetChannelId }, fullArticle);
         console.log(`  📨 Dispatched! channel=${dispatchRes.channel_id} msg=${dispatchRes.message_id}`);
 
-        await supabase.from('newsroom_posts').insert({
-          guild_id: guildId,
-          category: categoryId,
-          article_guid: article.guid,
-          title: article.title,
-          url: article.url,
-          source_name: article.source_name,
-          channel_id: dispatchRes.channel_id,
-          thread_id: dispatchRes.thread_id,
-          message_id: dispatchRes.message_id,
-        }).catch(e => console.warn('  ⚠ DB insert notice:', e.message));
+        postedGuids.add(article.guid);
+        postedGuids.add(article.url);
+        const updatedGuids = Array.from(postedGuids).slice(-200);
+        const updatedConfig = { ...config, posted_guids: updatedGuids };
+        try {
+          await supabase
+            .from('guild_config')
+            .update({ config: updatedConfig })
+            .eq('guild_id', guildId)
+            .eq('feature_key', `newsroom_${categoryId}`);
+        } catch (e) {
+          console.warn('  ⚠ Config save notice:', e.message);
+        }
 
         posted = true;
       } catch (err) {

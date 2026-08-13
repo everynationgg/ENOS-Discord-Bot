@@ -532,12 +532,15 @@ async function processNewsroomCategory(client, guildId, categoryId) {
         // Persist updated posted_guids back to guild_config in Supabase (keeps last 200 items permanently)
         const updatedGuids = Array.from(postedGuids).slice(-200);
         const updatedConfig = { ...config, posted_guids: updatedGuids };
-        await supabase
-          .from('guild_config')
-          .update({ config: updatedConfig })
-          .eq('guild_id', guildId)
-          .eq('feature_key', featureKey)
-          .catch(() => {});
+        try {
+          await supabase
+            .from('guild_config')
+            .update({ config: updatedConfig })
+            .eq('guild_id', guildId)
+            .eq('feature_key', featureKey);
+        } catch (e) {
+          logger.warn(`[NEWSROOM ENGINE] Config update notice: ${e.message}`);
+        }
 
         // Stagger posts by 1.5s to prevent Discord API rate limiting
         await new Promise((resolve) => setTimeout(resolve, 1500));
