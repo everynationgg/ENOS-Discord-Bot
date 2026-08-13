@@ -481,7 +481,8 @@ async function processNewsroomCategory(client, guildId, categoryId) {
       }
 
       const articleType = classifyArticleType(article);
-      const targetChannelId = (articleType === 'review' && config.review_channel_id)
+      const isTrailerContentType = (aiEval.content_type || '').toLowerCase() === 'trailer';
+      const targetChannelId = (!isTrailerContentType && articleType === 'review' && config.review_channel_id)
         ? config.review_channel_id
         : (config.upcoming_channel_id || config.channel_id);
 

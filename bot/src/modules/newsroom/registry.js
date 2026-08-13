@@ -42,8 +42,6 @@ const NEWSROOM_CATEGORIES = [
       { id: 'yt_paramount',   name: 'Paramount Pictures',     feedUrl: 'https://www.youtube.com/feeds/videos.xml?channel_id=UCF9IOB2TExg3QIBupFtBDxg' },
       { id: 'yt_marvel',      name: 'Marvel Entertainment',   feedUrl: 'https://www.youtube.com/feeds/videos.xml?channel_id=UCvC4D8onUfXzvjTOM-dBfEA' },
       { id: 'yt_20thcentury', name: '20th Century Studios',   feedUrl: 'https://www.youtube.com/feeds/videos.xml?channel_id=UCzWQYUVCpZqtN93H8RR44Qw' },
-      // News fallback for non-trailer movie content (casting, box office, release dates)
-      { id: 'deadline_movies', name: 'Deadline Hollywood',    feedUrl: 'https://deadline.com/category/movies/feed/' },
     ],
     fallbackImage: 'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?q=80&w=1200&auto=format&fit=crop',
     colorHex: 0xf59e0b, // Amber

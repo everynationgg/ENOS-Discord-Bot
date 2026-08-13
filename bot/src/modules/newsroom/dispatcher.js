@@ -47,9 +47,11 @@ async function dispatchArticleToDiscord(client, guildId, config, article) {
     messageParts.push(captionText);
   }
 
-  if (isReview) {
+  if (isReview && !isTrailer) {
+    // Reviews (non-trailer): title + caption + source credit — no external link
     messageParts.push(`*Reviewed by* **${article.source_name}**`);
   } else {
+    // Everything else (including trailers): always include the direct video URL or article URL
     const primaryUrl = article.video_url || article.url;
     if (primaryUrl) {
       messageParts.push(primaryUrl);
