@@ -4,6 +4,29 @@ const logger = require('../../lib/logger');
 const imageBufferCache = new Map();
 const CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutes cache
 
+/**
+ * Evicts expired image buffers and enforces maximum memory cache size limit.
+ */
+function pruneImageBufferCache() {
+  const now = Date.now();
+  for (const [key, entry] of imageBufferCache.entries()) {
+    if (now - entry.timestamp >= CACHE_TTL_MS) {
+      imageBufferCache.delete(key);
+    }
+  }
+
+  // Cap max entries at 50 to prevent memory allocation creep
+  if (imageBufferCache.size > 50) {
+    const oldestKeys = Array.from(imageBufferCache.entries())
+      .sort((a, b) => a[1].timestamp - b[1].timestamp)
+      .slice(0, imageBufferCache.size - 50)
+      .map(([k]) => k);
+    for (const key of oldestKeys) {
+      imageBufferCache.delete(key);
+    }
+  }
+}
+
 async function resolveDirectImageUrl(url) {
   if (!url || typeof url !== 'string' || !url.startsWith('http')) return url;
   if (url.includes('i.ibb.co/') || /\.(png|jpg|jpeg|gif|webp)(\?.*)?$/i.test(url)) return url;
@@ -47,6 +70,8 @@ async function resolveDirectImageUrl(url) {
 
 async function fetchImageBuffer(url) {
   if (!url || typeof url !== 'string' || !url.startsWith('http')) return null;
+
+  pruneImageBufferCache();
 
   const cached = imageBufferCache.get(url);
   if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {

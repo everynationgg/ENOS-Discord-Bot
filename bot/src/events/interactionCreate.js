@@ -87,47 +87,47 @@ module.exports = {
           return;
         }
         if (interaction.customId === 'verify_here') {
-          return handleVerifyButton(interaction);
+          return await handleVerifyButton(interaction);
         }
         if (interaction.customId === 'verify_ign_add') {
-          return handleIGNAddClick(interaction);
+          return await handleIGNAddClick(interaction);
         }
         if (interaction.customId === 'verify_ign_next') {
-          return handleIGNNext(interaction);
+          return await handleIGNNext(interaction);
         }
         if (interaction.customId === 'verify_birthday_confirm') {
-          return handleBirthdayConfirm(interaction);
+          return await handleBirthdayConfirm(interaction);
         }
         if (interaction.customId === 'verify_birthday_skip') {
-          return handleBirthdaySkip(interaction);
+          return await handleBirthdaySkip(interaction);
         }
         if (interaction.customId === 'helpdesk_start') {
           const { handleHelpDeskStart } = require('../modules/moderation/helpdesk');
-          return handleHelpDeskStart(interaction);
+          return await handleHelpDeskStart(interaction);
         }
         if (interaction.customId === 'helpdesk_close') {
           const { handleHelpDeskClose } = require('../modules/moderation/helpdesk');
-          return handleHelpDeskClose(interaction);
+          return await handleHelpDeskClose(interaction);
         }
         if (interaction.customId.startsWith('join_game_server:')) {
           const { handleKeyformButton } = require('../modules/moderation/keyform');
-          return handleKeyformButton(interaction);
+          return await handleKeyformButton(interaction);
         }
         if (interaction.customId === 'trivia_leaderboard') {
           const { handleTriviaLeaderboardButton } = require('../modules/gaming/trivia');
-          return handleTriviaLeaderboardButton(interaction);
+          return await handleTriviaLeaderboardButton(interaction);
         }
         if (interaction.customId.startsWith('trivia_start:')) {
           const { handleTriviaStartClick } = require('../modules/gaming/trivia');
-          return handleTriviaStartClick(interaction);
+          return await handleTriviaStartClick(interaction);
         }
         if (interaction.customId.startsWith('trivia_answer:')) {
           const { handleTriviaAnswerClick } = require('../modules/gaming/trivia');
-          return handleTriviaAnswerClick(interaction);
+          return await handleTriviaAnswerClick(interaction);
         }
         if (interaction.customId.startsWith('boss_')) {
           const { handleBossButton } = require('../commands/boss');
-          return handleBossButton(interaction);
+          return await handleBossButton(interaction);
         }
         if (interaction.customId === 'vault_start_quest') {
           if (!interaction.deferred && !interaction.replied) {
@@ -154,19 +154,19 @@ module.exports = {
         }
         if (interaction.customId.startsWith('showcase_claim_')) {
           const { handleShowcaseClaim } = require('../modules/moderation/showcase');
-          return handleShowcaseClaim(interaction);
+          return await handleShowcaseClaim(interaction);
         }
         if (interaction.customId.startsWith('showcase_feedback_')) {
           const { handleShowcaseFeedbackButton } = require('../modules/moderation/showcase');
-          return handleShowcaseFeedbackButton(interaction);
+          return await handleShowcaseFeedbackButton(interaction);
         }
         if (interaction.customId.startsWith('achievement_')) {
           const { handleRecruitmentInteraction } = require('../modules/gaming/recruitment');
-          return handleRecruitmentInteraction(interaction);
+          return await handleRecruitmentInteraction(interaction);
         }
         if (interaction.customId.startsWith('tts_')) {
           const { handleTtsComponent } = require('../commands/tts');
-          return handleTtsComponent(interaction);
+          return await handleTtsComponent(interaction);
         }
         return;
       }
@@ -175,22 +175,22 @@ module.exports = {
       if (interaction.isModalSubmit()) {
         if (interaction.customId === 'verify_modal') {
           const { handleVerifyModalSubmit } = require('../modules/moderation/verification');
-          return handleVerifyModalSubmit(interaction);
+          return await handleVerifyModalSubmit(interaction);
         }
         if (interaction.customId === 'verify_ign_modal') {
-          return handleIGNModalSubmit(interaction);
+          return await handleIGNModalSubmit(interaction);
         }
         if (interaction.customId.startsWith('showcase_feedback_modal:')) {
           const { handleShowcaseFeedbackSubmit } = require('../modules/moderation/showcase');
-          return handleShowcaseFeedbackSubmit(interaction);
+          return await handleShowcaseFeedbackSubmit(interaction);
         }
         if (interaction.customId.startsWith('lfg_modal:')) {
           const { handleLFGModalSubmit } = require('../modules/gaming/lfg');
-          return handleLFGModalSubmit(interaction);
+          return await handleLFGModalSubmit(interaction);
         }
         if (interaction.customId.startsWith('game_registration_modal:')) {
           const { handleKeyformModalSubmit } = require('../modules/moderation/keyform');
-          return handleKeyformModalSubmit(interaction);
+          return await handleKeyformModalSubmit(interaction);
         }
         return;
       }
@@ -199,30 +199,30 @@ module.exports = {
       if (interaction.isStringSelectMenu()) {
         if (interaction.customId.startsWith('showcase_select_')) {
           const { handleShowcaseSelectMenu } = require('../modules/moderation/showcase');
-          return handleShowcaseSelectMenu(interaction);
+          return await handleShowcaseSelectMenu(interaction);
         }
         if (interaction.customId.startsWith('translate_select_')) {
           const { handleTranslationSelection } = require('../modules/utility/translator');
-          return handleTranslationSelection(interaction);
+          return await handleTranslationSelection(interaction);
         }
         if (interaction.customId === 'verify_birth_month') {
-          return handleBirthMonthSelect(interaction);
+          return await handleBirthMonthSelect(interaction);
         }
         if (interaction.customId === 'verify_birth_day_group') {
-          return handleBirthDayGroupSelect(interaction);
+          return await handleBirthDayGroupSelect(interaction);
         }
         if (interaction.customId === 'verify_birth_day') {
-          return handleBirthDaySelect(interaction);
+          return await handleBirthDaySelect(interaction);
         }
         if (interaction.customId === 'verify_discovery') {
-          return handleDiscoverySelect(interaction);
+          return await handleDiscoverySelect(interaction);
         }
         if (interaction.customId === 'verify_game_branch') {
-          return handleGameBranchSelect(interaction);
+          return await handleGameBranchSelect(interaction);
         }
         if (interaction.customId.startsWith('tts_select:')) {
           const { handleTtsComponent } = require('../commands/tts');
-          return handleTtsComponent(interaction);
+          return await handleTtsComponent(interaction);
         }
         return;
       }
