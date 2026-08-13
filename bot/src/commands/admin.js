@@ -22,6 +22,9 @@ module.exports = {
       sub.setName('run-birthday-scan').setDescription('Manually trigger the birthday queue scan')
     )
     .addSubcommand(sub =>
+      sub.setName('run-newsroom').setDescription('Manually trigger newsroom feed check & dispatch now')
+    )
+    .addSubcommand(sub =>
       sub.setName('status').setDescription('Check bot and system health status')
     ),
 
@@ -36,6 +39,14 @@ module.exports = {
       await interaction.deferReply({ ephemeral: true });
       await postLandingMessage(client, interaction.guild.id);
       return interaction.editReply('✅ Landing message posted/refreshed.');
+    }
+
+    if (sub === 'run-newsroom') {
+      await interaction.deferReply({ ephemeral: true });
+      await interaction.editReply('⏳ Fetching and processing newsroom feeds...');
+      const { checkAndDispatchNewsroom } = require('../modules/newsroom/engine');
+      await checkAndDispatchNewsroom(client, { forceRun: true });
+      return interaction.editReply('✅ Newsroom check completed and latest articles dispatched.');
     }
 
     if (sub === 'run-digest') {

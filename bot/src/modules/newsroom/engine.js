@@ -343,8 +343,13 @@ function classifyArticleType(article) {
 
 /**
  * Processes a single newsroom category for a guild.
+ * @param {import('discord.js').Client} client
+ * @param {string} guildId
+ * @param {string} categoryId
+ * @param {object} [options]
+ * @param {boolean} [options.forceRun=false] - Bypass schedule interval check
  */
-async function processNewsroomCategory(client, guildId, categoryId) {
+async function processNewsroomCategory(client, guildId, categoryId, { forceRun = false } = {}) {
   try {
     const featureKey = `newsroom_${categoryId.toLowerCase()}`;
     const { data: configRow } = await supabase
@@ -363,18 +368,14 @@ async function processNewsroomCategory(client, guildId, categoryId) {
     const lastRunKey = `${guildId}_${categoryId.toLowerCase()}`;
     const now = Date.now();
 
-    if (!categoryLastRunMap.has(lastRunKey)) {
-      // First check on process start: initialize to NOW so it does not fire immediately on boot
-      categoryLastRunMap.set(lastRunKey, now);
-      return;
-    }
-
-    const lastRunTime = categoryLastRunMap.get(lastRunKey);
     const freqMinutesMap = { '15m': 15, '30m': 30, '1h': 60, '6h': 360, '12h': 720, '24h': 1440 };
-    const requiredIntervalMs = (freqMinutesMap[config.posting_frequency || '12h'] || 720) * 60 * 1000;
+    const requiredIntervalMs = (freqMinutesMap[config.posting_frequency || '1h'] || 60) * 60 * 1000;
 
-    if (now - lastRunTime < requiredIntervalMs) {
-      return; // Skip — waiting for posting_frequency schedule
+    if (!forceRun) {
+      const lastRunTime = categoryLastRunMap.get(lastRunKey) || config.last_run_at || 0;
+      if (lastRunTime > 0 && (now - lastRunTime < requiredIntervalMs)) {
+        return; // Skip — waiting for posting_frequency schedule
+      }
     }
 
     categoryLastRunMap.set(lastRunKey, now);
@@ -531,9 +532,9 @@ async function processNewsroomCategory(client, guildId, categoryId) {
         inMemoryPostedTitles.add(lowerTitle);
         postedCount++;
 
-        // Persist updated posted_guids back to guild_config in Supabase (keeps last 200 items permanently)
+        // Persist updated posted_guids and last_run_at back to guild_config in Supabase
         const updatedGuids = Array.from(postedGuids).slice(-200);
-        const updatedConfig = { ...config, posted_guids: updatedGuids };
+        const updatedConfig = { ...config, posted_guids: updatedGuids, last_run_at: now };
         try {
           await supabase
             .from('guild_config')
@@ -557,14 +558,17 @@ async function processNewsroomCategory(client, guildId, categoryId) {
 
 /**
  * Master check and dispatch loop for all newsroom categories across active guilds.
+ * @param {import('discord.js').Client} client
+ * @param {object} [options]
+ * @param {boolean} [options.forceRun=false]
  */
-async function checkAndDispatchNewsroom(client) {
+async function checkAndDispatchNewsroom(client, { forceRun = false } = {}) {
   try {
     const activeGuilds = client.guilds.cache.map((g) => g.id);
 
     for (const guildId of activeGuilds) {
       for (const cat of NEWSROOM_CATEGORIES) {
-        await processNewsroomCategory(client, guildId, cat.id);
+        await processNewsroomCategory(client, guildId, cat.id, { forceRun });
       }
     }
   } catch (err) {

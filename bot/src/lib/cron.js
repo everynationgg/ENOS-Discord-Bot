@@ -106,9 +106,10 @@ function initCrons(client) {
     }
   });
 
-  // ─── Initial Live Alert, Free Game Deal & Boss Canvas Checks on Startup ──────
+  // ─── Initial Live Alert, Free Game Deal, Newsroom & Boss Canvas Checks on Startup ──────
   checkTwitchLive(client).catch((err) => logger.error('[CRON] Initial Twitch check failed:', err.message));
   checkTikTokLive(client).catch((err) => logger.error('[CRON] Initial TikTok check failed:', err.message));
+  checkAndDispatchNewsroom(client).catch((err) => logger.error('[CRON] Initial Newsroom check failed:', err.message));
   (async () => {
     try {
       const { data: configs } = await supabase
