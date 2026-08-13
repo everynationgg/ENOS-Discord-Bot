@@ -23,7 +23,15 @@ async function dispatchArticleToDiscord(client, guildId, config, article) {
   const categoryDef = getCategoryDef(article.category);
   const emoji = categoryDef?.emoji || '📰';
 
-  const contentTypeLabel = article.content_type || (article.article_type === 'review' ? 'Review' : 'News');
+  const isReview = article.article_type === 'review';
+  const isTrailer = (article.content_type || '').toLowerCase() === 'trailer';
+
+  // Trailers MUST have a direct playable video URL (YouTube/Vimeo). Skip if none found.
+  if (isTrailer && !article.video_url) {
+    throw new Error(`Skipping trailer "${article.title}" — no direct playable video URL found.`);
+  }
+
+  const contentTypeLabel = article.content_type || (isReview ? 'Review' : 'News');
   const headerLine = `${emoji} **${article.title}** • *${contentTypeLabel}*`;
 
   let captionText = article.ai_caption || article.ai_summary || article.summary || '';
@@ -31,16 +39,21 @@ async function dispatchArticleToDiscord(client, guildId, config, article) {
     captionText = captionText.substring(0, 497) + '...';
   }
 
-  // Direct media link (YouTube/Vimeo) is preferred over article URL for native Discord video player rendering
-  const primaryUrl = article.video_url || article.url;
-
-  // Build clean standard text message
+  // Build message parts:
+  // - Reviews: title + caption + "Reviewed by [source]" — NO external link
+  // - Everything else: title + caption + direct video URL (preferred) or article URL
   const messageParts = [headerLine];
   if (captionText) {
     messageParts.push(captionText);
   }
-  if (primaryUrl) {
-    messageParts.push(primaryUrl);
+
+  if (isReview) {
+    messageParts.push(`*Reviewed by* **${article.source_name}**`);
+  } else {
+    const primaryUrl = article.video_url || article.url;
+    if (primaryUrl) {
+      messageParts.push(primaryUrl);
+    }
   }
 
   const messageContent = messageParts.join('\n\n');

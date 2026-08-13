@@ -178,14 +178,18 @@ function heuristicRelevanceCheck(article, categoryId, videoUrl) {
   const hardwareTerms = [
     'keyboard', 'mouse', 'gpu', 'graphics card', 'rtx 50', 'rtx 40', 'rx 7', 'headset',
     'gaming pc', 'monitor', 'pc build', 'affiliate', 'deal on', 'best price', 'discount code',
-    'laptop deal', 'prebuilt', 'motherboard', 'ram deal', 'ssd deal', 'hardware review'
+    'laptop deal', 'prebuilt', 'motherboard', 'ram deal', 'ssd deal', 'hardware review',
+    'best games of', 'games you should', 'games to play', 'ranked', 'every game', 'all games',
+    'beginner guide', 'tips and tricks', 'how to get', 'buying guide', 'gift guide',
+    'editorial', 'opinion:', 'opinion —', 'why we', 'the case for', 'streaming deal',
+    'tv show', 'streaming series', 'netflix series', 'hbo series', 'disney+ series',
   ];
 
   const hasHardware = hardwareTerms.some((t) => text.includes(t));
-  if (hasHardware && categoryId.toLowerCase() === 'games') {
+  if (hasHardware && (categoryId.toLowerCase() === 'games' || categoryId.toLowerCase() === 'movies')) {
     return {
       is_relevant: false,
-      rejection_reason: 'Hardware or shopping ad detected in Games category',
+      rejection_reason: 'Hardware, editorial, or shopping ad detected',
       content_type: 'Ad',
       caption: article.summary,
       video_url: videoUrl,
@@ -221,18 +225,20 @@ Title: "${article.title}"
 Source: "${article.source_name}"
 Excerpt: "${article.summary}"
 
-Quality Rules for "${categoryId}":
-- "games": Must be genuine video game news, announcements, patch notes, DLC, release dates, gameplay trailers, dev blogs, or official store free games (e.g. Epic Games Free Games). REJECT ALL hardware (keyboards, mice, headsets, GPUs, PCs, monitors, hardware reviews, PC builds), merchandise, store ads, sponsored shopping content, affiliate deals, or buying guides.
-- "anime": Must be anime news, episode releases, manga announcements, or animation trailers. REJECT hardware, tech sales, and shopping ads.
-- "movies": Must be film/movie news, trailers, casting, release dates, or movie reviews. REJECT TV show listicles/guides, television series news, tech ads, and hardware sales.
-- "music": Must be music news, album drops, music videos, artist announcements, or tour dates. REJECT audio equipment buying guides and hardware.
+Strict Quality Rules for "${categoryId}":
+- "games": ONLY accept: patch notes, game updates, DLC releases, new game announcements, gameplay trailers, release date reveals, dev blogs, store free game drops (e.g. Epic Free Games). REJECT: hardware (keyboards, mice, headsets, GPUs, monitors, PCs), opinion/editorial pieces, listicles ("best games of...", "games you should play"), buying guides, deals, affiliate content, streaming service news, TV show tie-ins, merchandise.
+- "anime": ONLY accept: anime episode releases, new season announcements, manga adaptation news, anime film announcements, trailer drops for anime titles. REJECT: hardware, shopping ads, general pop culture, live-action adaptations.
+- "movies": ONLY accept: film trailers, movie release announcements, casting news, box office results, and film reviews (not TV or streaming series). For any item classified as "Trailer", you MUST provide a real YouTube or Vimeo video_url extracted from the excerpt or content — if no direct video URL is available, set is_relevant to false. REJECT: TV show news, streaming series recaps, tech ads, hardware sales, listicles.
+- "music": ONLY accept: album drops, single releases, music videos, artist tour announcements. REJECT: audio equipment guides, hardware.
 
-Respond ONLY with a JSON object in this exact format (no markdown tags):
+content_type must be one of: Trailer, Patch Notes, Update, Release, Announcement, Review, Dev Blog, Free Game, Episode Release, Box Office, Casting
+
+Respond ONLY with a JSON object in this exact format (no markdown, no code fences):
 {
   "is_relevant": true,
   "rejection_reason": null,
   "content_type": "Trailer",
-  "caption": "Concise 1-2 sentence summary caption without repeating headline title unnecessarily.",
+  "caption": "Concise 1-2 sentence summary without repeating the headline title.",
   "video_url": null
 }`;
 
