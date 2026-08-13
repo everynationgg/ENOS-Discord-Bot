@@ -191,10 +191,10 @@ async function fetchRssFeed(feedUrl, sourceName) {
 
 
 /**
- * Extracts direct YouTube / Vimeo video URLs from RSS XML item blocks, title, or summary.
+ * Extracts direct YouTube / Vimeo video URLs from RSS XML item blocks, title, summary, or url.
  */
-function extractVideoUrl(itemBlock = '', title = '', summary = '') {
-  const combinedStr = `${itemBlock} ${title} ${summary}`;
+function extractVideoUrl(itemBlock = '', title = '', summary = '', url = '') {
+  const combinedStr = `${url} ${itemBlock} ${title} ${summary}`;
 
   // 1. YouTube watch or share URL
   const ytWatchMatch = combinedStr.match(/https?:\/\/(?:www\.)?youtube\.com\/watch\?v=([a-zA-Z0-9_-]{11})/i);
@@ -256,7 +256,7 @@ function heuristicRelevanceCheck(article, categoryId, videoUrl) {
  * 4. Extracts or verifies direct video URL.
  */
 async function evaluateArticleWithAi(article, categoryId) {
-  const extractedVideo = extractVideoUrl(article.raw_item_block, article.title, article.summary);
+  const extractedVideo = extractVideoUrl(article.raw_item_block, article.title, article.summary, article.url);
 
   if (!genAI) {
     return heuristicRelevanceCheck(article, categoryId, extractedVideo);
@@ -328,20 +328,15 @@ Respond ONLY with a JSON object in this exact format (no markdown, no code fence
  */
 function classifyArticleType(article) {
   const text = `${article.title} ${article.summary} ${article.source_name}`.toLowerCase();
-  const reviewKeywords = [
-    'review',
-    'rating',
-    'score',
-    'verdict',
-    'recap',
-    'critique',
-    'breakdown',
-    'thoughts on',
-    'worth watching',
-    'worth playing',
-    'rotten tomatoes',
-  ];
-  return reviewKeywords.some((k) => text.includes(k)) ? 'review' : 'upcoming';
+  
+  // If it contains a video URL or trailer keywords, it is video/upcoming content, not a text review
+  if (article.video_url || /youtube\.com|youtu\.be|vimeo\.com|trailer|teaser/i.test(text)) {
+    return 'upcoming';
+  }
+
+  // Word-boundary keywords for true reviews
+  const reviewRegex = /\b(review|reviews|rating|score|verdict|recap|critique|rotten tomatoes)\b/i;
+  return reviewRegex.test(text) ? 'review' : 'upcoming';
 }
 
 /**

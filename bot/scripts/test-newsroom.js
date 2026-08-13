@@ -164,7 +164,7 @@ async function main() {
       console.log(`  ✅ Accepted  | type: ${aiEval.content_type} | video: ${aiEval.video_url || 'none'}`);
 
       const articleType = classifyArticleType(article);
-      const isTrailerContentType = (aiEval.content_type || '').toLowerCase() === 'trailer';
+      const isTrailerContentType = (aiEval.content_type || '').toLowerCase() === 'trailer' || Boolean(aiEval.video_url);
       const targetChannelId = (!isTrailerContentType && articleType === 'review' && config.review_channel_id)
         ? config.review_channel_id
         : (config.upcoming_channel_id || config.channel_id);

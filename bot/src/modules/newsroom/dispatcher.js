@@ -23,8 +23,8 @@ async function dispatchArticleToDiscord(client, guildId, config, article) {
   const categoryDef = getCategoryDef(article.category);
   const emoji = categoryDef?.emoji || '📰';
 
-  const isReview = article.article_type === 'review';
-  const isTrailer = (article.content_type || '').toLowerCase() === 'trailer';
+  const isTrailer = (article.content_type || '').toLowerCase() === 'trailer' || Boolean(article.video_url);
+  const isReview = article.article_type === 'review' && !isTrailer;
 
   // Trailers MUST have a direct playable video URL (YouTube/Vimeo). Skip if none found.
   if (isTrailer && !article.video_url) {
