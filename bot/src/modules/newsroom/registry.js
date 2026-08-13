@@ -9,10 +9,10 @@ const NEWSROOM_CATEGORIES = [
     name: 'Games',
     emoji: '🎮',
     defaultSources: [
-      { id: 'ign_games', name: 'IGN Games', feedUrl: 'https://feeds.feedburner.com/ign/all' },
-      { id: 'gamespot', name: 'GameSpot', feedUrl: 'https://www.gamespot.com/feeds/news/' },
-      { id: 'kotaku', name: 'Kotaku', feedUrl: 'https://kotaku.com/rss' },
-      { id: 'eurogamer', name: 'Eurogamer', feedUrl: 'https://www.eurogamer.net/feed/news' },
+      { id: 'ign_games',   name: 'IGN Games (Games Only)', feedUrl: 'https://feeds.feedburner.com/ign/games-all' },
+      { id: 'gematsu',     name: 'Gematsu (Game Reveals)', feedUrl: 'https://www.gematsu.com/feed' },
+      { id: 'pcgamer',     name: 'PC Gamer News',          feedUrl: 'https://www.pcgamer.com/rss/' },
+      { id: 'yt_nintendo', name: 'Nintendo Trailers',      feedUrl: 'https://www.youtube.com/feeds/videos.xml?channel_id=UCgK_2VQWwigtTr_5TviGy2w' },
     ],
     fallbackImage: 'https://images.unsplash.com/photo-1550745165-9bc0b252726f?q=80&w=1200&auto=format&fit=crop',
     colorHex: 0x8b5cf6, // Violet
