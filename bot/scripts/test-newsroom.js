@@ -131,7 +131,7 @@ async function main() {
 
     // Fetch feeds
     const enabledSourceIds = config.enabled_sources || cat.defaultSources.map(s => s.id);
-    const activeSources = cat.defaultSources.filter(s => enabledSourceIds.includes(s.id));
+    const activeSources = cat.defaultSources.filter(s => enabledSourceIds.includes(s.id) || s.id.startsWith('yt_'));
     console.log(`  📡 Sources: ${activeSources.map(s => s.name).join(', ')}`);
 
     const feedResults = await Promise.all(activeSources.map(s => fetchFeed(s.feedUrl, s.name)));

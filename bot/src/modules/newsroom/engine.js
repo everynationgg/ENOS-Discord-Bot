@@ -222,6 +222,8 @@ function heuristicRelevanceCheck(article, categoryId, videoUrl) {
     'keyboard', 'mouse', 'gpu', 'graphics card', 'rtx 50', 'rtx 40', 'rx 7', 'headset',
     'gaming pc', 'monitor', 'pc build', 'affiliate', 'deal on', 'best price', 'discount code',
     'laptop deal', 'prebuilt', 'motherboard', 'ram deal', 'ssd deal', 'hardware review',
+    'made by google', 'apple event', 'galaxy unpacked', 'pixel 9', 'pixel 10', 'pixel watch',
+    'iphone', 'ipad', 'android phone', 'smartphone', 'smartwatch', 'tech launch', 'device announcement',
     'best games of', 'games you should', 'games to play', 'ranked', 'every game', 'all games',
     'beginner guide', 'tips and tricks', 'how to get', 'buying guide', 'gift guide',
     'editorial', 'opinion:', 'opinion —', 'why we', 'the case for', 'streaming deal',
@@ -233,7 +235,7 @@ function heuristicRelevanceCheck(article, categoryId, videoUrl) {
   if (hasHardware && (categoryId.toLowerCase() === 'games' || categoryId.toLowerCase() === 'movies')) {
     return {
       is_relevant: false,
-      rejection_reason: 'Hardware, editorial, app ad, or shopping promo detected',
+      rejection_reason: 'Hardware, consumer tech event, editorial, app ad, or shopping promo detected',
       content_type: 'Ad',
       caption: article.summary,
       video_url: videoUrl,
@@ -271,8 +273,8 @@ Excerpt: "${article.summary}"
 
 Strict Quality Rules for "${categoryId}":
 - REJECT ALL: app promotions (e.g. "The Rotten Tomatoes App", "Download our app"), store ads, merchandise, hardware, buying guides, affiliate content.
-- "games": ONLY accept: patch notes, game updates, DLC releases, new game announcements, gameplay trailers, release date reveals, dev blogs, store free game drops (e.g. Epic Free Games). REJECT: hardware, opinion/editorial pieces, listicles, buying guides, deals, affiliate content.
-- "anime": ONLY accept: anime episode releases (e.g. "Title — Episode N" listings are ALWAYS valid Episode Release content), new season announcements, manga adaptation news, anime film announcements, trailer drops for anime titles. REJECT: hardware, shopping ads, general pop culture news, live-action adaptations, non-anime video games.
+- "games": ONLY accept: video game patch notes, game updates, DLC releases, new video game announcements, gameplay trailers, release date reveals, dev blogs, store free game drops (e.g. Epic Free Games). REJECT: consumer tech devices, tech keynotes (e.g. "Made by Google", "Apple Event", "Galaxy Unpacked"), smartphones, smartwatches, PC/phone hardware, opinion/editorial pieces, listicles, buying guides, deals, affiliate content.
+- "anime": ONLY accept: anime video trailers (YouTube video sources qualify as Trailer), anime episode releases (e.g. "Title — Episode N" listings), new season announcements, manga adaptation news, anime film announcements, trailer drops for anime titles. REJECT: hardware, shopping ads, general pop culture news, live-action adaptations, non-anime video games.
 - "movies": ONLY accept: film trailers (YouTube video sources always qualify as Trailer), movie release announcements, casting news, box office results, and film reviews (not TV or streaming series). If the source is a YouTube channel, the item IS a video — set video_url to the article URL. REJECT: TV show news, streaming series recaps, tech ads, hardware sales, listicles, app download promos.
 - "music": ONLY accept: album drops, single releases, music videos, artist tour announcements. REJECT: audio equipment guides, hardware.
 
@@ -389,9 +391,9 @@ async function processNewsroomCategory(client, guildId, categoryId, { forceRun =
 
     const activeSources = [];
 
-    // Built-in sources
+    // Built-in sources (auto-include official YouTube video feeds)
     categoryDef.defaultSources.forEach((ds) => {
-      if (enabledSourceIds.includes(ds.id)) {
+      if (!config.enabled_sources || enabledSourceIds.includes(ds.id) || ds.id.startsWith('yt_')) {
         activeSources.push({ id: ds.id, name: ds.name, feedUrl: ds.feedUrl });
       }
     });

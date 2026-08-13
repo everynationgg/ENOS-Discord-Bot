@@ -22,9 +22,13 @@ const NEWSROOM_CATEGORIES = [
     name: 'Anime',
     emoji: '⛩️',
     defaultSources: [
-      { id: 'ann_news', name: 'Anime News Network', feedUrl: 'https://www.animenewsnetwork.com/all/rss.xml' },
-      { id: 'mal_news', name: 'MyAnimeList News', feedUrl: 'https://myanimelist.net/rss/news.xml' },
-      { id: 'crunchyroll', name: 'Crunchyroll News', feedUrl: 'https://www.crunchyroll.com/news/rss' },
+      { id: 'ann_news',             name: 'Anime News Network',     feedUrl: 'https://www.animenewsnetwork.com/all/rss.xml' },
+      { id: 'mal_news',             name: 'MyAnimeList News',       feedUrl: 'https://myanimelist.net/rss/news.xml' },
+      { id: 'crunchyroll',          name: 'Crunchyroll News',       feedUrl: 'https://www.crunchyroll.com/news/rss' },
+      { id: 'yt_crunchyroll',       name: 'Crunchyroll Trailers',   feedUrl: 'https://www.youtube.com/feeds/videos.xml?channel_id=UC-5MT-BUxTzkPTWMediyV0w' },
+      { id: 'yt_crunchyrolldubs',   name: 'Crunchyroll Dubs',       feedUrl: 'https://www.youtube.com/feeds/videos.xml?channel_id=UC6pGDc4bFGD1_36IKv3FnYg' },
+      { id: 'yt_netflixanime',      name: 'Netflix Anime',          feedUrl: 'https://www.youtube.com/feeds/videos.xml?channel_id=UCWOA1ZGywLbqmigxE4Qlvuw' },
+      { id: 'yt_vizmedia',          name: 'VIZ Media Trailers',     feedUrl: 'https://www.youtube.com/feeds/videos.xml?channel_id=UCcckdFKX9yMZBiTDb7HNmhw' },
     ],
     fallbackImage: 'https://images.unsplash.com/photo-1578632767115-351597cf2477?q=80&w=1200&auto=format&fit=crop',
     colorHex: 0xec4899, // Pink
