@@ -193,17 +193,23 @@ export default function SocialPage() {
   };
 
   // Birthday Queue actions
-  const handleTransform = async (id: string, notes: string) => {
+  const handleTransform = async (id: string, notes: string, userId?: string, ign?: string) => {
     setTransformingIds(prev => ({ ...prev, [id]: true }));
     try {
       const res = await fetch('/api/social/birthday/transform', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ notes }),
+        body: JSON.stringify({
+          user_id: userId,
+          ign: ign || 'N/A',
+          current_text: notes,
+          notes,
+        }),
       });
       const data = await res.json();
-      if (data.polished) {
-        setDrafts(prev => ({ ...prev, [id]: data.polished }));
+      const polishedText = data.polished || data.text;
+      if (polishedText) {
+        setDrafts(prev => ({ ...prev, [id]: polishedText }));
       } else if (data.error) {
         alert(data.error);
       }
@@ -1212,7 +1218,7 @@ export default function SocialPage() {
                             <button
                               id={`transform-ai-btn-${id}`}
                               className="btn btn-secondary btn-sm"
-                              onClick={() => handleTransform(id, originalNotes[id] || '')}
+                              onClick={() => handleTransform(id, originalNotes[id] || '', item.user_id, item.ign)}
                               disabled={isTransforming || status === 'saving' || !(originalNotes[id]?.trim())}
                               style={{ position: 'absolute', right: '0.5rem', bottom: '0.5rem', padding: '0.2rem 0.5rem', fontSize: '0.75rem' }}
                             >

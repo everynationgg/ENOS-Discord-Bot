@@ -23,11 +23,13 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { user_id, ign, current_text } = body;
+    const { user_id, ign, current_text, notes } = body;
     const guildId = getGuildId(req, body);
+    const textToTransform = current_text || notes || '';
+    const userIgn = ign || 'N/A';
 
-    if (!user_id || !ign) {
-      return NextResponse.json({ error: 'Missing user_id or ign context' }, { status: 400 });
+    if (!user_id) {
+      return NextResponse.json({ error: 'Missing user_id context' }, { status: 400 });
     }
 
     // 1. Fetch AI Prompt Formula from guild_settings
@@ -46,8 +48,8 @@ Do not include any placeholders, hashtags, or meta-commentary. Output ONLY the f
 
 Context:
 - Discord User Tag: <@${user_id}>
-- In-Game Name (IGN): ${ign}
-- Admin Notes to transform: ${current_text || '(No additional notes provided, write a friendly generic birthday post based on the style guidelines)'}`;
+- In-Game Name (IGN): ${userIgn}
+- Admin Notes to transform: ${textToTransform || '(No additional notes provided, write a friendly generic birthday post based on the style guidelines)'}`;
 
     // 3. Request Gemini API using native fetch
     const response = await fetch(
@@ -75,7 +77,7 @@ Context:
       throw new Error('Gemini API returned an empty response.');
     }
 
-    return NextResponse.json({ text });
+    return NextResponse.json({ polished: text, text });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
