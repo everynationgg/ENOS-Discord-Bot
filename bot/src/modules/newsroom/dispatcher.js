@@ -1,4 +1,4 @@
-const { ChannelType } = require('discord.js');
+const { ChannelType, MessageFlags } = require('discord.js');
 const logger = require('../../lib/logger');
 const { getCategoryDef } = require('./registry');
 
@@ -58,6 +58,14 @@ async function dispatchArticleToDiscord(client, guildId, config, article) {
 
   const messageContent = messageParts.join('\n\n');
 
+  // Suppress Discord's automatic link-preview card for non-video posts.
+  // When video_url exists (YouTube/Vimeo), we want the native inline player — no flag.
+  // For article links, SuppressEmbeds prevents the external preview card.
+  const messageOptions = { content: messageContent };
+  if (!article.video_url) {
+    messageOptions.flags = MessageFlags.SuppressEmbeds;
+  }
+
   // Check channel type
   const isThread = channel.isThread();
   const isForum = channel.type === ChannelType.GuildForum;
@@ -68,7 +76,7 @@ async function dispatchArticleToDiscord(client, guildId, config, article) {
     }
 
     logger.info(`[NEWSROOM DISPATCHER] Sending message directly inside thread "${channel.name}"`);
-    const msg = await channel.send({ content: messageContent });
+    const msg = await channel.send(messageOptions);
     return {
       channel_id: channel.parentId || channel.id,
       thread_id: channel.id,
@@ -81,9 +89,7 @@ async function dispatchArticleToDiscord(client, guildId, config, article) {
     const thread = await channel.threads.create({
       name: threadTitle,
       autoArchiveDuration: 1440,
-      message: {
-        content: messageContent,
-      },
+      message: messageOptions,
     });
 
     return {
@@ -93,7 +99,7 @@ async function dispatchArticleToDiscord(client, guildId, config, article) {
     };
   } else {
     logger.info(`[NEWSROOM DISPATCHER] Sending native message to text channel ${channel.name}`);
-    const msg = await channel.send({ content: messageContent });
+    const msg = await channel.send(messageOptions);
     return {
       channel_id: channel.id,
       thread_id: null,

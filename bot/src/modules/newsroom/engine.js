@@ -93,7 +93,7 @@ async function fetchRssFeed(feedUrl, sourceName) {
       signal: controller.signal,
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) ENOS-Discord-Bot/1.0',
-        Accept: 'application/rss+xml, application/xml, text/xml, */*',
+        Accept: 'application/rss+xml, application/atom+xml, application/xml, text/xml, */*',
       },
     });
     clearTimeout(timeoutId);
@@ -139,6 +139,48 @@ async function fetchRssFeed(feedUrl, sourceName) {
       }
     }
 
+    // Parse Atom <entry> tags (used by YouTube channel feeds)
+    const entryRegex = /<entry[\s>](.*?)<\/entry>/gs;
+    while ((match = entryRegex.exec(xmlText)) !== null) {
+      const entryBlock = match[1];
+
+      const titleMatch = entryBlock.match(/<title[^>]*>(.*?)<\/title>/s);
+      // YouTube Atom feeds use <yt:videoId> — prefer that for a clean watch URL
+      const ytIdMatch = entryBlock.match(/<yt:videoId>(.*?)<\/yt:videoId>/s);
+      const linkMatch = entryBlock.match(/<link[^>]+rel=["']alternate["'][^>]+href=["']([^"']+)["']/i)
+        || entryBlock.match(/<link[^>]+href=["']([^"']+)["'][^>]+rel=["']alternate["']/i)
+        || entryBlock.match(/<link[^>]+href=["']([^"']+)["']/i);
+      const guidMatch = entryBlock.match(/<id>(.*?)<\/id>/s);
+      const descMatch = entryBlock.match(/<media:description>(.*?)<\/media:description>/s)
+        || entryBlock.match(/<summary[^>]*>(.*?)<\/summary>/s)
+        || entryBlock.match(/<content[^>]*>(.*?)<\/content>/s);
+      const dateMatch = entryBlock.match(/<published>(.*?)<\/published>/s)
+        || entryBlock.match(/<updated>(.*?)<\/updated>/s);
+
+      const title = cleanHtmlText(titleMatch ? titleMatch[1] : '');
+      const videoId = ytIdMatch ? ytIdMatch[1].trim() : null;
+      const url = videoId
+        ? `https://www.youtube.com/watch?v=${videoId}`
+        : (linkMatch ? cleanHtmlText(linkMatch[1]) : '').trim();
+      const guid = videoId ? `yt:video:${videoId}` : (guidMatch ? cleanHtmlText(guidMatch[1]) : url).trim();
+      const summary = cleanHtmlText(descMatch ? descMatch[1] : '');
+      const publishedAt = dateMatch ? cleanHtmlText(dateMatch[1]) : null;
+      const imageUrl = extractImageUrl(entryBlock);
+
+      if (title && url) {
+        items.push({
+          guid: guid || url,
+          title,
+          url,
+          summary: summary.substring(0, 500),
+          published_at: publishedAt,
+          image_url: imageUrl,
+          source_name: sourceName,
+          raw_item_block: entryBlock,
+        });
+      }
+    }
+
     return items;
   } catch (err) {
     clearTimeout(timeoutId);
@@ -146,6 +188,7 @@ async function fetchRssFeed(feedUrl, sourceName) {
     return [];
   }
 }
+
 
 /**
  * Extracts direct YouTube / Vimeo video URLs from RSS XML item blocks, title, or summary.

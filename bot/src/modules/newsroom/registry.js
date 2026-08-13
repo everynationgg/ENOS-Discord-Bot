@@ -34,9 +34,13 @@ const NEWSROOM_CATEGORIES = [
     name: 'Movies',
     emoji: '🍿',
     defaultSources: [
-      { id: 'variety_film', name: 'Variety Film', feedUrl: 'https://variety.com/v/film/feed/' },
-      { id: 'deadline_movies', name: 'Deadline Hollywood', feedUrl: 'https://deadline.com/category/movies/feed/' },
-      { id: 'rottentomatoes', name: 'Rotten Tomatoes News', feedUrl: 'https://editorial.rottentomatoes.com/feed/' },
+      // YouTube studio/trailer channels — items come with direct youtube.com/watch URLs
+      { id: 'yt_movieclips',  name: 'Movieclips Trailers',    feedUrl: 'https://www.youtube.com/feeds/videos.xml?channel_id=UC3gNmTGu-TTJFPpfSsCl-qA' },
+      { id: 'yt_warnerbros',  name: 'Warner Bros. Pictures',  feedUrl: 'https://www.youtube.com/feeds/videos.xml?channel_id=UCi8e0iOVk1fEOogdfu4YgfA' },
+      { id: 'yt_sony',        name: 'Sony Pictures',          feedUrl: 'https://www.youtube.com/feeds/videos.xml?channel_id=UC_A-VCqy2P5C5-Vn4W1587w' },
+      { id: 'yt_universal',   name: 'Universal Pictures',     feedUrl: 'https://www.youtube.com/feeds/videos.xml?channel_id=UCq-Fj5jknLsUf-MWSy4_brA' },
+      // News fallback for non-trailer movie content (casting, box office, release dates)
+      { id: 'deadline_movies', name: 'Deadline Hollywood',    feedUrl: 'https://deadline.com/category/movies/feed/' },
     ],
     fallbackImage: 'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?q=80&w=1200&auto=format&fit=crop',
     colorHex: 0xf59e0b, // Amber
