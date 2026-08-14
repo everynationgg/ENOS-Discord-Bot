@@ -58,18 +58,21 @@ export async function GET(req: NextRequest) {
 
       if (bdays && bdays.length > 0) {
         for (const b of bdays) {
-          await supabaseAdmin
-            .from('birthday_queue')
-            .insert({
-              guild_id: b.guild_id || guildId,
-              user_id: b.user_id,
-              ign: b.ign || null,
-              target_date: yyyyMmDd,
-              scratchpad_text: '',
-              is_approved: false,
-              is_sent: false,
-            })
-            .catch(() => {});
+          try {
+            await supabaseAdmin
+              .from('birthday_queue')
+              .insert({
+                guild_id: b.guild_id || guildId,
+                user_id: b.user_id,
+                ign: b.ign || null,
+                target_date: yyyyMmDd,
+                scratchpad_text: '',
+                is_approved: false,
+                is_sent: false,
+              });
+          } catch {
+            // duplicate key or other insert error — safe to ignore
+          }
         }
       }
     }
