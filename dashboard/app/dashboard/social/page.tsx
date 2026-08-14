@@ -162,10 +162,10 @@ export default function SocialPage() {
   }, []);
 
   useEffect(() => {
-    if (birthdayEnabled) {
+    if (activeTab === 'birthday_queue' || birthdayEnabled) {
       loadQueue();
     }
-  }, [birthdayEnabled, loadQueue]);
+  }, [activeTab, birthdayEnabled, loadQueue]);
 
   // Save Birthday System Configuration Settings
   const handleSaveConfig = async () => {
@@ -388,7 +388,10 @@ export default function SocialPage() {
           </button>
           <button
             className={`sidebar-item ${activeTab === 'birthday_queue' ? 'active' : ''}`}
-            onClick={() => setActiveTab('birthday_queue')}
+            onClick={() => {
+              setActiveTab('birthday_queue');
+              loadQueue();
+            }}
             id="sidebar-social-queue"
           >
             🎉 Birthday Queue Workspace
@@ -1231,7 +1234,7 @@ export default function SocialPage() {
                               id={`transform-ai-btn-${id}`}
                               className="btn btn-secondary btn-sm"
                               onClick={() => handleTransform(id, originalNotes[id] || '', item.user_id, item.ign)}
-                              disabled={isTransforming || status === 'saving' || !(originalNotes[id]?.trim())}
+                              disabled={isTransforming || status === 'saving'}
                               style={{ position: 'absolute', right: '0.5rem', bottom: '0.5rem', padding: '0.2rem 0.5rem', fontSize: '0.75rem' }}
                             >
                               {isTransforming ? '⏳ Transforming...' : '🤖 Transform with AI'}
