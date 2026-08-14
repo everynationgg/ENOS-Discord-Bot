@@ -991,7 +991,7 @@ async function resetDailyQuests(client) {
       const { data: configs } = await supabase
         .from('guild_config')
         .select('*')
-        .in('feature_key', ['vault', 'vault_economy'])
+        .eq('feature_key', 'vault')
         .eq('enabled', true);
 
       const processedGuilds = new Set();

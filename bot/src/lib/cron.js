@@ -265,14 +265,18 @@ function initCrons(client) {
     { timezone: tz }
   );
 
-  // ─── Birthday Announcement Dispatcher: Every 5 minutes ────────────────────
-  cron.schedule('*/5 * * * *', async () => {
-    try {
-      await dispatchBirthdays(client);
-    } catch (err) {
-      logger.error('[CRON] Birthday dispatcher failed:', err.message);
-    }
-  });
+  // ─── Birthday Announcement Dispatcher: Every minute ───────────────────────
+  cron.schedule(
+    '* * * * *',
+    async () => {
+      try {
+        await dispatchBirthdays(client);
+      } catch (err) {
+        logger.error('[CRON] Birthday dispatcher failed:', err.message);
+      }
+    },
+    { timezone: tz }
+  );
 
   // ─── Trivia Scheduler: Every minute ──────────────────────────────────────────
   cron.schedule('* * * * *', async () => {

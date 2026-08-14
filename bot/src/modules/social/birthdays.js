@@ -4,21 +4,32 @@ const logger = require('../../lib/logger');
 const tz = process.env.BOT_TIMEZONE || 'Asia/Manila';
 
 /**
- * Gets the current date formatted for a specific offset in the bot timezone.
+ * Gets the current date and time formatted for a specific offset in the bot timezone.
  * @param {number} daysAhead 
- * @returns {{ mmDd: string, yyyyMmDd: string }}
+ * @returns {{ mmDd: string, yyyyMmDd: string, hour: number, minute: number }}
  */
 function getTargetDates(daysAhead = 0) {
-  const date = new Date(new Date().toLocaleString('en-US', { timeZone: tz }));
-  date.setDate(date.getDate() + daysAhead);
-  
-  const yyyy = date.getFullYear();
-  const mm = String(date.getMonth() + 1).padStart(2, '0');
-  const dd = String(date.getDate()).padStart(2, '0');
-  
+  let target = new Date();
+  if (daysAhead !== 0) {
+    target = new Date(Date.now() + daysAhead * 86400000);
+  }
+  const options = {
+    timeZone: tz,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  };
+  const parts = new Intl.DateTimeFormat('en-US', options).formatToParts(target);
+  const map = parts.reduce((acc, p) => ({ ...acc, [p.type]: p.value }), {});
+
   return {
-    mmDd: `${mm}-${dd}`,
-    yyyyMmDd: `${yyyy}-${mm}-${dd}`
+    mmDd: `${map.month}-${map.day}`,
+    yyyyMmDd: `${map.year}-${map.month}-${map.day}`,
+    hour: parseInt(map.hour, 10),
+    minute: parseInt(map.minute, 10),
   };
 }
 
@@ -172,10 +183,7 @@ async function loadBirthdayQueue(client) {
  */
 async function dispatchBirthdays(client) {
   try {
-    const { mmDd, yyyyMmDd } = getTargetDates(0); // Today's target date in YYYY-MM-DD
-    const now = new Date(new Date().toLocaleString('en-US', { timeZone: tz }));
-    const currentHour = now.getHours();
-    const currentMin = now.getMinutes();
+    const { yyyyMmDd, hour: currentHour, minute: currentMin } = getTargetDates(0); // Today's target date and current time
 
     // 1. Fetch active servers with configuration
     const { data: guilds, error: guildError } = await supabase
@@ -204,12 +212,12 @@ async function dispatchBirthdays(client) {
         continue;
       }
 
-      // Query approved, unsent queue items for today
+      // Query approved, unsent queue items for today (or earlier if missed)
       const { data: queueItems, error: queueError } = await supabase
         .from('birthday_queue')
         .select('*')
         .eq('guild_id', guildId)
-        .eq('target_date', yyyyMmDd)
+        .lte('target_date', yyyyMmDd)
         .eq('is_approved', true)
         .eq('is_sent', false);
 

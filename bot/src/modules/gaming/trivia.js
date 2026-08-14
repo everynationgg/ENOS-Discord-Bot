@@ -962,12 +962,40 @@ async function checkAndProcessTrivia(client) {
             const [schedH, schedM] = targetTime.split(':').map(Number);
 
             if (currH > schedH || (currH === schedH && currM >= schedM)) {
-              logger.info(`[TRIVIA CRON] Triggering scheduled drop ${completedCount + 1}/${config.scheduled_drop_times.length} for guild ${guildId}. Time reached: ${currentTimeStr} >= ${targetTime}`);
-              const dropSuccess = await triggerTriviaDrop(client, guildId);
-              if (dropSuccess) {
-                config.completed_drops_today = completedCount + 1;
-                config.last_drop_date = today;
-                isConfigDirty = true;
+              // ── Race-condition guard ─────────────────────────────────────────
+              // Persist scheduled_drop_date to DB BEFORE triggering the drop so
+              // any concurrent cron tick (slow Gemini call, etc.) sees today's
+              // date and won't re-enter this branch and fire a duplicate drop.
+              if (isConfigDirty) {
+                await supabase
+                  .from('guild_config')
+                  .update({ config })
+                  .eq('guild_id', guildId)
+                  .eq('feature_key', 'trivia');
+                isConfigDirty = false;
+              }
+
+              // Final idempotency re-check: re-count actual drops from DB right
+              // before firing. Catches any concurrent spawn that finished between
+              // our initial count above and now.
+              const { data: recheckDrops } = await supabase
+                .from('trivia_drops')
+                .select('id')
+                .eq('guild_id', guildId)
+                .gte('created_at', startOfDayUtc)
+                .lte('created_at', endOfDayUtc);
+              const recheckCount = recheckDrops?.length || 0;
+
+              if (recheckCount > completedCount) {
+                logger.warn(`[TRIVIA CRON] Idempotency guard: drop already exists (${recheckCount} found vs ${completedCount} expected) — skipping duplicate spawn for guild ${guildId}.`);
+              } else {
+                logger.info(`[TRIVIA CRON] Triggering scheduled drop ${completedCount + 1}/${config.scheduled_drop_times.length} for guild ${guildId}. Time reached: ${currentTimeStr} >= ${targetTime}`);
+                const dropSuccess = await triggerTriviaDrop(client, guildId);
+                if (dropSuccess) {
+                  config.completed_drops_today = completedCount + 1;
+                  config.last_drop_date = today;
+                  isConfigDirty = true;
+                }
               }
             }
           }
