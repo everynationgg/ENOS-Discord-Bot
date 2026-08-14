@@ -522,79 +522,108 @@ async function executeCombatAction(guildId, userId, actionType) {
   const newLevel = currentLevel;
   const newXp = currentXp;
 
-  // Atomic Update Boss HP & Synergy State in Supabase
-  const newHp = Math.max(0, boss.current_hp - totalDmg);
+  // Atomic Update Boss HP & Synergy State in Supabase via RPC
+  let newHp = Math.max(0, boss.current_hp - totalDmg);
   let actionText = `${classKey.toUpperCase()} used ${skillName} dealt ${totalDmg.toLocaleString()} DMG`;
   if (isCrit) actionText += ' 💥 (CRITICAL STRIKE! 2x DMG)';
   if (apConserved) actionText += ' ⚡ (0 AP SPENT!)';
   if (isSynergy) actionText += ` 🔥 (${synergyType.toUpperCase()} COMBO!)`;
 
-  const { data: updatedBoss, error: bossErr } = await supabase
-    .from('boss_seasons')
-    .update({
-      current_hp: newHp,
-      mom_buff: newMomBuff,
-      dad_debuff: newDadDebuff,
-      last_action: actionText,
-      last_action_by: userId,
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', boss.id)
-    .select()
-    .single();
-
-  if (bossErr) {
-    logger.error('[BOSS] Failed to update boss HP:', bossErr.message);
-    return { success: false, message: 'Failed to process attack.' };
-  }
-
-  // Update Player AP & Damage
-  // weekly_points is accumulated as AP-contribution (2 pts per AP, 1.5x overkill)
-  // Final slay points (6-10) are set correctly at boss defeat in triggerOverkillRevival/handleOverkillDefeat
-  const newAp = playerState.ap_remaining - actualApDeducted;
   const apContribPoints = Math.round(actualApDeducted * 2 * pointsMultiplier);
-  const newWeeklyPoints = (playerState.weekly_points || 0) + apContribPoints;
-  await supabase
-    .from('boss_player_states')
-    .update({
-      ap_remaining: newAp,
-      is_locked: true,
-      total_damage: playerState.total_damage + totalDmg,
-      weekly_points: newWeeklyPoints,
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', playerState.id);
 
-  // Update User Account Profile with calculated XP/level
-  await supabase
-    .from('boss_user_profiles')
-    .update({
-      level: newLevel,
-      xp: newXp,
-      unallocated_stats: newUnallocated,
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', profile.id);
+  // Try atomic RPC function first
+  const { data: rpcRes, error: rpcErr } = await supabase.rpc('apply_boss_attack_result', {
+    p_boss_id: boss.id,
+    p_player_state_id: playerState.id,
+    p_profile_id: profile.id,
+    p_damage: totalDmg,
+    p_mom_buff: newMomBuff,
+    p_dad_debuff: newDadDebuff,
+    p_action_text: actionText,
+    p_user_id: userId,
+    p_ap_deducted: actualApDeducted,
+    p_ap_contrib_points: apContribPoints,
+    p_new_level: newLevel,
+    p_new_xp: newXp,
+    p_new_unallocated: newUnallocated,
+    p_guild_id: guildId,
+    p_week_identifier: boss.week_identifier,
+    p_action_type: actionType,
+    p_class_key: classKey,
+    p_skill_name: skillName,
+    p_points_earned: pointsEarned,
+    p_xp_earned: xpEarned,
+    p_is_synergy: isSynergy,
+    p_synergy_type: synergyType,
+    p_ap_conserved: apConserved,
+  });
+
+  if (!rpcErr && rpcRes && rpcRes.length > 0) {
+    newHp = Number(rpcRes[0].new_boss_hp);
+  } else {
+    if (rpcErr) {
+      logger.warn('[BOSS] RPC apply_boss_attack_result warning, using atomic table fallback:', rpcErr.message);
+    }
+    // Fallback: Atomic table updates
+    const { error: bossErr } = await supabase
+      .from('boss_seasons')
+      .update({
+        current_hp: newHp,
+        mom_buff: newMomBuff,
+        dad_debuff: newDadDebuff,
+        last_action: actionText,
+        last_action_by: userId,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', boss.id);
+
+    if (bossErr) {
+      logger.error('[BOSS] Failed to update boss HP:', bossErr.message);
+      return { success: false, message: 'Failed to process attack.' };
+    }
+
+    const newAp = Math.max(0, playerState.ap_remaining - actualApDeducted);
+    const newWeeklyPoints = (playerState.weekly_points || 0) + apContribPoints;
+    await supabase
+      .from('boss_player_states')
+      .update({
+        ap_remaining: newAp,
+        is_locked: true,
+        total_damage: playerState.total_damage + totalDmg,
+        weekly_points: newWeeklyPoints,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', playerState.id);
+
+    await supabase
+      .from('boss_user_profiles')
+      .update({
+        level: newLevel,
+        xp: newXp,
+        unallocated_stats: newUnallocated,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', profile.id);
+
+    await supabase.from('boss_transactions').insert({
+      guild_id: guildId,
+      user_id: userId,
+      week_identifier: boss.week_identifier,
+      action_type: actionType,
+      class_key: classKey,
+      skill_name: skillName,
+      damage_dealt: totalDmg,
+      points_earned: pointsEarned,
+      xp_earned: xpEarned,
+      is_synergy: isSynergy,
+      synergy_type: synergyType,
+      ap_conserved: apConserved,
+    });
+  }
 
   // Trigger Weekly Boss Quest Completion in Vault
   const { handleBossQuestCompletion } = require('./vault');
   await handleBossQuestCompletion(userId, guildId).catch(() => {});
-
-  // Log Transaction
-  await supabase.from('boss_transactions').insert({
-    guild_id: guildId,
-    user_id: userId,
-    week_identifier: boss.week_identifier,
-    action_type: actionType,
-    class_key: classKey,
-    skill_name: skillName,
-    damage_dealt: totalDmg,
-    points_earned: pointsEarned,
-    xp_earned: xpEarned,
-    is_synergy: isSynergy,
-    synergy_type: synergyType,
-    ap_conserved: apConserved,
-  });
 
   // Check Boss Defeat & Spawn Overkill Mode or Resolve Overkill Defeat
   if (newHp <= 0) {
