@@ -151,8 +151,8 @@ export default function SocialPage() {
         const initialDrafts: Record<string, string> = {};
         const initialOriginals: Record<string, string> = {};
         data.forEach((item: any) => {
-          initialDrafts[item.id] = item.draft_message || '';
-          initialOriginals[item.id] = item.rough_notes || '';
+          initialDrafts[item.id] = item.scratchpad_text || item.draft_message || '';
+          initialOriginals[item.id] = item.rough_notes || item.scratchpad_text || '';
         });
         setDrafts(initialDrafts);
         setOriginalNotes(initialOriginals);
@@ -228,7 +228,13 @@ export default function SocialPage() {
       const res = await fetch('/api/social/birthday/queue', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id, action: 'approve', draft_message: draftMessage, rough_notes: roughNotes }),
+        body: JSON.stringify({
+          id,
+          action: 'approve',
+          scratchpad_text: draftMessage,
+          draft_message: draftMessage,
+          rough_notes: roughNotes,
+        }),
       });
 
       if (!res.ok) throw new Error('Save rejected');
@@ -252,7 +258,13 @@ export default function SocialPage() {
       const res = await fetch('/api/social/birthday/queue', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id, action: 'send_now', draft_message: draftMessage, rough_notes: roughNotes }),
+        body: JSON.stringify({
+          id,
+          action: 'send_now',
+          scratchpad_text: draftMessage,
+          draft_message: draftMessage,
+          rough_notes: roughNotes,
+        }),
       });
 
       if (!res.ok) throw new Error('Trigger rejected');

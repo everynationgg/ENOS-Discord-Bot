@@ -35,11 +35,28 @@ export async function GET(req: NextRequest) {
     // Auto-sync birthdays for Today (0d), 1d, 2d, 3d into birthday_queue if missing
     for (let offset = 0; offset <= 3; offset++) {
       const { mmDd, yyyyMmDd } = getTargetDatesForOffset(offset);
+      const parts = mmDd.split('-');
+      const mm = parts[0];
+      const dd = parts[1];
+      const monthNum = parseInt(mm, 10);
+      const dayNum = parseInt(dd, 10);
+
+      const possibleFormats = Array.from(
+        new Set([
+          `${mm}-${dd}`,
+          `${monthNum}-${dayNum}`,
+          `${monthNum}-${dd}`,
+          `${mm}-${dayNum}`,
+          `${mm}/${dd}`,
+          `${monthNum}/${dayNum}`,
+        ])
+      );
+
       const { data: bdays } = await supabaseAdmin
         .from('member_birthdays')
         .select('user_id, ign')
         .eq('guild_id', guildId)
-        .eq('birth_date', mmDd);
+        .in('birth_date', possibleFormats);
 
       if (bdays && bdays.length > 0) {
         for (const b of bdays) {
@@ -81,16 +98,17 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { id, scratchpad_text, is_approved, action } = body;
+    const { id, scratchpad_text, draft_message, rough_notes, is_approved, action } = body;
     const guildId = getGuildId(req, body);
 
     if (!id) {
       return NextResponse.json({ error: 'Missing queue item ID' }, { status: 400 });
     }
 
+    const textToSave = scratchpad_text || draft_message || rough_notes || '';
+
     if (action === 'send_now') {
-      const textToPost = scratchpad_text || '';
-      if (!textToPost.trim()) {
+      if (!textToSave.trim()) {
         return NextResponse.json({ error: 'Cannot send an empty birthday wish' }, { status: 400 });
       }
 
@@ -116,7 +134,7 @@ export async function POST(req: NextRequest) {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          content: textToPost,
+          content: textToSave,
         }),
       });
 
@@ -129,7 +147,7 @@ export async function POST(req: NextRequest) {
       const { error: dbError } = await supabaseAdmin
         .from('birthday_queue')
         .update({
-          scratchpad_text: textToPost,
+          scratchpad_text: textToSave,
           is_approved: true,
           is_sent: true,
         })
@@ -153,11 +171,16 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: true, deleted: true });
     }
 
+    let isApproved = typeof is_approved === 'boolean' ? is_approved : false;
+    if (action === 'approve') {
+      isApproved = true;
+    }
+
     const { error } = await supabaseAdmin
       .from('birthday_queue')
       .update({
-        scratchpad_text: scratchpad_text || '',
-        is_approved: typeof is_approved === 'boolean' ? is_approved : false,
+        scratchpad_text: textToSave,
+        is_approved: isApproved,
       })
       .eq('id', id)
       .eq('guild_id', guildId); // Enforce guild isolation
