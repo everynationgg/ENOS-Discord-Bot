@@ -237,6 +237,7 @@ export default function ModerationPage() {
       setShowcaseSummary('Patch notes for v1.4.2 performance and bug fixes.');
       setShowcaseBody('⚡ **Improvements**:\n- Reduced canvas render latency by 40%.\n- Improved daily trivia drop anti-cheat shuffling.\n\n🐛 **Fixes**:\n- Fixed edge case where voice streak rewards doubled on server restart.');
       setShowcaseRewardCoins(0);
+      setDropdownItems([]);
     } else if (preset === 'showcase') {
       setShowcaseTitleSize('h1');
       setShowcaseTitle('Video Tutorial: How to Play Trivia & Earn Vault Coins');
@@ -262,7 +263,7 @@ export default function ModerationPage() {
     setShowcaseTryChannel(item.try_feature_channel || '');
     setShowcaseChannelId(item.channel_id || '');
     setShowcaseFeedbackChannelId(item.feedback_channel_id || '');
-    if (Array.isArray(item.dropdown_items) && item.dropdown_items.length > 0) {
+    if (Array.isArray(item.dropdown_items)) {
       setDropdownItems(item.dropdown_items);
     }
     setShowcaseStatusMsg(`📌 Loaded post "${item.title}" into Dashboard editor.`);
@@ -1553,21 +1554,37 @@ export default function ModerationPage() {
                       <label className="form-label" style={{ fontWeight: 700, margin: 0, fontSize: '0.95rem' }}>
                         📋 Dynamic Dropdown Options Builder ({dropdownItems.length})
                       </label>
-                      <button
-                        type="button"
-                        className="btn btn-secondary"
-                        onClick={handleAddDropdownItem}
-                        style={{ fontSize: '0.78rem', padding: '0.35rem 0.75rem' }}
-                      >
-                        ➕ Add Dropdown Option
-                      </button>
+                      <div style={{ display: 'flex', gap: '0.5rem' }}>
+                        {dropdownItems.length > 0 && (
+                          <button
+                            type="button"
+                            className="btn btn-secondary"
+                            onClick={() => setDropdownItems([])}
+                            style={{ fontSize: '0.78rem', padding: '0.35rem 0.75rem', color: '#f87171' }}
+                          >
+                            🗑️ Clear All Options
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          className="btn btn-secondary"
+                          onClick={handleAddDropdownItem}
+                          style={{ fontSize: '0.78rem', padding: '0.35rem 0.75rem' }}
+                        >
+                          ➕ Add Dropdown Option
+                        </button>
+                      </div>
                     </div>
 
-                    {dropdownItems.map((item, idx) => (
-                      <div key={item.id || idx} style={{ marginBottom: '1rem', backgroundColor: 'var(--bg-secondary)', padding: '0.85rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                          <span style={{ fontWeight: 600, fontSize: '0.85rem' }}>Option #{idx + 1}</span>
-                          {dropdownItems.length > 1 && (
+                    {dropdownItems.length === 0 ? (
+                      <div style={{ padding: '0.85rem', borderRadius: '8px', backgroundColor: 'var(--bg-secondary)', border: '1px border-color', fontSize: '0.8125rem', color: 'var(--text-muted)', textAlign: 'center' }}>
+                        ℹ️ No dropdown options configured. The announcement will be published as a clean update without interactive dropdowns.
+                      </div>
+                    ) : (
+                      dropdownItems.map((item, idx) => (
+                        <div key={item.id || idx} style={{ marginBottom: '1rem', backgroundColor: 'var(--bg-secondary)', padding: '0.85rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                            <span style={{ fontWeight: 600, fontSize: '0.85rem' }}>Option #{idx + 1}</span>
                             <button
                               type="button"
                               onClick={() => handleRemoveDropdownItem(idx)}
@@ -1575,8 +1592,7 @@ export default function ModerationPage() {
                             >
                               🗑️ Remove
                             </button>
-                          )}
-                        </div>
+                          </div>
 
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', marginBottom: '0.5rem' }}>
                           <input
@@ -1642,7 +1658,8 @@ export default function ModerationPage() {
                           style={{ width: '100%', fontFamily: 'inherit', resize: 'vertical' }}
                         />
                       </div>
-                    ))}
+                      ))
+                    )}
                   </div>
 
                   {/* Main Embed Banner Upload (Optional) */}
