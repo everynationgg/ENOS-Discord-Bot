@@ -12,9 +12,6 @@ function getGuildId(req: NextRequest, body?: any) {
 
 // GET /api/social/birthday/config — Fetch server-specific birthday configuration
 export async function GET(req: NextRequest) {
-  const session = await auth();
-  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-
   try {
     const guildId = getGuildId(req);
     const { data, error } = await supabaseAdmin

@@ -26,9 +26,6 @@ function getTargetDatesForOffset(daysAhead: number) {
 
 // GET /api/social/birthday/queue — Fetch unsent birthday queue items
 export async function GET(req: NextRequest) {
-  const session = await auth();
-  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-
   try {
     const guildId = getGuildId(req);
 

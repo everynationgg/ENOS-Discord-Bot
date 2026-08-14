@@ -4,9 +4,6 @@ import { supabaseAdmin } from '@/lib/supabase';
 
 // GET /api/social/birthday/channels — Fetch live text/announcement channels for the guild
 export async function GET(req: NextRequest) {
-  const session = await auth();
-  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-
   const guildId = req.nextUrl.searchParams.get('guild_id') || process.env.DISCORD_GUILD_ID!;
   const token = process.env.DISCORD_TOKEN || process.env.DISCORD_BOT_TOKEN;
 
