@@ -118,7 +118,7 @@ async function loadBirthdayQueue(client) {
 
       const { data: gSetting } = await supabase
         .from('guild_settings')
-        .select('birthday_channel_id')
+        .select('birthday_channel_id, log_channel_id')
         .eq('guild_id', guildId)
         .maybeSingle();
 
@@ -129,7 +129,11 @@ async function loadBirthdayQueue(client) {
         .eq('feature_key', 'birthday')
         .maybeSingle();
 
-      const adminChannelId = gConfig?.config?.admin_channel_id || gConfig?.config?.notification_channel_id || gSetting?.birthday_channel_id;
+      // Admin alert goes to log_channel_id (private/admin channel), NOT the public birthday channel
+      const adminChannelId = gConfig?.config?.admin_channel_id
+        || gConfig?.config?.notification_channel_id
+        || gSetting?.log_channel_id
+        || gSetting?.birthday_channel_id;
 
       if (adminChannelId) {
         const discordGuild = await client.guilds.fetch(guildId).catch(() => null);

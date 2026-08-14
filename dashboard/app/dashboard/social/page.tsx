@@ -161,11 +161,16 @@ export default function SocialPage() {
     setQueueLoading(false);
   }, []);
 
+  // Always load the queue on mount and whenever the birthday_queue tab becomes active
   useEffect(() => {
-    if (activeTab === 'birthday_queue' || birthdayEnabled) {
+    loadQueue();
+  }, [loadQueue]);
+
+  useEffect(() => {
+    if (activeTab === 'birthday_queue') {
       loadQueue();
     }
-  }, [activeTab, birthdayEnabled, loadQueue]);
+  }, [activeTab]);
 
   // Save Birthday System Configuration Settings
   const handleSaveConfig = async () => {
@@ -1178,11 +1183,7 @@ export default function SocialPage() {
                   <button className="btn btn-secondary btn-sm" onClick={loadQueue}>🔄 Refresh Queue</button>
                 </div>
 
-                {!birthdayEnabled ? (
-                  <div style={{ padding: '2.5rem', textAlign: 'center', color: 'var(--text-muted)', background: 'rgba(255,255,255,0.02)', borderRadius: 'var(--radius-md)' }}>
-                    🎂 Birthday System is currently disabled. Enable it in the settings tab to view the queue workspace.
-                  </div>
-                ) : queueLoading ? (
+                {queueLoading ? (
                   <div style={{ display: 'flex', justifyContent: 'center', padding: '3rem' }}>
                     <div className="spinner" style={{ width: 28, height: 28 }} />
                   </div>
