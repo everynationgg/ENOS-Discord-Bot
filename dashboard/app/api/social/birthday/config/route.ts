@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { supabaseAdmin } from '@/lib/supabase';
 
+export const dynamic = 'force-dynamic';
+
 function getGuildId(req: NextRequest, body?: any) {
   return (
     req.nextUrl.searchParams.get('guild_id') ||
