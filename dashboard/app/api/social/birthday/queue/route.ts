@@ -10,6 +10,20 @@ function getGuildId(req: NextRequest, body?: any) {
   );
 }
 
+const TIMEZONE = process.env.BOT_TIMEZONE || 'Asia/Manila';
+
+function getTargetDatesForOffset(daysAhead: number) {
+  const date = new Date(new Date().toLocaleString('en-US', { timeZone: TIMEZONE }));
+  date.setDate(date.getDate() + daysAhead);
+  const yyyy = date.getFullYear();
+  const mm = String(date.getMonth() + 1).padStart(2, '0');
+  const dd = String(date.getDate()).padStart(2, '0');
+  return {
+    mmDd: `${mm}-${dd}`,
+    yyyyMmDd: `${yyyy}-${mm}-${dd}`,
+  };
+}
+
 // GET /api/social/birthday/queue — Fetch unsent birthday queue items
 export async function GET(req: NextRequest) {
   const session = await auth();
@@ -17,6 +31,34 @@ export async function GET(req: NextRequest) {
 
   try {
     const guildId = getGuildId(req);
+
+    // Auto-sync birthdays for Today (0d), 1d, 2d, 3d into birthday_queue if missing
+    for (let offset = 0; offset <= 3; offset++) {
+      const { mmDd, yyyyMmDd } = getTargetDatesForOffset(offset);
+      const { data: bdays } = await supabaseAdmin
+        .from('member_birthdays')
+        .select('user_id, ign')
+        .eq('guild_id', guildId)
+        .eq('birth_date', mmDd);
+
+      if (bdays && bdays.length > 0) {
+        for (const b of bdays) {
+          await supabaseAdmin
+            .from('birthday_queue')
+            .insert({
+              guild_id: guildId,
+              user_id: b.user_id,
+              ign: b.ign || null,
+              target_date: yyyyMmDd,
+              scratchpad_text: '',
+              is_approved: false,
+              is_sent: false,
+            })
+            .catch(() => {});
+        }
+      }
+    }
+
     const { data, error } = await supabaseAdmin
       .from('birthday_queue')
       .select('*')

@@ -42,62 +42,64 @@ async function loadBirthdayQueue(client) {
       return;
     }
 
-    // 2. We look for birthdays matching MM-DD of 3 days from now
-    const { mmDd, yyyyMmDd } = getTargetDates(3);
-    logger.info(`[BIRTHDAYS] Scanning member birthdays matching date: ${mmDd} for queue target: ${yyyyMmDd}`);
+    // 2. We look for birthdays matching MM-DD for Today (0d), Tomorrow (1d), 2d, and 3d ahead
+    for (let daysAhead = 0; daysAhead <= 3; daysAhead++) {
+      const { mmDd, yyyyMmDd } = getTargetDates(daysAhead);
+      logger.info(`[BIRTHDAYS] Scanning member birthdays matching date: ${mmDd} (+${daysAhead}d) for queue target: ${yyyyMmDd}`);
 
-    for (const guild of activeGuilds) {
-      const guildId = guild.guild_id;
+      for (const guild of activeGuilds) {
+        const guildId = guild.guild_id;
 
-      // Scan birthdays for this server
-      const { data: birthdays, error: bdayError } = await supabase
-        .from('member_birthdays')
-        .select('user_id, ign')
-        .eq('guild_id', guildId)
-        .eq('birth_date', mmDd);
+        // Scan birthdays for this server
+        const { data: birthdays, error: bdayError } = await supabase
+          .from('member_birthdays')
+          .select('user_id, ign')
+          .eq('guild_id', guildId)
+          .eq('birth_date', mmDd);
 
-      if (bdayError) {
-        logger.error(`[BIRTHDAYS] Error fetching birthdays for guild ${guildId}:`, bdayError.message);
-        continue;
-      }
-
-      if (!birthdays || birthdays.length === 0) continue;
-
-      for (const bday of birthdays) {
-        // Verify member is still in the Discord server
-        const discordGuild = await client.guilds.fetch(guildId).catch(() => null);
-        if (discordGuild) {
-          const member = await discordGuild.members.fetch(bday.user_id).catch(() => null);
-          if (!member) {
-            logger.info(`[BIRTHDAYS] Member ${bday.user_id} has left guild ${guildId}. Pruning birthday record.`);
-            await supabase.from('member_birthdays').delete().eq('guild_id', guildId).eq('user_id', bday.user_id);
-            await supabase.from('birthday_queue').delete().eq('guild_id', guildId).eq('user_id', bday.user_id);
-            continue;
-          }
+        if (bdayError) {
+          logger.error(`[BIRTHDAYS] Error fetching birthdays for guild ${guildId}:`, bdayError.message);
+          continue;
         }
 
-        // Insert into birthday_queue if not already exists
-        const { error: insertError } = await supabase
-          .from('birthday_queue')
-          .insert({
-            guild_id: guildId,
-            user_id: bday.user_id,
-            ign: bday.ign || null,
-            target_date: yyyyMmDd,
-            scratchpad_text: '', // Start empty
-            is_approved: false,
-            is_sent: false,
-          });
+        if (!birthdays || birthdays.length === 0) continue;
 
-        if (insertError) {
-          // If duplicate key error (UNIQUE constraint violated), just ignore
-          if (insertError.code === '23505') {
-            logger.debug(`[BIRTHDAYS] Queue item already exists for user ${bday.user_id} in guild ${guildId}`);
-          } else {
-            logger.error(`[BIRTHDAYS] Error queuing birthday for user ${bday.user_id}:`, insertError.message);
+        for (const bday of birthdays) {
+          // Verify member is still in the Discord server
+          const discordGuild = await client.guilds.fetch(guildId).catch(() => null);
+          if (discordGuild) {
+            const member = await discordGuild.members.fetch(bday.user_id).catch(() => null);
+            if (!member) {
+              logger.info(`[BIRTHDAYS] Member ${bday.user_id} has left guild ${guildId}. Pruning birthday record.`);
+              await supabase.from('member_birthdays').delete().eq('guild_id', guildId).eq('user_id', bday.user_id);
+              await supabase.from('birthday_queue').delete().eq('guild_id', guildId).eq('user_id', bday.user_id);
+              continue;
+            }
           }
-        } else {
-          logger.info(`[BIRTHDAYS] Queued upcoming birthday for user ${bday.user_id} in guild ${guildId} on ${yyyyMmDd}`);
+
+          // Insert into birthday_queue if not already exists
+          const { error: insertError } = await supabase
+            .from('birthday_queue')
+            .insert({
+              guild_id: guildId,
+              user_id: bday.user_id,
+              ign: bday.ign || null,
+              target_date: yyyyMmDd,
+              scratchpad_text: '', // Start empty
+              is_approved: false,
+              is_sent: false,
+            });
+
+          if (insertError) {
+            // If duplicate key error (UNIQUE constraint violated), just ignore
+            if (insertError.code === '23505') {
+              logger.debug(`[BIRTHDAYS] Queue item already exists for user ${bday.user_id} in guild ${guildId}`);
+            } else {
+              logger.error(`[BIRTHDAYS] Error queuing birthday for user ${bday.user_id}:`, insertError.message);
+            }
+          } else {
+            logger.info(`[BIRTHDAYS] Queued upcoming birthday for user ${bday.user_id} in guild ${guildId} on ${yyyyMmDd}`);
+          }
         }
       }
     }
