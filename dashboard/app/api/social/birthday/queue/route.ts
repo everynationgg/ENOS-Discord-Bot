@@ -54,8 +54,7 @@ export async function GET(req: NextRequest) {
 
       const { data: bdays } = await supabaseAdmin
         .from('member_birthdays')
-        .select('user_id, ign')
-        .eq('guild_id', guildId)
+        .select('user_id, ign, guild_id')
         .in('birth_date', possibleFormats);
 
       if (bdays && bdays.length > 0) {
@@ -63,7 +62,7 @@ export async function GET(req: NextRequest) {
           await supabaseAdmin
             .from('birthday_queue')
             .insert({
-              guild_id: guildId,
+              guild_id: b.guild_id || guildId,
               user_id: b.user_id,
               ign: b.ign || null,
               target_date: yyyyMmDd,
@@ -79,13 +78,16 @@ export async function GET(req: NextRequest) {
     const { data, error } = await supabaseAdmin
       .from('birthday_queue')
       .select('*')
-      .eq('guild_id', guildId)
       .eq('is_sent', false)
       .order('target_date', { ascending: true });
 
     if (error) throw new Error(error.message);
 
-    return NextResponse.json(data || []);
+    return NextResponse.json(data || [], {
+      headers: {
+        'Cache-Control': 'no-store, max-age=0',
+      },
+    });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });
   }

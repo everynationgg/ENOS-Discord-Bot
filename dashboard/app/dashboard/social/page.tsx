@@ -142,10 +142,10 @@ export default function SocialPage() {
   const loadQueue = useCallback(async () => {
     setQueueLoading(true);
     try {
-      const res = await fetch('/api/social/birthday/queue');
+      const res = await fetch(`/api/social/birthday/queue?t=${Date.now()}`, { cache: 'no-store' });
       if (res.ok) {
         const data = await res.json();
-        setQueue(data);
+        setQueue(Array.isArray(data) ? data : []);
         
         // Initialize drafts and original notes
         const initialDrafts: Record<string, string> = {};
