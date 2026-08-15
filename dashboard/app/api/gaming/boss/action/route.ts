@@ -79,6 +79,7 @@ export async function POST(req: NextRequest) {
 
         // Promote staged artwork & fields into active config and clear staged_boss_config
         const updatedCfg = { ...(featureRow?.config || {}) };
+        if (stagedConfig?.game_name) updatedCfg.game_name = stagedConfig.game_name;
         if (sName) updatedCfg.override_name = sName;
         if (sTitle) updatedCfg.boss_title = sTitle;
         if (sLore) updatedCfg.lore = sLore;

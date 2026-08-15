@@ -144,6 +144,7 @@ async function getOrCreateActiveBoss(guildId) {
 
     // Clear staged_boss_config so it doesn't re-trigger, and promote staged artwork & fields to active config
     const updatedConfig = { ...(featureRow?.config || {}) };
+    if (stagedConfig.game_name) updatedConfig.game_name = stagedConfig.game_name;
     if (sName) updatedConfig.override_name = sName;
     if (sTitle) updatedConfig.boss_title = sTitle;
     if (sLore) updatedConfig.lore = sLore;
