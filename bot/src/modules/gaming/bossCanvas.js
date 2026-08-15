@@ -215,6 +215,7 @@ async function renderBossImage(data) {
     customImageUrl = null,
     customBgUrl = null,
     victoryImageUrl = null,
+    lossImageUrl = null,
     userClassKey = null,
     classImageUrls = {},
     isOverkill = false,
@@ -225,11 +226,12 @@ async function renderBossImage(data) {
   const activeClass = userClassKey || 'mom';
   const targetClassUrl = classImageUrls[activeClass] || classImageUrls.mom || classImageUrls.dad || classImageUrls.kid;
 
-  const [bgBuf, bossBuf, classBuf, victoryBuf] = await Promise.all([
+  const [bgBuf, bossBuf, classBuf, victoryBuf, lossBuf] = await Promise.all([
     fetchImageBuffer(customBgUrl),
     fetchImageBuffer(customImageUrl),
     fetchImageBuffer(targetClassUrl),
     fetchImageBuffer(victoryImageUrl),
+    fetchImageBuffer(lossImageUrl),
   ]);
 
   const normAction = (lastAction || '').toLowerCase();
@@ -275,7 +277,7 @@ async function renderBossImage(data) {
 
   if (!customBgLoaded) {
     const bgGrad = ctx.createLinearGradient(0, 0, width, height);
-    if (isOverkill) {
+    if (isOverkill || viewMode === 'loss') {
       bgGrad.addColorStop(0, '#1a0303');
       bgGrad.addColorStop(0.5, '#2d0808');
       bgGrad.addColorStop(1, '#0e0202');
@@ -288,7 +290,7 @@ async function renderBossImage(data) {
     ctx.fillRect(0, 0, width, height);
 
     // Subtle Grid Lines
-    ctx.strokeStyle = isOverkill ? 'rgba(239, 68, 68, 0.08)' : 'rgba(99, 102, 241, 0.09)';
+    ctx.strokeStyle = (isOverkill || viewMode === 'loss') ? 'rgba(239, 68, 68, 0.08)' : 'rgba(99, 102, 241, 0.09)';
     ctx.lineWidth = 1;
     for (let y = 0; y < height; y += 8) {
       ctx.beginPath();
@@ -325,6 +327,38 @@ async function renderBossImage(data) {
     ctx.fillStyle = '#4ade80';
     ctx.font = 'bold 20px sans-serif';
     ctx.fillText('SERVER SAVED & REWARDS AWARDED', 35, 118);
+
+    ctx.restore();
+    return canvas.toBuffer('image/png');
+  }
+
+  // ─── PHASE L: LOSS / ESCAPED VIEW ─────────────────────────────────────────
+  if (viewMode === 'loss') {
+    const mainPicBuf = lossBuf || bossBuf;
+    if (mainPicBuf) {
+      try {
+        const lossImg = await loadImage(mainPicBuf);
+        drawImageContain(ctx, lossImg, 0, 0, width, height, 0.5, 0.5);
+      } catch (e) {}
+    }
+
+    const frameGrad = ctx.createRadialGradient(400, 210, 200, 400, 210, 420);
+    frameGrad.addColorStop(0, 'rgba(0,0,0,0.1)');
+    frameGrad.addColorStop(1, 'rgba(30,0,0,0.88)');
+    ctx.fillStyle = frameGrad;
+    ctx.fillRect(0, 0, width, height);
+
+    ctx.fillStyle = '#ef4444';
+    ctx.font = 'bold 22px sans-serif';
+    ctx.fillText('SYSTEM DEFENSE COMPROMISED', 35, 50);
+
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 26px sans-serif';
+    ctx.fillText('BOSS ESCAPED — REALM UNCONTAINED', 35, 85);
+
+    ctx.fillStyle = '#f87171';
+    ctx.font = 'bold 20px sans-serif';
+    ctx.fillText('STAND BY FOR NEXT ANOMALY CYCLE', 35, 118);
 
     ctx.restore();
     return canvas.toBuffer('image/png');

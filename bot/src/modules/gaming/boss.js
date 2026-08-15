@@ -84,6 +84,27 @@ async function getOrCreateActiveBoss(guildId) {
     bossHp = 50000 + (targetPlayers * 35000);
   }
 
+  // ─── Adaptive Difficulty: Check previous concluded boss season ──────────────
+  try {
+    const { data: lastSeason } = await supabase
+      .from('boss_seasons')
+      .select('is_defeated, current_hp, max_hp, week_identifier')
+      .eq('guild_id', guildId)
+      .eq('is_concluded', true)
+      .neq('week_identifier', currentWeek)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (lastSeason && (!lastSeason.is_defeated || Number(lastSeason.current_hp) > 0)) {
+      const scaledHp = Math.round(bossHp * 0.75);
+      logger.info(`[BOSS SPAWN] Adaptive HP applied: Previous week (${lastSeason.week_identifier}) was not defeated (${lastSeason.current_hp}/${lastSeason.max_hp} HP left). Reducing HP by 25% from ${bossHp.toLocaleString()} to ${scaledHp.toLocaleString()}.`);
+      bossHp = scaledHp;
+    }
+  } catch (scaleErr) {
+    logger.warn('[BOSS SPAWN] Adaptive HP check failed, using standard scaling:', scaleErr.message);
+  }
+
   // Generate default Boss AI Lore
   const bossData = await generateGlitchBossLore();
 
@@ -130,6 +151,7 @@ async function getOrCreateActiveBoss(guildId) {
     if (stagedConfig.custom_image_url) updatedConfig.custom_image_url = stagedConfig.custom_image_url;
     if (stagedConfig.custom_bg_url) updatedConfig.custom_bg_url = stagedConfig.custom_bg_url;
     if (stagedConfig.victory_image_url) updatedConfig.victory_image_url = stagedConfig.victory_image_url;
+    if (stagedConfig.loss_image_url) updatedConfig.loss_image_url = stagedConfig.loss_image_url;
     if (stagedConfig.mom_image_url) updatedConfig.mom_image_url = stagedConfig.mom_image_url;
     if (stagedConfig.dad_image_url) updatedConfig.dad_image_url = stagedConfig.dad_image_url;
     if (stagedConfig.kid_image_url) updatedConfig.kid_image_url = stagedConfig.kid_image_url;
@@ -765,13 +787,22 @@ async function concludeWeeklyBossBattle(guildId, client = null) {
   const boss = await getOrCreateActiveBoss(guildId);
   if (!boss) return;
 
+  const isDefeated = Number(boss.current_hp) <= 0;
+
   await supabase
     .from('boss_seasons')
-    .update({ is_concluded: true, is_defeated: true, updated_at: new Date().toISOString() })
+    .update({ is_concluded: true, is_defeated: isDefeated, updated_at: new Date().toISOString() })
     .eq('id', boss.id);
 
-  if (Number(boss.current_hp) <= 0 && !boss.is_defeated) {
+  if (isDefeated && !boss.is_defeated) {
     await handleOverkillDefeat(guildId, boss);
+  } else if (!isDefeated) {
+    await logBotEvent(guildId, 'boss_escaped', null, {
+      week: boss.week_identifier,
+      remaining_hp: Number(boss.current_hp),
+      max_hp: Number(boss.max_hp),
+    });
+    logger.info(`[BOSS CONCLUDE] Weekly Boss escaped for guild ${guildId}: ${boss.current_hp}/${boss.max_hp} HP remaining.`);
   }
 
   try {

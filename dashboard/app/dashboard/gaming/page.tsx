@@ -1570,17 +1570,41 @@ function TriviaCardForm({ config, setConfig, setTriviaRefreshKey }: { config: an
 function BossCardForm({ config, setConfig }: { config: any; setConfig: (key: string, val: any) => void }) {
   const [bossSubTab, setBossSubTab] = useState<'active' | 'staging'>('active');
   const [showClassImages, setShowClassImages] = useState(false);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+
   const gameName = config.game_name || '';
   const bossName = config.override_name || '';
   const baseHP = config.override_hp || '';
   const imageUrl = config.custom_image_url || '';
   const bgUrl = config.custom_bg_url || '';
   const victoryImageUrl = config.victory_image_url || '';
+  const lossImageUrl = config.loss_image_url || '';
   const momImageUrl = config.mom_image_url || '';
   const dadImageUrl = config.dad_image_url || '';
   const kidImageUrl = config.kid_image_url || '';
 
   const staged = config.staged_boss_config || {};
+
+  const handleBossAction = async (action: string) => {
+    if (!confirm(`Confirm action: ${action}?`)) return;
+    setActionLoading(action);
+    try {
+      const body: any = { action };
+      if (action === 'force_spawn') {
+        body.boss_name = bossName;
+        body.hp = baseHP;
+        body.image_url = imageUrl;
+      }
+      const res = await fetch('/api/gaming/boss/action', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      alert(res.ok ? `✅ ${data.message || 'Success'}` : `❌ ${data.error || 'Error'}`);
+    } catch (e: any) { alert(`❌ Request error: ${e.message}`); }
+    finally { setActionLoading(null); }
+  };
 
   return (
     <>
@@ -1601,7 +1625,6 @@ function BossCardForm({ config, setConfig }: { config: any; setConfig: (key: str
         </button>
       </div>
 
-      {/* Admin Quick Action Controls — Fixed at top */}
       <div style={{
         background: 'rgba(250, 204, 21, 0.05)',
         border: '1px solid rgba(250, 204, 21, 0.2)',
@@ -1620,58 +1643,39 @@ function BossCardForm({ config, setConfig }: { config: any; setConfig: (key: str
         <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
           <button
             type="button"
-            className="btn btn-secondary btn-sm"
-            style={{ backgroundColor: '#ef4444', color: '#fff', border: 'none' }}
-            onClick={async () => {
-              if (!confirm('Are you sure you want to FORCE RESET the weekly boss? This will reset Boss HP and player AP for the current week.')) return;
-              try {
-                const res = await fetch('/api/gaming/boss/action', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ action: 'force_reset' }),
-                });
-                const data = await res.json();
-                if (res.ok) {
-                  alert(`✅ ${data.message || 'Boss reset successfully!'}`);
-                } else {
-                  alert(`❌ Reset failed: ${data.error || 'Unknown error'}`);
-                }
-              } catch (e: any) {
-                alert(`❌ Request error: ${e.message}`);
-              }
-            }}
+            className="btn btn-sm"
+            style={{ backgroundColor: '#ef4444', color: '#fff', border: 'none', fontWeight: 600 }}
+            disabled={actionLoading === 'slay'}
+            onClick={() => handleBossAction('slay')}
           >
-            🔄 Force Weekly Reset
+            {actionLoading === 'slay' ? 'Executing...' : '💥 Kill Boss (Slay)'}
           </button>
           <button
             type="button"
-            className="btn btn-primary btn-sm"
-            style={{ backgroundColor: '#3b82f6', border: 'none' }}
-            onClick={async () => {
-              if (!confirm('Are you sure you want to FORCE SPAWN the Weekly Boss? This will update or spawn the active boss for the current week.')) return;
-              try {
-                const res = await fetch('/api/gaming/boss/action', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    action: 'force_spawn',
-                    boss_name: bossName,
-                    hp: baseHP,
-                    image_url: imageUrl,
-                  }),
-                });
-                const data = await res.json();
-                if (res.ok) {
-                  alert(`✅ ${data.message || 'Boss force spawned successfully!'}`);
-                } else {
-                  alert(`❌ Force spawn failed: ${data.error || 'Unknown error'}`);
-                }
-              } catch (e: any) {
-                alert(`❌ Request error: ${e.message}`);
-              }
-            }}
+            className="btn btn-sm"
+            style={{ backgroundColor: '#eab308', color: '#000', border: 'none', fontWeight: 600 }}
+            disabled={actionLoading === 'reroll'}
+            onClick={() => handleBossAction('reroll')}
           >
-            ⚔️ Force Spawn Weekly Boss
+            {actionLoading === 'reroll' ? 'Rerolling...' : '🎲 Reroll Lore'}
+          </button>
+          <button
+            type="button"
+            className="btn btn-sm"
+            style={{ backgroundColor: '#3b82f6', color: '#fff', border: 'none', fontWeight: 600 }}
+            disabled={actionLoading === 'revive'}
+            onClick={() => handleBossAction('revive')}
+          >
+            {actionLoading === 'revive' ? 'Reviving...' : '🔄 Revive / Reset HP'}
+          </button>
+          <button
+            type="button"
+            className="btn btn-sm"
+            style={{ backgroundColor: '#8b5cf6', color: '#fff', border: 'none', fontWeight: 600 }}
+            disabled={actionLoading === 'deploy_staged'}
+            onClick={() => handleBossAction('deploy_staged')}
+          >
+            {actionLoading === 'deploy_staged' ? 'Deploying...' : '🚀 Deploy Staged'}
           </button>
         </div>
       </div>
@@ -1680,121 +1684,87 @@ function BossCardForm({ config, setConfig }: { config: any; setConfig: (key: str
         <>
           <div className="section-divider">
             <div className="section-divider-line" />
-            <span className="section-divider-text">Active Boss Configuration</span>
+            <span className="section-divider-text">⚔️ Live Boss Configuration</span>
             <div className="section-divider-line" />
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
             <div className="form-group">
-              <label className="form-label">Game Name</label>
+              <label className="form-label">Active Game Realm</label>
               <input
                 id="boss-game-name"
                 className="form-input"
-                placeholder="e.g. Where Winds Meet"
+                placeholder="e.g. Subnautica 2, Palworld"
                 value={gameName}
                 onChange={(e) => setConfig('game_name', e.target.value)}
               />
             </div>
-
             <div className="form-group">
-              <label className="form-label">Boss Name Override</label>
+              <label className="form-label">Custom Boss Name Override</label>
               <input
-                id="boss-override-name"
+                id="boss-name"
                 className="form-input"
-                placeholder="e.g. Glitched Void Sovereign"
+                placeholder="e.g. Leviathan: Bangus"
                 value={bossName}
                 onChange={(e) => setConfig('override_name', e.target.value)}
               />
             </div>
-
             <div className="form-group">
               <label className="form-label">Boss Subtitle / Class Title</label>
               <input
-                id="boss-title-input"
+                id="boss-title"
                 className="form-input"
-                placeholder="e.g. System Threat (Where Winds Meet)"
+                placeholder="e.g. System Threat (Subnautica 2)"
                 value={config.boss_title || ''}
                 onChange={(e) => setConfig('boss_title', e.target.value)}
               />
             </div>
-
             <div className="form-group">
-              <label className="form-label">Base Max HP</label>
+              <label className="form-label">Base HP Override (Optional)</label>
               <input
-                id="boss-override-hp"
+                id="boss-hp"
                 type="number"
                 className="form-input"
-                placeholder="e.g. 500000"
+                placeholder="Auto-calculated dynamically if blank"
                 value={baseHP}
                 onChange={(e) => setConfig('override_hp', parseInt(e.target.value) || '')}
               />
             </div>
-
             <div className="form-group" style={{ gridColumn: 'span 2' }}>
-              <label className="form-label">Custom Boss Lore & Story Background</label>
+              <label className="form-label">Custom Boss Lore & Backstory</label>
               <textarea
-                id="boss-lore-input"
+                id="boss-lore"
                 className="form-textarea"
                 rows={3}
-                placeholder="Describe the boss lore and story background..."
+                placeholder="Custom lore explaining the boss..."
                 value={config.lore || ''}
                 onChange={(e) => setConfig('lore', e.target.value)}
               />
             </div>
-
-            <div className="form-group" style={{ gridColumn: 'span 2' }}>
-              <label className="form-label">Announcement Channel ID</label>
-              <input
-                id="boss-announcement-channel"
-                className="form-input"
-                placeholder="Channel ID to post weekly boss status card"
-                value={config.channel_id || ''}
-                onChange={(e) => setConfig('channel_id', e.target.value)}
-              />
-            </div>
           </div>
 
-          <div style={{ marginTop: '0.75rem', display: 'flex', gap: '0.5rem' }}>
-            <button
-              type="button"
-              className="btn btn-secondary btn-sm"
-              style={{ backgroundColor: 'rgba(59, 130, 246, 0.15)', color: '#60a5fa', border: '1px solid rgba(59, 130, 246, 0.3)', fontWeight: 600, width: '100%' }}
-              onClick={async () => {
-                try {
-                  const res = await fetch('/api/gaming/boss/action', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ action: 'refresh' }),
-                  });
-                  const data = await res.json();
-                  if (res.ok) {
-                    alert(`✅ ${data.message || 'Discord Weekly Boss Card refreshed and updated with active Name, Title & Lore!'}`);
-                  } else {
-                    alert(`❌ Refresh failed: ${data.error || 'Unknown error'}`);
-                  }
-                } catch (e: any) {
-                  alert(`❌ Request error: ${e.message}`);
-                }
-              }}
-            >
-              🔄 Refresh Discord Boss Card Now
-            </button>
-          </div>
-
-          {/* Collapsible Advanced Settings (Class Cards & Custom Images) */}
           <div style={{ marginTop: '1rem', borderTop: '1px solid var(--border-subtle)', paddingTop: '0.75rem' }}>
-            <button
-              type="button"
-              className="btn btn-secondary btn-sm"
-              onClick={() => setShowClassImages(!showClassImages)}
-              style={{ width: '100%', justifyContent: 'space-between', display: 'flex', alignItems: 'center' }}
-            >
-              <span>🎨 Advanced Settings — Class Cards & Arena Artwork</span>
-              <span>{showClassImages ? '▲ Hide' : '▼ Expand'}</span>
-            </button>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+              <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                🎨 Custom Artwork & Visual Overrides
+              </span>
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                onClick={() => setShowClassImages(!showClassImages)}
+              >
+                {showClassImages ? 'Hide Artwork Settings' : 'Configure Custom Artwork'}
+              </button>
+            </div>
 
             {showClassImages && (
-              <div style={{ marginTop: '0.75rem', padding: '0.75rem', background: 'var(--bg-tertiary)', borderRadius: '8px' }}>
+              <div style={{
+                background: 'var(--surface-elevated)',
+                padding: '0.75rem',
+                borderRadius: '8px',
+                border: '1px solid var(--border-subtle)',
+                marginTop: '0.5rem'
+              }}>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
                   <ImageUploader
                     id="boss-custom-image"
@@ -1815,6 +1785,13 @@ function BossCardForm({ config, setConfig }: { config: any; setConfig: (key: str
                     label="Victory Background Image URL"
                     value={victoryImageUrl}
                     onChange={(url) => setConfig('victory_image_url', url)}
+                    previewHeight="120px"
+                  />
+                  <ImageUploader
+                    id="boss-loss-image"
+                    label="Loss / Defeat Image URL"
+                    value={lossImageUrl}
+                    onChange={(url) => setConfig('loss_image_url', url)}
                     previewHeight="120px"
                   />
                   <ImageUploader
@@ -1910,7 +1887,7 @@ function BossCardForm({ config, setConfig }: { config: any; setConfig: (key: str
             </div>
           </div>
 
-          <div style={{ marginTop: '0.75rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginTop: '0.75rem' }}>
             <ImageUploader
               id="staged-boss-image"
               label="Staged Boss Banner Image URL"
@@ -1918,14 +1895,25 @@ function BossCardForm({ config, setConfig }: { config: any; setConfig: (key: str
               onChange={(url) => setConfig('staged_boss_config', { ...staged, custom_image_url: url })}
               previewHeight="120px"
             />
-          </div>
-
-          <div style={{ marginTop: '0.75rem' }}>
             <ImageUploader
               id="staged-boss-bg-image"
               label="Staged Arena Background Image URL"
               value={staged.custom_bg_url || ''}
               onChange={(url) => setConfig('staged_boss_config', { ...staged, custom_bg_url: url })}
+              previewHeight="120px"
+            />
+            <ImageUploader
+              id="staged-boss-victory-image"
+              label="Staged Victory Background Image URL"
+              value={staged.victory_image_url || ''}
+              onChange={(url) => setConfig('staged_boss_config', { ...staged, victory_image_url: url })}
+              previewHeight="120px"
+            />
+            <ImageUploader
+              id="staged-boss-loss-image"
+              label="Staged Loss / Defeat Image URL"
+              value={staged.loss_image_url || ''}
+              onChange={(url) => setConfig('staged_boss_config', { ...staged, loss_image_url: url })}
               previewHeight="120px"
             />
           </div>
