@@ -828,7 +828,7 @@ async function concludeWeeklyBossBattle(guildId, client = null) {
             publicMsg = recent.find(
               (m) =>
                 m.author.id === client.user.id &&
-                m.embeds.some((e) => e.title?.includes('Weekly Boss') || e.title?.includes('OVERKILL') || e.title?.includes('VICTORY'))
+                m.embeds.some((e) => e.title?.includes('Weekly Boss') || e.title?.includes('OVERKILL') || e.title?.includes('VICTORY') || e.title?.includes('ESCAPED'))
             );
           }
         }
@@ -900,7 +900,8 @@ async function spawnAndAnnounceWeeklyBoss(client, guildId, { forceNewPost = fals
                 (e) =>
                   e.title?.includes('Weekly Boss') ||
                   e.title?.includes('OVERKILL') ||
-                  e.title?.includes('VICTORY')
+                  e.title?.includes('VICTORY') ||
+                  e.title?.includes('ESCAPED')
               )
           );
           if (bossMessages.size > 0) {
@@ -944,7 +945,7 @@ async function spawnAndAnnounceWeeklyBoss(client, guildId, { forceNewPost = fals
           publicMsg = recent.find(
             (m) =>
               m.author.id === client.user.id &&
-              m.embeds.some((e) => e.title?.includes('Weekly Boss') || e.title?.includes('OVERKILL'))
+              m.embeds.some((e) => e.title?.includes('Weekly Boss') || e.title?.includes('OVERKILL') || e.title?.includes('VICTORY') || e.title?.includes('ESCAPED'))
           );
         }
       }
