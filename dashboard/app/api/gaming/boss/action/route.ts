@@ -66,7 +66,7 @@ export async function POST(req: NextRequest) {
       let finalBgUrl = resolvedBgUrl || featureRow?.config?.custom_bg_url || null;
 
       if (action === 'spawn_staged' || stagedConfig) {
-        const sName = stagedConfig?.boss_name || stagedConfig?.override_name;
+        const sName = stagedConfig?.override_name || stagedConfig?.boss_name;
         const sTitle = stagedConfig?.boss_title;
         const sLore = stagedConfig?.lore;
         const sHp = stagedConfig?.max_hp || stagedConfig?.override_hp;

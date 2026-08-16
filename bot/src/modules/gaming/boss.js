@@ -131,7 +131,7 @@ async function getOrCreateActiveBoss(guildId) {
   let finalBgUrl = (stagedConfig && stagedConfig.custom_bg_url) ? stagedConfig.custom_bg_url : (featureRow?.config?.custom_bg_url || null);
 
   if (stagedConfig && (stagedConfig.enabled || stagedConfig.enabled === undefined)) {
-    const sName = stagedConfig.boss_name || stagedConfig.override_name;
+    const sName = stagedConfig.override_name || stagedConfig.boss_name;
     const sTitle = stagedConfig.boss_title;
     const sLore = stagedConfig.lore;
     const sHp = stagedConfig.max_hp || stagedConfig.override_hp;
@@ -553,6 +553,7 @@ async function executeCombatAction(guildId, userId, actionType) {
   if (isSynergy) actionText += ` 🔥 (${synergyType.toUpperCase()} COMBO!)`;
 
   const apContribPoints = Math.round(actualApDeducted * 2 * pointsMultiplier);
+  let newAp = Math.max(0, playerState.ap_remaining - actualApDeducted);
 
   // Try atomic RPC function first
   const { data: rpcRes, error: rpcErr } = await supabase.rpc('apply_boss_attack_result', {
@@ -583,6 +584,7 @@ async function executeCombatAction(guildId, userId, actionType) {
 
   if (!rpcErr && rpcRes && rpcRes.length > 0) {
     newHp = Number(rpcRes[0].new_boss_hp);
+    newAp = Number(rpcRes[0].new_player_ap);
   } else {
     if (rpcErr) {
       logger.warn('[BOSS] RPC apply_boss_attack_result warning, using atomic table fallback:', rpcErr.message);
@@ -605,7 +607,7 @@ async function executeCombatAction(guildId, userId, actionType) {
       return { success: false, message: 'Failed to process attack.' };
     }
 
-    const newAp = Math.max(0, playerState.ap_remaining - actualApDeducted);
+    newAp = Math.max(0, playerState.ap_remaining - actualApDeducted);
     const newWeeklyPoints = (playerState.weekly_points || 0) + apContribPoints;
     await supabase
       .from('boss_player_states')

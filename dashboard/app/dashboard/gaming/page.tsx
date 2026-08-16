@@ -1849,8 +1849,8 @@ function BossCardForm({ config, setConfig }: { config: any; setConfig: (key: str
                 id="staged-boss-name"
                 className="form-input"
                 placeholder="e.g. Jetragon Corruptor"
-                value={staged.override_name || ''}
-                onChange={(e) => setConfig('staged_boss_config', { ...staged, override_name: e.target.value })}
+                value={staged.override_name || staged.boss_name || ''}
+                onChange={(e) => setConfig('staged_boss_config', { ...staged, override_name: e.target.value, boss_name: e.target.value })}
               />
             </div>
             <div className="form-group">
