@@ -38,30 +38,48 @@ async function generateTriviaQuestion(topic) {
     throw new Error('Missing GEMINI_API_KEY environment variable.');
   }
 
-  const prompt = `Generate a challenging multiple-choice trivia question.
-If a topic is provided, it must be about that topic (lore, gameplay, details). Otherwise, it should be about general gaming, pop culture, or tech.
+  const prompt = `You are a precision trivia author. Generate a challenging, 100% FACTUALLY ACCURATE multiple-choice trivia question.
+If a topic is provided, it must strictly be about that topic (lore, gameplay mechanics, official release history). Otherwise, it should be about general gaming, pop culture, or tech.
 Topic: ${topic || 'Random general gaming, pop culture, or tech knowledge'}
 
-Respond ONLY with a raw JSON object containing these keys:
-{
-  "question": "The question text",
-  "correct_answer": "The correct answer text",
-  "incorrect_answers": ["wrong answer 1", "wrong answer 2", "wrong answer 3"]
-}
-Do not wrap in markdown, backticks, or write any extra text.`;
+CRITICAL FACT-CHECKING RULES:
+1. FACTUAL ACCURACY IS MANDATORY: Every fact, name, ability, mechanic, and number in the question and answers must be 100% verifiably true in official game releases, patch notes, or lore.
+2. NEVER MIX OR CONFLATE MECHANICS: Do not combine one character's/game's ability name with another character's mechanic (e.g. do NOT mix Sion's Cannibalism with Twisted Fate's map vision).
+3. The "correct_answer" must be indisputably correct.
+4. The 3 "incorrect_answers" must be distinctly wrong and not accidentally also correct or ambiguous.
+5. Double-check your question before outputting to ensure no false premises exist.
 
-  const modelsToTry = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-2.0-flash-lite', 'gemini-1.5-pro'];
+Respond ONLY with a JSON object containing these exact keys:
+{
+  "question": "The fact-checked question text",
+  "correct_answer": "The indisputably correct answer",
+  "incorrect_answers": ["wrong answer 1", "wrong answer 2", "wrong answer 3"]
+}`;
+
+  const modelsToTry = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-2.0-flash-lite', 'gemini-1.5-pro', 'gemini-flash-latest'];
   let lastError;
 
   for (const modelName of modelsToTry) {
     try {
-      const model = genAI.getGenerativeModel({ model: modelName });
+      const model = genAI.getGenerativeModel({
+        model: modelName,
+        generationConfig: {
+          temperature: 0.2,
+          responseMimeType: 'application/json',
+        },
+      });
       const result = await model.generateContent(prompt);
       const text = result.response.text().trim();
       const cleanJson = text.replace(/^```json\s*/i, '').replace(/```$/, '').trim();
       const parsed = JSON.parse(cleanJson);
 
-      if (parsed.question && parsed.correct_answer && parsed.incorrect_answers && parsed.incorrect_answers.length === 3) {
+      if (
+        parsed.question &&
+        parsed.correct_answer &&
+        Array.isArray(parsed.incorrect_answers) &&
+        parsed.incorrect_answers.length === 3 &&
+        !parsed.incorrect_answers.includes(parsed.correct_answer)
+      ) {
         return parsed;
       }
     } catch (err) {
