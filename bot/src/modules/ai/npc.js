@@ -189,6 +189,122 @@ DELIBERATION INSTRUCTION:
   throw lastError || new Error('All Gemini model fallbacks failed');
 }
 
+// In-memory queue to debounce multiple rapid messages from the same user
+// Key: `${guildId}:${channelId}:${authorId}` -> { timer, latestMessage, texts: string[], triggerType: string, config: object }
+const pendingUserBatches = new Map();
+
+/**
+ * Executes a debounced batch of messages for a user in a channel.
+ * @param {string} batchKey
+ */
+async function executeNpcBatch(batchKey) {
+  const batch = pendingUserBatches.get(batchKey);
+  if (!batch) return;
+  pendingUserBatches.delete(batchKey);
+
+  const { guildId, channelId, authorId, authorName, latestMessage, texts, triggerType, config } = batch;
+
+  try {
+    // Show typing indicator
+    latestMessage.channel.sendTyping().catch(() => {});
+
+    // Working Memory: Last 8 messages
+    let conversationHistory = '';
+    try {
+      const recentMessages = await latestMessage.channel.messages.fetch({ limit: 8 });
+      const sorted = [...recentMessages.values()].reverse();
+      conversationHistory = sorted
+        .filter(m => !m.system && m.content)
+        .map(m => `[${m.member?.displayName || m.author.username}]: ${m.content.substring(0, 200)}`)
+        .join('\n');
+    } catch (e) {
+      logger.warn(`[NPC] Failed to fetch channel history: ${e.message}`);
+    }
+
+    // Member Profile & Relationship
+    const profile = await getMemberProfile(guildId, authorId);
+    const tierNames = ['Stranger', 'Acquaintance', 'Regular', 'Veteran'];
+    const currentTierName = tierNames[profile.relationship.familiarity_tier] || 'Stranger';
+
+    // Server Lore
+    const loreItems = await getServerLore(guildId);
+    const loreText = loreItems.length > 0
+      ? loreItems.map(l => `- [${l.category.toUpperCase()}] ${l.title}: ${l.content}`).join('\n')
+      : 'No specific lore recorded yet.';
+
+    // Build System Persona Prompt
+    const sarcasmLevel = config.sarcasm_level || 3;
+    const brevity = config.response_brevity || 'balanced';
+
+    const systemPrompt = `You are ENOS, an observant, calm, and dry-witted community member in the Every Nation Discord server.
+
+CORE CHARACTER IDENTITY:
+- You are a veteran community regular who lives in this server.
+- You speak casually like a real gamer on Discord (lowercase-friendly, dry humor, direct).
+- You care about the server's vibe, banter, and gaming camaraderie.
+- You are NOT an emotional therapist. Do NOT give cheesy support speeches or advice.
+- You are NOT a sellout or system mascot. NEVER mention Vault coins, taxes, or promote server features unprompted.
+- NEVER ping @everyone, @here, or any Discord roles under any circumstance.
+- Respect your familiarity level with the person talking to you.
+
+CURRENT SPEAKER CONTEXT:
+- Speaker: ${authorName} (ID: ${authorId})
+- Familiarity Tier: ${currentTierName} (Level ${profile.relationship.familiarity_tier}/3)
+- Known Facts About Speaker: ${profile.facts.length > 0 ? profile.facts.join('; ') : 'None yet (new/stranger)'}
+
+SERVER LORE & COMMUNITY MEMORY:
+${loreText}
+
+TONE & STYLE SETTINGS:
+- Sarcasm/Banter Level: ${sarcasmLevel}/5 (1: chill & grounded, 3: dry wit & teasing, 5: sharp roaster)
+- Brevity Mode: ${brevity} (Keep responses strictly 1-2 punchy sentences)
+- Trigger Context: ${triggerType === 'mention' ? 'Direct mention' : triggerType === 'name_drop' ? 'Name mentioned without @' : 'Ambient room chatter'}`;
+
+    const combinedTriggerMessage = texts.join('\n');
+
+    const decision = await deliberateAndRespond({
+      systemPrompt,
+      conversationHistory,
+      triggerMessage: combinedTriggerMessage,
+      authorName,
+    });
+
+    // Ephemeral log to database (safe non-blocking)
+    try {
+      await supabase.from('npc_deliberation_logs').insert({
+        guild_id: guildId,
+        channel_id: channelId,
+        trigger_type: triggerType,
+        trigger_message: combinedTriggerMessage.substring(0, 300),
+        author_id: authorId,
+        should_speak: decision.should_speak,
+        internal_thought: decision.thought || null,
+        generated_response: decision.response || null,
+      });
+    } catch (e) {
+      logger.warn(`[NPC] Log error: ${e.message}`);
+    }
+
+    if (decision.should_speak && decision.response && decision.response.trim().length > 0) {
+      const replyContent = decision.response.trim();
+
+      // Send inline reply to the user's latest message
+      await latestMessage.reply({
+        content: replyContent,
+        allowedMentions: { repliedUser: true, parse: [] }, // NEVER parse @everyone or roles
+      });
+
+      // Update cooldown for this channel
+      ambientCooldowns.set(`${guildId}:${channelId}`, Date.now());
+
+      // Update relationship & interaction count
+      await recordInteraction(guildId, authorId, authorName);
+    }
+  } catch (err) {
+    logger.error(`[NPC] Deliberation error for guild ${guildId}: ${err.message}`);
+  }
+}
+
 /**
  * Main message handler for the NPC AI Community Member.
  * @param {import('discord.js').Message} message
@@ -253,109 +369,37 @@ async function handleNpcMessage(message, client) {
     triggerType = 'ambient_chat';
   }
 
-  // 5. Gather Context
   const authorName = message.member?.displayName || message.author.username;
   const authorId = message.author.id;
+  const batchKey = `${guildId}:${channelId}:${authorId}`;
+  const existingBatch = pendingUserBatches.get(batchKey);
 
-  // Working Memory: Last 8 messages
-  let conversationHistory = '';
-  try {
-    const recentMessages = await message.channel.messages.fetch({ limit: 8 });
-    const sorted = [...recentMessages.values()].reverse();
-    conversationHistory = sorted
-      .filter(m => !m.system && m.content)
-      .map(m => `[${m.member?.displayName || m.author.username}]: ${m.content.substring(0, 200)}`)
-      .join('\n');
-  } catch (e) {
-    logger.warn(`[NPC] Failed to fetch channel history: ${e.message}`);
+  // Send typing indicator immediately so the user knows ENOS is active
+  if (triggerType === 'mention' || triggerType === 'name_drop') {
+    message.channel.sendTyping().catch(() => {});
   }
 
-  // Member Profile & Relationship
-  const profile = await getMemberProfile(guildId, authorId);
-  const tierNames = ['Stranger', 'Acquaintance', 'Regular', 'Veteran'];
-  const currentTierName = tierNames[profile.relationship.familiarity_tier] || 'Stranger';
-
-  // Server Lore
-  const loreItems = await getServerLore(guildId);
-  const loreText = loreItems.length > 0
-    ? loreItems.map(l => `- [${l.category.toUpperCase()}] ${l.title}: ${l.content}`).join('\n')
-    : 'No specific lore recorded yet.';
-
-  // Build System Persona Prompt
-  const sarcasmLevel = config.sarcasm_level || 3;
-  const brevity = config.response_brevity || 'balanced';
-
-  let systemPrompt = `You are ENOS, an observant, calm, and dry-witted community member in the Every Nation Discord server.
-
-CORE CHARACTER IDENTITY:
-- You are a veteran community regular who lives in this server.
-- You speak casually like a real gamer on Discord (lowercase-friendly, dry humor, direct).
-- You care about the server's vibe, banter, and gaming camaraderie.
-- You are NOT an emotional therapist. Do NOT give cheesy support speeches or advice.
-- You are NOT a sellout or system mascot. NEVER mention Vault coins, taxes, or promote server features unprompted.
-- NEVER ping @everyone, @here, or any Discord roles under any circumstance.
-- Respect your familiarity level with the person talking to you.
-
-CURRENT SPEAKER CONTEXT:
-- Speaker: ${authorName} (ID: ${authorId})
-- Familiarity Tier: ${currentTierName} (Level ${profile.relationship.familiarity_tier}/3)
-- Known Facts About Speaker: ${profile.facts.length > 0 ? profile.facts.join('; ') : 'None yet (new/stranger)'}
-
-SERVER LORE & COMMUNITY MEMORY:
-${loreText}
-
-TONE & STYLE SETTINGS:
-- Sarcasm/Banter Level: ${sarcasmLevel}/5 (1: chill & grounded, 3: dry wit & teasing, 5: sharp roaster)
-- Brevity Mode: ${brevity} (Keep responses strictly 1-2 punchy sentences)
-- Trigger Context: ${triggerType === 'mention' ? 'Direct mention' : triggerType === 'name_drop' ? 'Name mentioned without @' : 'Ambient room chatter'}`;
-
-  // 6. Deliberate and Respond
-  try {
-    // Show brief typing indicator if direct mention or name drop
-    if (triggerType === 'mention' || triggerType === 'name_drop') {
-      message.channel.sendTyping().catch(() => {});
-    }
-
-    const decision = await deliberateAndRespond({
-      systemPrompt,
-      conversationHistory,
-      triggerMessage: content,
+  // Debounce rapid messages from the same user (2.5 seconds window)
+  if (existingBatch) {
+    clearTimeout(existingBatch.timer);
+    existingBatch.texts.push(content);
+    existingBatch.latestMessage = message;
+    if (triggerType === 'mention') existingBatch.triggerType = 'mention';
+    existingBatch.timer = setTimeout(() => executeNpcBatch(batchKey), 2500);
+  } else {
+    const delay = (triggerType === 'mention' || triggerType === 'name_drop') ? 2500 : 1000;
+    const batch = {
+      guildId,
+      channelId,
+      authorId,
       authorName,
-    });
-
-    // Ephemeral log to database (safe non-blocking)
-    try {
-      await supabase.from('npc_deliberation_logs').insert({
-        guild_id: guildId,
-        channel_id: channelId,
-        trigger_type: triggerType,
-        trigger_message: content.substring(0, 300),
-        author_id: authorId,
-        should_speak: decision.should_speak,
-        internal_thought: decision.thought || null,
-        generated_response: decision.response || null,
-      });
-    } catch (e) {
-      logger.warn(`[NPC] Log error: ${e.message}`);
-    }
-
-    if (decision.should_speak && decision.response && decision.response.trim().length > 0) {
-      const replyContent = decision.response.trim();
-
-      // Send inline reply to the user's message
-      await message.reply({
-        content: replyContent,
-        allowedMentions: { repliedUser: true, parse: [] } // NEVER parse @everyone or roles
-      });
-
-      // Update cooldown for this channel
-      ambientCooldowns.set(`${guildId}:${channelId}`, Date.now());
-
-      // Update relationship & interaction count
-      await recordInteraction(guildId, authorId, authorName);
-    }
-  } catch (err) {
-    logger.error(`[NPC] Deliberation error for guild ${guildId}: ${err.message}`);
+      latestMessage: message,
+      texts: [content],
+      triggerType,
+      config,
+      timer: setTimeout(() => executeNpcBatch(batchKey), delay),
+    };
+    pendingUserBatches.set(batchKey, batch);
   }
 }
 
