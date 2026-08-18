@@ -323,17 +323,21 @@ TONE & STYLE SETTINGS:
       authorName,
     });
 
-    // Ephemeral log to database
-    await supabase.from('npc_deliberation_logs').insert({
-      guild_id: guildId,
-      channel_id: channelId,
-      trigger_type: triggerType,
-      trigger_message: content.substring(0, 300),
-      author_id: authorId,
-      should_speak: decision.should_speak,
-      internal_thought: decision.thought || null,
-      generated_response: decision.response || null,
-    }).catch(e => logger.warn(`[NPC] Log error: ${e.message}`));
+    // Ephemeral log to database (safe non-blocking)
+    try {
+      await supabase.from('npc_deliberation_logs').insert({
+        guild_id: guildId,
+        channel_id: channelId,
+        trigger_type: triggerType,
+        trigger_message: content.substring(0, 300),
+        author_id: authorId,
+        should_speak: decision.should_speak,
+        internal_thought: decision.thought || null,
+        generated_response: decision.response || null,
+      });
+    } catch (e) {
+      logger.warn(`[NPC] Log error: ${e.message}`);
+    }
 
     if (decision.should_speak && decision.response && decision.response.trim().length > 0) {
       const replyContent = decision.response.trim();
