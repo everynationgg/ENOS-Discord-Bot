@@ -56,7 +56,7 @@ Respond ONLY with a JSON object containing these exact keys:
   "incorrect_answers": ["wrong answer 1", "wrong answer 2", "wrong answer 3"]
 }`;
 
-  const modelsToTry = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-2.0-flash-lite', 'gemini-1.5-pro', 'gemini-flash-latest'];
+  const modelsToTry = ['gemini-3.6-flash', 'gemini-3.5-flash', 'gemini-3.5-flash-lite', 'gemini-flash-latest', 'gemini-2.5-flash'];
   let lastError;
 
   for (const modelName of modelsToTry) {

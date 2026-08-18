@@ -143,16 +143,23 @@ LATEST MESSAGE:
 [${authorName}]: ${triggerMessage}
 
 DELIBERATION INSTRUCTION:
-1. Determine whether ENOS should speak or remain silent based on your personality and social relevance.
-2. If should_speak is true, generate a concise, natural, 1-2 sentence response.
-3. Respond ONLY with valid JSON in this exact structure:
+1. If the user directly mentioned you or called your name ("enos"), you are being spoken to — should_speak must be TRUE and you must provide a natural, dry-witted response.
+2. If this is ambient room chatter, evaluate whether to speak (TRUE) or remain quiet (FALSE).
+3. If should_speak is TRUE, generate a concise, natural, 1-2 sentence response.
+4. Respond ONLY with valid JSON in this exact structure:
 {
   "should_speak": true,
   "thought": "Brief internal reason for speaking or staying silent",
   "response": "The exact response to send in chat (or empty string if silent)"
 }`;
 
-  const modelsToTry = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-flash-latest'];
+  const modelsToTry = [
+    'gemini-3.6-flash',
+    'gemini-3.5-flash',
+    'gemini-3.5-flash-lite',
+    'gemini-flash-latest',
+    'gemini-2.5-flash',
+  ];
   let lastError;
 
   for (const modelName of modelsToTry) {
