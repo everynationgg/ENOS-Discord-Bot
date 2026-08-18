@@ -12,6 +12,7 @@ const NAV_ITEMS = [
   { href: '/dashboard/newsroom', label: 'Newsroom', icon: '📰' },
   { href: '/dashboard/leaderboards', label: 'Leaderboards', icon: '🏆' },
   { href: '/dashboard/social', label: 'Social', icon: '📡' },
+  { href: '/dashboard/companion', label: 'AI Companion', icon: '🤖' },
   { href: '/dashboard/system-ops', label: 'System Ops', icon: '⚙️' },
   { href: '/dashboard/logs', label: 'Logs', icon: '📋' },
 ];
