@@ -170,7 +170,7 @@ export default function CompanionPage() {
     <div className="page-wrapper">
       <div className="page-header">
         <h1>🤖 ENOS NPC</h1>
-        <p>The Nation's living digital resident. Observant, dry-witted, and part of the crew.</p>
+        <p>The Nation&apos;s living digital resident. Observant, dry-witted, and part of the crew.</p>
       </div>
 
       <div className="dashboard-layout" style={{ padding: 0 }}>
@@ -226,7 +226,7 @@ export default function CompanionPage() {
 
               <div className="overview-item">
                 <h3>🎭 Tone & Social Expression</h3>
-                <p>Adjust how sharp or playful ENOS's banter is, and control how frequently it chimes into ambient chat.</p>
+                <p>Adjust how sharp or playful ENOS&apos;s banter is, and control how frequently it chimes into ambient chat.</p>
               </div>
 
               <div className="overview-item">
@@ -253,6 +253,11 @@ export default function CompanionPage() {
                   featureKey="npc_companion"
                   initialEnabled={enabled}
                   initialConfig={config}
+                  onSave={(savedCfg, isEn) => {
+                    setConfig((prev) => ({ ...prev, ...savedCfg }));
+                    setEnabled(isEn);
+                  }}
+                  onToggle={(isEn) => setEnabled(isEn)}
                 >
                   {(_cfg, _setCfg) => (
                     <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
@@ -260,7 +265,7 @@ export default function CompanionPage() {
                         Status: <strong style={{ color: enabled ? '#22C55E' : 'var(--text-muted)' }}>{enabled ? 'Active in Server' : 'Disabled'}</strong>
                       </p>
                       <p style={{ marginTop: '0.5rem' }}>
-                        Use the tabs on the left to configure ENOS's personality, schedule, community memories, and member relationship roster.
+                        Use the tabs on the left to configure ENOS&apos;s personality, schedule, community memories, and member relationship roster.
                       </p>
                     </div>
                   )}
@@ -280,6 +285,11 @@ export default function CompanionPage() {
                 featureKey="npc_companion"
                 initialEnabled={enabled}
                 initialConfig={config}
+                onSave={(savedCfg, isEn) => {
+                  setConfig((prev) => ({ ...prev, ...savedCfg }));
+                  setEnabled(isEn);
+                }}
+                onToggle={(isEn) => setEnabled(isEn)}
               >
                 {(cfg, setCfg) => {
                   const sarcasm = cfg.sarcasm_level ?? 3;
@@ -344,7 +354,7 @@ export default function CompanionPage() {
                           <option value="thoughtful">📖 Thoughtful (2–3 Lines)</option>
                         </select>
                         <span className="form-hint">
-                          Keeps ENOS's replies compact and aligned with Discord chatting rhythms.
+                          Keeps ENOS&apos;s replies compact and aligned with Discord chatting rhythms.
                         </span>
                       </div>
                     </>
@@ -365,6 +375,11 @@ export default function CompanionPage() {
                 featureKey="npc_companion"
                 initialEnabled={enabled}
                 initialConfig={config}
+                onSave={(savedCfg, isEn) => {
+                  setConfig((prev) => ({ ...prev, ...savedCfg }));
+                  setEnabled(isEn);
+                }}
+                onToggle={(isEn) => setEnabled(isEn)}
               >
                 {(cfg, setCfg) => {
                   const allowedChannels = (cfg.allowed_channel_ids || []).join(', ');
@@ -529,7 +544,7 @@ export default function CompanionPage() {
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '0.875rem' }}>
                 {loreList.length === 0 ? (
                   <div style={{ gridColumn: '1 / -1', padding: '2rem', textAlign: 'center', color: 'var(--text-muted)', background: 'var(--bg-card)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)' }}>
-                    No community lore recorded yet. Click "+ Add Lore" to teach ENOS about your server history!
+                    No community lore recorded yet. Click &quot;+ Add Lore&quot; to teach ENOS about your server history!
                   </div>
                 ) : (
                   loreList.map((item) => (

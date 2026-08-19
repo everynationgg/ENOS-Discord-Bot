@@ -52,6 +52,13 @@ module.exports = {
       await interaction.deferReply({ flags: MessageFlags.Ephemeral });
       const profile = await getMemberStatus(guildId, userId);
 
+      const isOwner = interaction.guild?.ownerId === userId;
+      let member = interaction.member;
+      const filteredRoles = member?.roles?.cache
+        ? member.roles.cache.filter(r => r.id !== interaction.guild.id).sort((a, b) => b.position - a.position)
+        : null;
+      const topRole = isOwner ? '👑 Server Owner' : (filteredRoles?.first()?.name || 'Community Member');
+
       const tierNames = ['Stranger', 'Acquaintance', 'Regular', 'Veteran'];
       const tierEmojis = ['👤', '🤝', '🎮', '👑'];
       const currentTier = profile.relationship.familiarity_tier || 0;
@@ -63,6 +70,7 @@ module.exports = {
         .setTitle(`${tierEmoji} Your Standing with ENOS`)
         .setDescription(`ENOS knows you as a **${tierName}** (Tier ${currentTier}/3).`)
         .addFields(
+          { name: 'Server Standing', value: topRole, inline: true },
           { name: 'Interactions', value: `${profile.relationship.interaction_count || 0} chats`, inline: true },
           { name: 'Known Since', value: profile.relationship.first_seen_at ? `<t:${Math.floor(new Date(profile.relationship.first_seen_at).getTime() / 1000)}:R>` : 'Recently', inline: true },
           {

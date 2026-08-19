@@ -226,6 +226,36 @@ async function executeNpcBatch(batchKey) {
     const tierNames = ['Stranger', 'Acquaintance', 'Regular', 'Veteran'];
     const currentTierName = tierNames[profile.relationship.familiarity_tier] || 'Stranger';
 
+    // Extract Discord Member Roles & Owner Status for context
+    let member = latestMessage.member;
+    if (!member && latestMessage.guild) {
+      try {
+        member = await latestMessage.guild.members.fetch(authorId).catch(() => null);
+      } catch {
+        // Fallback gracefully
+      }
+    }
+
+    const isOwner = latestMessage.guild?.ownerId === authorId;
+    let rolesList = [];
+    let topRole = 'Community Member';
+
+    if (member?.roles?.cache) {
+      const filteredRoles = member.roles.cache
+        .filter(r => r.id !== latestMessage.guild.id)
+        .sort((a, b) => b.position - a.position);
+
+      if (filteredRoles.size > 0) {
+        topRole = filteredRoles.first().name;
+        rolesList = filteredRoles.map(r => r.name).slice(0, 3);
+      }
+    }
+
+    let roleStandingContext = isOwner ? '👑 Server Owner & Creator' : `Top Role: ${topRole}`;
+    if (rolesList.length > 1 && !isOwner) {
+      roleStandingContext += ` (Key Roles: ${rolesList.join(', ')})`;
+    }
+
     // Server Lore
     const loreItems = await getServerLore(guildId);
     const loreText = loreItems.length > 0
@@ -249,6 +279,8 @@ CORE CHARACTER IDENTITY:
 
 CURRENT SPEAKER CONTEXT:
 - Speaker: ${authorName} (ID: ${authorId})
+- Server Standing: ${roleStandingContext}
+${isOwner ? '- Note on Server Owner: This user founded and runs Every Nation. You know who they are—they are the boss, but do NOT tone down your personality, become formal, or be a suck-up. Keep your signature dry wit and gamer banter naturally.' : '- Note on Roles: Role info is for conversational awareness and context only. Maintain your authentic, dry-witted personality and casual tone regardless of member standing.'}
 - Familiarity Tier: ${currentTierName} (Level ${profile.relationship.familiarity_tier}/3)
 - Known Facts About Speaker: ${profile.facts.length > 0 ? profile.facts.join('; ') : 'None yet (new/stranger)'}
 

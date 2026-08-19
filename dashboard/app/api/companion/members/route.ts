@@ -36,7 +36,7 @@ export async function GET(req: NextRequest) {
 
     // Fetch all memories for these users
     const userIds = (relationships || []).map((r) => r.user_id);
-    let memoriesByUser: Record<string, string[]> = {};
+    const memoriesByUser: Record<string, string[]> = {};
 
     if (userIds.length > 0) {
       const { data: memories } = await supabaseAdmin

@@ -12,6 +12,8 @@ interface FeatureCardProps {
   featureKey: string;
   initialEnabled?: boolean;
   initialConfig?: Record<string, any>;
+  onSave?: (config: Record<string, any>, enabled: boolean) => void;
+  onToggle?: (enabled: boolean) => void;
   children?: (config: Record<string, any>, setConfig: (key: string, value: any) => void) => React.ReactNode;
 }
 
@@ -23,6 +25,8 @@ export default function FeatureCard({
   featureKey,
   initialEnabled = false,
   initialConfig = {},
+  onSave,
+  onToggle,
   children,
 }: FeatureCardProps) {
   const [enabled, setEnabled] = useState(initialEnabled);
@@ -44,6 +48,7 @@ export default function FeatureCard({
         body: JSON.stringify({ feature_key: featureKey, enabled: newEnabled, config }),
       });
       if (!res.ok) throw new Error('Failed');
+      onToggle?.(newEnabled);
       setSaveStatus('saved');
       setTimeout(() => setSaveStatus('idle'), 2500);
     } catch {
@@ -61,6 +66,7 @@ export default function FeatureCard({
         body: JSON.stringify({ feature_key: featureKey, enabled, config }),
       });
       if (!res.ok) throw new Error('Failed');
+      onSave?.(config, enabled);
       setSaveStatus('saved');
       setTimeout(() => setSaveStatus('idle'), 2500);
     } catch {
