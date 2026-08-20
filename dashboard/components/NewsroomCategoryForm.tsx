@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   NewsroomCategoryDef,
   NewsroomConfig,
@@ -36,11 +36,7 @@ export default function NewsroomCategoryForm({ category }: NewsroomCategoryFormP
   // Channels state
   const [channels, setChannels] = useState<{ id: string; name: string }[]>([]);
 
-  useEffect(() => {
-    fetchData();
-  }, [category.id]);
-
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     setLoading(true);
     try {
       // Fetch channel list
@@ -72,7 +68,11 @@ export default function NewsroomCategoryForm({ category }: NewsroomCategoryFormP
     } finally {
       setLoading(false);
     }
-  };
+  }, [category]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
   const handleToggleSource = (sourceId: string) => {
     if (enabledSources.includes(sourceId)) {

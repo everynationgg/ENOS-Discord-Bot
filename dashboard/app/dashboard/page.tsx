@@ -13,24 +13,30 @@ export default function DashboardHome() {
   useEffect(() => {
     if (status !== 'authenticated') return;
 
-    const guildId = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('guild_id') || '' : '';
-    const query = guildId ? `?guild_id=${guildId}` : '';
+    const fetchStatus = () => {
+      const guildId = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('guild_id') || '' : '';
+      const query = guildId ? `?guild_id=${guildId}` : '';
 
-    Promise.all([
-      fetch(`/api/system/health${query}`).then((r) => r.json()),
-      fetch(`/api/config${query}`).then((r) => r.json()),
-    ])
-      .then(([healthData, configMap]) => {
-        setHealth(healthData);
-        const list = Object.entries(configMap).map(([key, val]: [string, any]) => ({
-          feature_key: key,
-          enabled: val.enabled,
-          updated_at: val.updated_at || new Date().toISOString(),
-        }));
-        setConfigs(list);
-        setLoading(false);
-      })
-      .catch(() => setLoading(false));
+      Promise.all([
+        fetch(`/api/system/health${query}`).then((r) => r.json()),
+        fetch(`/api/config${query}`).then((r) => r.json()),
+      ])
+        .then(([healthData, configMap]) => {
+          setHealth(healthData);
+          const list = Object.entries(configMap || {}).map(([key, val]: [string, any]) => ({
+            feature_key: key,
+            enabled: val.enabled,
+            updated_at: val.updated_at || new Date().toISOString(),
+          }));
+          setConfigs(list);
+          setLoading(false);
+        })
+        .catch(() => setLoading(false));
+    };
+
+    fetchStatus();
+    const interval = setInterval(fetchStatus, 30000);
+    return () => clearInterval(interval);
   }, [status]);
 
   if (status === 'loading' || loading) {

@@ -50,7 +50,7 @@ export default function GuildSelector() {
     }
 
     loadGuilds();
-  }, []);
+  }, [searchParams]);
 
   const handleGuildChange = (newGuildId: string) => {
     setSelectedGuildId(newGuildId);

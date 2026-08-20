@@ -170,7 +170,7 @@ export default function SocialPage() {
     if (activeTab === 'birthday_queue') {
       loadQueue();
     }
-  }, [activeTab]);
+  }, [activeTab, loadQueue]);
 
   // Save Birthday System Configuration Settings
   const handleSaveConfig = async () => {
