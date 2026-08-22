@@ -99,6 +99,7 @@ async function loadBirthdayQueue(client) {
               scratchpad_text: '', // Start empty
               is_approved: false,
               is_sent: false,
+              is_dismissed: false,
             });
 
           if (insertError) {
@@ -153,6 +154,20 @@ async function loadBirthdayQueue(client) {
         if (adminChan && adminChan.isTextBased()) {
           const { EmbedBuilder } = require('discord.js');
           for (const bday of bdaysTomorrow) {
+            // Check if this upcoming birthday was dismissed in the queue
+            const { data: queueItem } = await supabase
+              .from('birthday_queue')
+              .select('is_dismissed')
+              .eq('guild_id', guildId)
+              .eq('user_id', bday.user_id)
+              .eq('target_date', yyyyMmDdTomorrow)
+              .maybeSingle();
+
+            if (queueItem?.is_dismissed) {
+              logger.info(`[BIRTHDAYS] Skipping 1-day admin alert for user ${bday.user_id} (dismissed in queue).`);
+              continue;
+            }
+
             const alertEmbed = new EmbedBuilder()
               .setColor(0xF43F5E)
               .setTitle('🎂 Upcoming Birthday Tomorrow!')
@@ -212,12 +227,13 @@ async function dispatchBirthdays(client) {
         continue;
       }
 
-      // Query approved, unsent queue items for today (or earlier if missed)
+      // Query approved, unsent, active queue items for today
       const { data: queueItems, error: queueError } = await supabase
         .from('birthday_queue')
         .select('*')
         .eq('guild_id', guildId)
-        .lte('target_date', yyyyMmDd)
+        .eq('target_date', yyyyMmDd)
+        .neq('is_dismissed', true)
         .eq('is_approved', true)
         .eq('is_sent', false);
 

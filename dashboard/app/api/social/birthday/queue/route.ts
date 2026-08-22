@@ -69,6 +69,7 @@ export async function GET(req: NextRequest) {
                 scratchpad_text: '',
                 is_approved: false,
                 is_sent: false,
+                is_dismissed: false,
               });
           } catch {
             // duplicate key or other insert error — safe to ignore
@@ -77,10 +78,16 @@ export async function GET(req: NextRequest) {
       }
     }
 
+    const { yyyyMmDd: todayDate } = getTargetDatesForOffset(0);
+    const { yyyyMmDd: maxDate } = getTargetDatesForOffset(3);
+
     const { data, error } = await supabaseAdmin
       .from('birthday_queue')
       .select('*')
       .eq('is_sent', false)
+      .neq('is_dismissed', true)
+      .gte('target_date', todayDate)
+      .lte('target_date', maxDate)
       .order('target_date', { ascending: true });
 
     if (error) throw new Error(error.message);
@@ -154,6 +161,7 @@ export async function POST(req: NextRequest) {
           scratchpad_text: textToSave,
           is_approved: true,
           is_sent: true,
+          is_dismissed: false,
         })
         .eq('id', id)
         .eq('guild_id', guildId);
@@ -163,16 +171,20 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: true, sent: true });
     }
 
-    if (action === 'delete') {
+    if (action === 'delete' || action === 'dismiss') {
+      // Mark as dismissed so that auto-sync does not recreate this item for this target_date
       const { error: dbError } = await supabaseAdmin
         .from('birthday_queue')
-        .delete()
+        .update({
+          is_dismissed: true,
+          is_approved: false,
+        })
         .eq('id', id)
         .eq('guild_id', guildId);
 
       if (dbError) throw new Error(dbError.message);
 
-      return NextResponse.json({ success: true, deleted: true });
+      return NextResponse.json({ success: true, deleted: true, dismissed: true });
     }
 
     let isApproved = typeof is_approved === 'boolean' ? is_approved : false;

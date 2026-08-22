@@ -285,7 +285,7 @@ export default function SocialPage() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this birthday queue entry?')) return;
+    if (!confirm('Are you sure you want to dismiss this birthday from the queue? It will not re-appear for this date.')) return;
     setCardStatus(prev => ({ ...prev, [id]: 'saving' }));
     try {
       const res = await fetch('/api/social/birthday/queue', {
@@ -297,11 +297,11 @@ export default function SocialPage() {
       if (!res.ok) throw new Error('Delete rejected');
       
       setCardStatus(prev => ({ ...prev, [id]: 'saved' }));
-      // Reload queue to remove this item since it is now deleted
+      // Reload queue to remove this item since it is now dismissed
       loadQueue();
       setTimeout(() => setCardStatus(prev => ({ ...prev, [id]: 'idle' })), 2500);
     } catch (err: any) {
-      alert(`Delete failed: ${err.message}`);
+      alert(`Dismiss failed: ${err.message}`);
       setCardStatus(prev => ({ ...prev, [id]: 'error' }));
     }
   };
@@ -1276,7 +1276,7 @@ export default function SocialPage() {
                                 disabled={isTransforming || status === 'saving'}
                                 style={{ padding: '0.25rem 0.5rem' }}
                               >
-                                🗑️ Delete
+                                🗑️ Dismiss
                               </button>
 
                               <button
