@@ -86,19 +86,26 @@ async function getOrCreateActiveBoss(guildId) {
 
   // ─── Adaptive Difficulty: Check previous concluded boss season ──────────────
   try {
-    const { data: lastSeason } = await supabase
+    const { data: lastSeasons } = await supabase
       .from('boss_seasons')
-      .select('is_defeated, current_hp, max_hp, week_identifier')
+      .select('is_defeated, is_overkill, current_hp, max_hp, week_identifier')
       .eq('guild_id', guildId)
       .eq('is_concluded', true)
       .neq('week_identifier', currentWeek)
       .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
+      .limit(2);
 
-    if (lastSeason && (!lastSeason.is_defeated || Number(lastSeason.current_hp) > 0)) {
+    // If any record from the previous week was defeated OR was an overkill session, the boss was defeated
+    const wasPreviousWeekDefeated =
+      lastSeasons &&
+      lastSeasons.length > 0 &&
+      lastSeasons.some((s) => s.is_defeated || s.is_overkill || Number(s.current_hp) <= 0);
+
+    if (lastSeasons && lastSeasons.length > 0 && !wasPreviousWeekDefeated) {
       const scaledHp = Math.round(bossHp * 0.75);
-      logger.info(`[BOSS SPAWN] Adaptive HP applied: Previous week (${lastSeason.week_identifier}) was not defeated (${lastSeason.current_hp}/${lastSeason.max_hp} HP left). Reducing HP by 25% from ${bossHp.toLocaleString()} to ${scaledHp.toLocaleString()}.`);
+      logger.info(
+        `[BOSS SPAWN] Adaptive HP applied: Previous week (${lastSeasons[0].week_identifier}) was not defeated (${lastSeasons[0].current_hp}/${lastSeasons[0].max_hp} HP left). Reducing HP by 25% from ${bossHp.toLocaleString()} to ${scaledHp.toLocaleString()}.`
+      );
       bossHp = scaledHp;
     }
   } catch (scaleErr) {
@@ -790,14 +797,15 @@ async function concludeWeeklyBossBattle(guildId, client = null) {
   const boss = await getOrCreateActiveBoss(guildId);
   if (!boss) return;
 
-  const isDefeated = Number(boss.current_hp) <= 0;
+  // If the boss reached Overkill mode, the main Weekly Boss was ALREADY defeated!
+  const isDefeated = Boolean(boss.is_overkill || boss.is_defeated || Number(boss.current_hp) <= 0);
 
   await supabase
     .from('boss_seasons')
     .update({ is_concluded: true, is_defeated: isDefeated, updated_at: new Date().toISOString() })
     .eq('id', boss.id);
 
-  if (isDefeated && !boss.is_defeated) {
+  if (boss.is_overkill && Number(boss.current_hp) <= 0 && !boss.is_defeated) {
     await handleOverkillDefeat(guildId, boss);
   } else if (!isDefeated) {
     await logBotEvent(guildId, 'boss_escaped', null, {
@@ -806,6 +814,14 @@ async function concludeWeeklyBossBattle(guildId, client = null) {
       max_hp: Number(boss.max_hp),
     });
     logger.info(`[BOSS CONCLUDE] Weekly Boss escaped for guild ${guildId}: ${boss.current_hp}/${boss.max_hp} HP remaining.`);
+  } else {
+    await logBotEvent(guildId, 'boss_defeated', null, {
+      week: boss.week_identifier,
+      is_overkill: Boolean(boss.is_overkill),
+      remaining_hp: Number(boss.current_hp),
+      max_hp: Number(boss.max_hp),
+    });
+    logger.info(`[BOSS CONCLUDE] Weekly Boss concluded victorious for guild ${guildId} (Overkill: ${Boolean(boss.is_overkill)}).`);
   }
 
   try {

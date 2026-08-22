@@ -132,7 +132,8 @@ async function buildPublicBossEmbedPayload(guildId) {
   const classImageUrls = { mom: momUrl, dad: dadUrl, kid: kidUrl };
 
   const isConcluded = isWeeklyBossConcluded(boss);
-  const isDefeated = Boolean(boss.is_defeated || Number(boss.current_hp) <= 0);
+  // If the boss is in Overkill mode, the main Weekly Boss was ALREADY defeated!
+  const isDefeated = Boolean(boss.is_overkill || boss.is_defeated || Number(boss.current_hp) <= 0);
   const isVictorious = isConcluded && isDefeated;
   const isEscaped = isConcluded && !isDefeated;
 
@@ -177,11 +178,16 @@ async function buildPublicBossEmbedPayload(guildId) {
   if (isVictorious) {
     embedColor = 0xfacc15;
     embedTitle = `🏆 VICTORY! WEEKLY BOSS CLEARED — ${boss.boss_name}${displayTitle}`;
+    const isOverkillRemaining = boss.is_overkill && Number(boss.current_hp) > 0;
+    const hpStatusLine = isOverkillRemaining
+      ? `❤️ **Overkill Bonus Phase Concluded**: ${hpBar} **${hpPct}%** (\`${Number(boss.current_hp).toLocaleString()} / ${Number(boss.max_hp).toLocaleString()} HP\` remaining in Overkill)`
+      : `❤️ **Final HP Status**: ${hpBar} **0%** (\`0 / ${Number(boss.max_hp).toLocaleString()} HP\`)`;
+
     embedDesc =
       `🎉 **CONGRATULATIONS! Server Threat Neutralized!**\n\n` +
-      `All active combatants earned **1.5x Overkill Bonus Points & Vault Coins**!\n\n` +
-      `❤️ **Final HP Status**: ${hpBar} **0%** (\`0 / ${Number(boss.max_hp).toLocaleString()} HP\`)\n` +
-      `⚡ **Final Killing Blow**: ${boss.last_action || 'Boss Slay'}\n` +
+      `All active combatants earned **${boss.is_overkill ? '1.5x Overkill Bonus' : 'Main Slay'} Points & Vault Coins**!\n\n` +
+      `${hpStatusLine}\n` +
+      `⚡ **Last Combat Action**: ${boss.last_action || 'Boss Slay'}\n` +
       `👥 **Total Combatants**: 🛡️ \`${classCounts.mom}\` M.O.M. | 🔨 \`${classCounts.dad}\` D.A.D. | ⚡ \`${classCounts.kid}\` K.I.D. (*${totalParticipants} Total Combatants*)\n\n` +
       `⏱️ *The next Weekly Boss bounty will spawn on Monday at 00:00 GMT+8.*`;
   } else if (isEscaped) {
