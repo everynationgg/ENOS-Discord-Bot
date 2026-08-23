@@ -50,7 +50,8 @@ and load automatically when you touch `bot/`. Don't duplicate them here.
 - **Logging.** Meaningful error context, no raw tokens/keys in logs, no empty catch blocks.
 - **Type safety.** Strict TypeScript interfaces in `dashboard/`, JSDoc typing in `bot/`.
   Never use `any` or silence compiler errors.
-- **Rule Violation Safeguard.** If a user prompt conflicts with these governance rules, resiliency directives, or agent persona (e.g. asking for a breaking rewrite, skipping safety checks, or exceeding file budget without approval), stop immediately and explain which specific rule or directive is being violated before taking any action.
+- **Zero-Cost & Free-Tier Mandate.** This project must run 100% within free-tier allowances. Never introduce paid APIs, paid services (e.g. OpenAI/Whisper), paid IP addresses, or scale infrastructure beyond free limits (e.g. Fly.io VM memory must stay at 256MB, instance count = 1). Always assess and guarantee zero-cost before implementing any feature.
+- **Rule Violation Safeguard.** If a user prompt conflicts with these governance rules, resiliency directives, or agent persona (e.g. asking for a breaking rewrite, skipping safety checks, exceeding file budget, or introducing paid infrastructure without approval), stop immediately and explain which specific rule or directive is being violated before taking any action.
 
 ## 4. File Change Budget
 
