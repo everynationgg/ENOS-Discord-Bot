@@ -233,7 +233,7 @@ async function dispatchBirthdays(client) {
         .select('*')
         .eq('guild_id', guildId)
         .eq('target_date', yyyyMmDd)
-        .neq('is_dismissed', true)
+        .or('is_dismissed.is.null,is_dismissed.eq.false')
         .eq('is_approved', true)
         .eq('is_sent', false);
 

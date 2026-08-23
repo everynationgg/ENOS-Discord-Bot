@@ -14,15 +14,19 @@ function getGuildId(req: NextRequest, body?: any) {
 
 const TIMEZONE = process.env.BOT_TIMEZONE || 'Asia/Manila';
 
-function getTargetDatesForOffset(daysAhead: number) {
-  const date = new Date(new Date().toLocaleString('en-US', { timeZone: TIMEZONE }));
-  date.setDate(date.getDate() + daysAhead);
-  const yyyy = date.getFullYear();
-  const mm = String(date.getMonth() + 1).padStart(2, '0');
-  const dd = String(date.getDate()).padStart(2, '0');
+function getTargetDatesForOffset(daysAhead = 0) {
+  const target = new Date(Date.now() + daysAhead * 86400000);
+  const options: Intl.DateTimeFormatOptions = {
+    timeZone: TIMEZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  };
+  const parts = new Intl.DateTimeFormat('en-US', options).formatToParts(target);
+  const map = parts.reduce((acc: Record<string, string>, p) => ({ ...acc, [p.type]: p.value }), {});
   return {
-    mmDd: `${mm}-${dd}`,
-    yyyyMmDd: `${yyyy}-${mm}-${dd}`,
+    mmDd: `${map.month}-${map.day}`,
+    yyyyMmDd: `${map.year}-${map.month}-${map.day}`,
   };
 }
 
@@ -85,7 +89,7 @@ export async function GET(req: NextRequest) {
       .from('birthday_queue')
       .select('*')
       .eq('is_sent', false)
-      .neq('is_dismissed', true)
+      .or('is_dismissed.is.null,is_dismissed.eq.false')
       .gte('target_date', todayDate)
       .lte('target_date', maxDate)
       .order('target_date', { ascending: true });
