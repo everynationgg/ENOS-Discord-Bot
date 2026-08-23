@@ -99,6 +99,15 @@ function initVoiceBot(mainClient) {
 }
 
 /**
+ * Returns the Voice Herald Sub-Bot client instance.
+ * Used by voiceTranslation.js to reuse the existing connection without circular imports.
+ * @returns {import('discord.js').Client|null}
+ */
+function getVoiceBotClient() {
+  return voiceBotClient;
+}
+
+/**
  * Clean raw text: Strip Discord custom emojis, URLs, and user mentions
  */
 function cleanTextForSpeech(text) {
@@ -360,8 +369,9 @@ function buildControlPanelPayload(session, voiceChannelName) {
   );
 
   const rowButtons = new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId('tts_btn:come').setLabel('Bring Menu Here (/come)').setStyle(ButtonStyle.Secondary).setEmoji('📍'),
-    new ButtonBuilder().setCustomId('tts_btn:leave').setLabel('Disconnect (/leave)').setStyle(ButtonStyle.Danger).setEmoji('🔴')
+    new ButtonBuilder().setCustomId('tts_btn:come').setLabel('Bring Menu Here').setStyle(ButtonStyle.Secondary).setEmoji('📍'),
+    new ButtonBuilder().setCustomId('tts_btn:start_translation').setLabel('Voice Translation').setStyle(ButtonStyle.Success).setEmoji('🌐'),
+    new ButtonBuilder().setCustomId('tts_btn:leave').setLabel('Disconnect').setStyle(ButtonStyle.Danger).setEmoji('🔴')
   );
 
   return { embeds: [embed], components: [rowLang, rowModel, rowPersona, rowButtons] };
@@ -498,12 +508,32 @@ function queueTextMessage(guildId, textChannelId, rawText) {
   processSpeechQueue(guildId);
 }
 
+/**
+ * Enqueues a plain-text string directly into the active TTS speech queue.
+ * Used by Voice Translation to hand off the compiled translation script.
+ * Bypasses the channel-ID check used by queueTextMessage.
+ * @param {string} guildId
+ * @param {string} text
+ * @returns {boolean} true if queued successfully
+ */
+function enqueueTtsText(guildId, text) {
+  const session = activeSessions.get(guildId);
+  if (!session) return false;
+  const cleaned = cleanTextForSpeech(text);
+  if (!cleaned) return false;
+  session.queue.push(cleaned);
+  processSpeechQueue(guildId);
+  return true;
+}
+
 module.exports = {
   initVoiceBot,
+  getVoiceBotClient,
   joinVoiceSession,
   relocateControlPanel,
   leaveVoiceSession,
   queueTextMessage,
+  enqueueTtsText,
   buildControlPanelPayload,
   activeSessions,
   LANGUAGES,

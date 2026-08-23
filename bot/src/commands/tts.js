@@ -28,6 +28,9 @@ module.exports = {
     )
     .addSubcommand((sub) =>
       sub.setName('leave').setDescription('Disconnect the Voice Herald Sub-Bot from Voice Channel')
+    )
+    .addSubcommand((sub) =>
+      sub.setName('translate').setDescription('Start an on-demand Voice Translation session in your current Voice Channel')
     ),
 
   async execute(interaction) {
@@ -60,6 +63,20 @@ module.exports = {
       const res = await leaveVoiceSession(guild.id);
       return interaction.editReply({ content: res.message });
     }
+
+    if (sub === 'translate') {
+      const voiceChannel = member?.voice?.channel;
+      if (!voiceChannel) {
+        return interaction.reply({
+          content: 'You must be connected to a Voice Channel to start Voice Translation.',
+          flags: MessageFlags.Ephemeral,
+        });
+      }
+      await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+      const { startTranslationSession } = require('../modules/social/voiceTranslation');
+      const res = await startTranslationSession(guild, voiceChannel, interaction.channel, interaction.member);
+      return interaction.editReply({ content: res.message });
+    }
   },
 
   /**
@@ -80,6 +97,22 @@ module.exports = {
     if (customId === 'tts_btn:come') {
       await interaction.deferReply({ flags: MessageFlags.Ephemeral });
       const res = await relocateControlPanel(guildId, interaction.channel);
+      return interaction.editReply({ content: res.message });
+    }
+
+    if (customId === 'tts_btn:start_translation') {
+      const voiceChannel = interaction.member?.voice?.channel;
+      if (!voiceChannel) {
+        return interaction.reply({
+          content: 'You must be in a Voice Channel to start Voice Translation.',
+          flags: MessageFlags.Ephemeral,
+        });
+      }
+      await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+      const { startTranslationSession } = require('../modules/social/voiceTranslation');
+      const res = await startTranslationSession(
+        interaction.guild, voiceChannel, interaction.channel, interaction.member
+      );
       return interaction.editReply({ content: res.message });
     }
 

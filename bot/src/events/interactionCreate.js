@@ -168,6 +168,10 @@ module.exports = {
           const { handleTtsComponent } = require('../commands/tts');
           return await handleTtsComponent(interaction);
         }
+        if (interaction.customId.startsWith('vtrans_')) {
+          const { handleTranslationInteraction } = require('../modules/social/voiceTranslation');
+          return await handleTranslationInteraction(interaction);
+        }
         return;
       }
 
