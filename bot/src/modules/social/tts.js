@@ -99,15 +99,6 @@ function initVoiceBot(mainClient) {
 }
 
 /**
- * Returns the Voice Herald Sub-Bot client instance.
- * Used by voiceTranslation.js to reuse the existing connection without circular imports.
- * @returns {import('discord.js').Client|null}
- */
-function getVoiceBotClient() {
-  return voiceBotClient;
-}
-
-/**
  * Clean raw text: Strip Discord custom emojis, URLs, and user mentions
  */
 function cleanTextForSpeech(text) {
@@ -370,7 +361,6 @@ function buildControlPanelPayload(session, voiceChannelName) {
 
   const rowButtons = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId('tts_btn:come').setLabel('Bring Menu Here').setStyle(ButtonStyle.Secondary).setEmoji('📍'),
-    new ButtonBuilder().setCustomId('tts_btn:start_translation').setLabel('Voice Translation').setStyle(ButtonStyle.Success).setEmoji('🌐'),
     new ButtonBuilder().setCustomId('tts_btn:leave').setLabel('Disconnect').setStyle(ButtonStyle.Danger).setEmoji('🔴')
   );
 
@@ -398,7 +388,7 @@ async function joinVoiceSession(guild, voiceChannel, textChannel, mainClient) {
     channelId: voiceChannel.id,
     guildId: guildId,
     adapterCreator: voiceGuild.voiceAdapterCreator,
-    selfDeaf: false,
+    selfDeaf: true,
   });
 
   const player = createAudioPlayer();
@@ -528,7 +518,6 @@ function enqueueTtsText(guildId, text) {
 
 module.exports = {
   initVoiceBot,
-  getVoiceBotClient,
   joinVoiceSession,
   relocateControlPanel,
   leaveVoiceSession,
