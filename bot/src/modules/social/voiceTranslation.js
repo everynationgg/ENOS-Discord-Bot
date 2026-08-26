@@ -31,9 +31,9 @@ const translationSessions = new Map();
 // Completed sessions (temp, 30-min TTL): sessionId -> CompletedSession
 const completedSessions = new Map();
 
-// Minimum PCM bytes to bother transcribing: ~0.4s of 48kHz stereo 16-bit
-// 48000 samples/s * 2 channels * 2 bytes * 0.4s = 76,800 bytes
-const MIN_PCM_BYTES = 76800;
+// Minimum PCM bytes to bother transcribing: ~0.1s of 48kHz stereo 16-bit
+// 48000 samples/s * 2 channels * 2 bytes * 0.1s = 19,200 bytes
+const MIN_PCM_BYTES = 19200;
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -159,8 +159,8 @@ function attachReceiver(connection, session, vbc) {
   const { receiver } = connection;
 
   const onSpeakingStart = (userId) => {
-    // Stop processing if session was ended between speaking events
-    if (!translationSessions.has(session.guildId)) return;
+    // Stop processing if session was ended or is stopping
+    if (!translationSessions.has(session.guildId) || session.stopping) return;
 
     // Ignore the sub-bot's own audio (Discord doesn't echo it back, but be explicit)
     if (vbc?.user && userId === vbc.user.id) return;
@@ -170,9 +170,9 @@ function attachReceiver(connection, session, vbc) {
     session.activeSpeakers.add(userId);
 
     // Subscribe to this speaker's stream.
-    // AfterSilence(1500ms) ends stream after 1.5s of silence -- natural utterance boundary.
+    // AfterSilence(1200ms) ends stream after 1.2s of silence -- natural utterance boundary.
     const userStream = receiver.subscribe(userId, {
-      end: { behavior: EndBehaviorType.AfterSilence, duration: 1500 },
+      end: { behavior: EndBehaviorType.AfterSilence, duration: 1200 },
     });
 
     // Opus -> PCM decoder via prism-media/opusscript
@@ -188,45 +188,52 @@ function attachReceiver(connection, session, vbc) {
       session.activeSpeakers.delete(userId);
     });
 
-    decoder.on('end', async () => {
-      session.activeSpeakers.delete(userId);
+    const processPromise = new Promise((resolve) => {
+      decoder.on('end', async () => {
+        session.activeSpeakers.delete(userId);
+        if (chunks.length === 0) return resolve();
 
-      // Session may have been stopped while collecting audio
-      if (!translationSessions.has(session.guildId)) return;
-      if (chunks.length === 0) return;
+        const pcmBuffer = Buffer.concat(chunks);
 
-      const pcmBuffer = Buffer.concat(chunks);
+        // Skip chunks too short to contain meaningful speech
+        if (pcmBuffer.length < MIN_PCM_BYTES) {
+          logger.info(`[VTRANS] Skipping short chunk for ${userId} (${pcmBuffer.length} bytes)`);
+          return resolve();
+        }
 
-      // Skip chunks too short to contain meaningful speech
-      if (pcmBuffer.length < MIN_PCM_BYTES) {
-        logger.info(`[VTRANS] Skipping short chunk for ${userId} (${pcmBuffer.length} bytes)`);
-        return;
-      }
+        try {
+          const wavBuffer = pcmToWav(pcmBuffer);
 
-      const wavBuffer = pcmToWav(pcmBuffer);
+          // Transcribe via Gemini (non-blocking -- next speaker can start while this runs)
+          const result = await transcribeWithGemini(wavBuffer);
+          if (result && result.transcript) {
+            const displayName = await resolveDisplayName(userId, session.guildId, vbc);
 
-      // Transcribe via Gemini (non-blocking -- next speaker can start while this runs)
-      const result = await transcribeWithGemini(wavBuffer);
-      if (!result || !result.transcript) return; // inaudible or silence
+            session.transcript.push({
+              userId,
+              displayName,
+              language: result.language || 'Unknown',
+              languageCode: result.language_code || 'unknown',
+              originalText: result.transcript,
+              translatedText: result.translation || result.transcript,
+              isEnglish: result.is_english === true,
+              timestamp: Date.now(),
+            });
 
-      const displayName = await resolveDisplayName(userId, session.guildId, vbc);
-
-      session.transcript.push({
-        userId,
-        displayName,
-        language: result.language || 'Unknown',
-        languageCode: result.language_code || 'unknown',
-        originalText: result.transcript,
-        translatedText: result.translation || result.transcript,
-        isEnglish: result.is_english === true,
-        timestamp: Date.now(),
+            logger.info(
+              `[VTRANS] [${displayName}] [${result.language}] "${result.transcript}"` +
+                (result.is_english ? '' : ` -> "${result.translation}"`)
+            );
+          }
+        } catch (err) {
+          logger.error(`[VTRANS] Transcription processing error for user ${userId}:`, err.message);
+        }
+        resolve();
       });
-
-      logger.info(
-        `[VTRANS] [${displayName}] [${result.language}] "${result.transcript}"` +
-          (result.is_english ? '' : ` -> "${result.translation}"`)
-      );
     });
+
+    session.inFlightTranscriptions.add(processPromise);
+    processPromise.finally(() => session.inFlightTranscriptions.delete(processPromise));
 
     userStream.on('error', (err) => {
       logger.warn(`[VTRANS] User stream error for ${userId}: ${err.message}`);
@@ -319,6 +326,8 @@ async function startTranslationSession(guild, voiceChannel, textChannel, initiat
     startedAt: Date.now(),
     transcript: [],
     activeSpeakers: new Set(),
+    inFlightTranscriptions: new Set(),
+    stopping: false,
     connection,
     ownedConnection,
     _speakingListener: null,
@@ -370,8 +379,8 @@ async function stopTranslationSession(guildId, textChannel) {
     return { success: false, message: 'No active Voice Translation session.' };
   }
 
-  // Remove from map first -- signals in-flight decoders to discard results
-  translationSessions.delete(guildId);
+  // Mark session as stopping so no new speaking bursts are started
+  session.stopping = true;
 
   // Clean up speaking event listener
   if (session._speakingListener && session._receiver) {
@@ -379,6 +388,21 @@ async function stopTranslationSession(guildId, textChannel) {
       session._receiver.speaking.removeListener('start', session._speakingListener);
     } catch (_) {}
   }
+
+  // If there are active speakers or in-flight decoders/Gemini transcriptions, give them up to 2.5s to finish
+  if (session.activeSpeakers.size > 0 || session.inFlightTranscriptions.size > 0) {
+    logger.info(
+      `[VTRANS] Flushing in-flight audio on session stop: activeSpeakers=${session.activeSpeakers.size}, inFlight=${session.inFlightTranscriptions.size}`
+    );
+    const timeout = new Promise((r) => setTimeout(r, 2500));
+    await Promise.race([
+      Promise.allSettled(Array.from(session.inFlightTranscriptions)),
+      timeout,
+    ]);
+  }
+
+  // Remove from active map now that in-flight chunks have settled
+  translationSessions.delete(guildId);
 
   const { getVoiceBotClient } = require('./tts');
   const vbc = getVoiceBotClient();
@@ -388,16 +412,16 @@ async function stopTranslationSession(guildId, textChannel) {
     // We owned this connection for translation only -- destroy it
     try { session.connection.destroy(); } catch (_) {}
   } else {
-    // Herald of Voice owns this connection -- restore selfDeaf: true
+    // Herald of Voice owns this connection -- restore selfDeaf: false
     try {
       session.connection.rejoin({
         channelId: session.voiceChannelId,
-        selfDeaf: true,
+        selfDeaf: false,
         selfMute: false,
       });
-      logger.info('[VTRANS] Restored Herald of Voice connection to selfDeaf: true.');
+      logger.info('[VTRANS] Restored Herald of Voice connection state.');
     } catch (err) {
-      logger.warn('[VTRANS] Could not restore selfDeaf:', err.message);
+      logger.warn('[VTRANS] Could not update voice connection state:', err.message);
     }
   }
 

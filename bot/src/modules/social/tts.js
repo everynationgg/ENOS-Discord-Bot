@@ -398,7 +398,7 @@ async function joinVoiceSession(guild, voiceChannel, textChannel, mainClient) {
     channelId: voiceChannel.id,
     guildId: guildId,
     adapterCreator: voiceGuild.voiceAdapterCreator,
-    selfDeaf: true,
+    selfDeaf: false,
   });
 
   const player = createAudioPlayer();
