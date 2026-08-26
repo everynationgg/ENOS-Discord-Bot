@@ -1,6 +1,6 @@
 # fly.toml app configuration file for ENOS Discord Bot
 
-app = "enos-discord-bot"
+app = "enos-bot"
 primary_region = "sin"
 
 [build]
