@@ -370,7 +370,24 @@ async function handleNpcMessage(message, client) {
   }
 
   // 4. Determine Trigger Type
-  const isDirectPing = client.user && message.mentions.has(client.user.id);
+  // Guard: if this message is a reply to one of ENOS's feature posts (embed cards from
+  // deals, boss, trivia, etc.), Discord auto-injects ENOS into message.mentions even
+  // though the user never typed @ENOS. Detect this by checking if the referenced message
+  // is from ENOS and has embeds — if so, suppress the false mention trigger.
+  // Name drops ("enos" in text) are unaffected and still work normally.
+  let isReplyToFeaturePost = false;
+  if (message.reference?.messageId && client.user && message.mentions.has(client.user.id)) {
+    try {
+      const referencedMsg = await message.channel.messages.fetch(message.reference.messageId);
+      if (referencedMsg.author.id === client.user.id && referencedMsg.embeds.length > 0) {
+        isReplyToFeaturePost = true;
+      }
+    } catch (e) {
+      // If we can't fetch the referenced message, default to allowing the trigger
+    }
+  }
+
+  const isDirectPing = !isReplyToFeaturePost && client.user && message.mentions.has(client.user.id);
   const isNameDropped = /\benos\b/i.test(content);
 
   let triggerType = null;
