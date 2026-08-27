@@ -11,7 +11,7 @@ export async function GET(req: NextRequest) {
 
     const { data } = await supabaseAdmin
       .from('guild_config')
-      .select('config')
+      .select('enabled, config')
       .eq('guild_id', guildId)
       .eq('feature_key', 'en_tts')
       .maybeSingle();
@@ -27,6 +27,7 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({
       success: true,
+      enabled: data?.enabled ?? true,
       voice_bot_client_id: process.env.DISCORD_VOICE_BOT_CLIENT_ID || '1531251424456081569',
       config,
     });

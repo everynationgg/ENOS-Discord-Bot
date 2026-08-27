@@ -86,8 +86,9 @@ export default function SocialPage() {
         .then((r) => r.json())
         .then((data) => {
           if (data.voice_bot_client_id) setTtsVoiceBotClientId(data.voice_bot_client_id);
+          // Top-level enabled comes from the standard guild_config.enabled column
+          setTtsEnabled(data.enabled ?? true);
           const cfg = data.config || {};
-          setTtsEnabled(cfg.enabled ?? true);
           setTtsLanguage(cfg.default_language || 'en');
           setTtsVoiceModel(cfg.default_voice_model || 'female');
           setTtsPersona(cfg.default_persona || 'default');
@@ -442,6 +443,11 @@ export default function SocialPage() {
               <div className="overview-item">
                 <h3>🎉 Birthday Queue Workspace</h3>
                 <p>Manage and authorize upcoming birthday cards, transform rough member facts into polished greetings, and release them to Discord.</p>
+              </div>
+
+              <div className="overview-item">
+                <h3>🎙️ EN TTS &amp; Voice Herald</h3>
+                <p>Summons a dedicated Text-to-Speech sub-bot into voice channels to read messages aloud with configurable language, pitch, and character persona.</p>
               </div>
             </div>
           )}
@@ -1310,128 +1316,159 @@ export default function SocialPage() {
             </div>
           )}
           {activeTab === 'en_tts' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-              <div style={{ padding: '1.5rem', background: 'var(--bg-card)', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', paddingBottom: '1rem', borderBottom: '1px solid var(--border-color)', flexWrap: 'wrap', gap: '1rem' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                    <span style={{ fontSize: '1.75rem' }}>🎙️</span>
-                    <div>
-                      <h2 style={{ fontSize: '1.2rem', fontWeight: 700, margin: 0 }}>EN TTS — Text-To-Speech & Voice Herald</h2>
-                      <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Configure dedicated voice sub-bot, auto-translation, and character personas</span>
-                    </div>
-                  </div>
-                  <a
-                    href={`https://discord.com/api/oauth2/authorize?client_id=${ttsVoiceBotClientId}&permissions=3146752&scope=bot`}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="btn btn-primary btn-sm"
-                    style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', textDecoration: 'none' }}
-                  >
-                    🔗 Invite Voice Herald Bot
-                  </a>
+            <div className="split-layout-detail">
+              <div className="feature-instructions">
+                <h3>EN TTS & Voice Herald Guidelines</h3>
+                <p>Summons a dedicated Text-to-Speech sub-bot into your voice channels to read messages aloud.</p>
+                <ol>
+                  <li>Use the toggle to enable or disable the TTS system server-wide.</li>
+                  <li>Set default language, voice pitch, and character persona for the Herald.</li>
+                  <li>Configure <strong>Max Characters Per Message</strong> to control how long spoken messages can be.</li>
+                  <li>Add <strong>Ignored Prefixes</strong> (comma-separated) for messages the bot should stay silent on.</li>
+                </ol>
+                <div className="tip-box">
+                  <strong>💡 Invite the Voice Herald Sub-Bot:</strong><br />
+                  The TTS feature uses a separate dedicated bot. Use the button to invite it to your server before using <code>/tts join</code>.
                 </div>
+              </div>
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-                  <div className="form-group">
-                    <label className="form-label" style={{ fontWeight: 600 }}>Master Feature Switch</label>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginTop: '0.35rem' }}>
-                      <input
-                        type="checkbox"
-                        checked={ttsEnabled}
-                        onChange={(e) => setTtsEnabled(e.target.checked)}
-                        style={{ width: 18, height: 18, cursor: 'pointer' }}
-                      />
-                      <span style={{ fontSize: '0.9rem' }}>Enable EN TTS & Voice Herald Sub-Bot in Voice Channels</span>
-                    </div>
-                  </div>
+              <div className="feature-form-card">
+                <FeatureCard
+                  id="en-tts"
+                  icon="🎙️"
+                  title="EN TTS — Text-To-Speech & Voice Herald"
+                  description="Summons a dedicated voice sub-bot to read messages aloud in voice channels with selectable languages, pitches, and personas."
+                  featureKey="en_tts"
+                  initialEnabled={ttsEnabled}
+                  initialConfig={{
+                    default_language: ttsLanguage,
+                    default_voice_model: ttsVoiceModel,
+                    default_persona: ttsPersona,
+                    max_characters: ttsMaxChars,
+                    ignored_prefixes: ttsIgnoredPrefixes,
+                  }}
+                >
+                  {() => (
+                    <>
+                      <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '0.5rem', marginBottom: '0.25rem' }}>
+                        <a
+                          href={`https://discord.com/api/oauth2/authorize?client_id=${ttsVoiceBotClientId}&permissions=3146752&scope=bot`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="btn btn-secondary btn-sm"
+                          style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', textDecoration: 'none' }}
+                        >
+                          🔗 Invite Voice Herald Bot
+                        </a>
+                      </div>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.25rem' }}>
-                    <div className="form-group">
-                      <label className="form-label" style={{ fontWeight: 600 }}>Default Spoken Language</label>
-                      <select
-                        className="input-field"
-                        value={ttsLanguage}
-                        onChange={(e) => setTtsLanguage(e.target.value)}
-                        style={{ width: '100%', marginTop: '0.35rem' }}
-                      >
-                        <option value="en">English (US)</option>
-                        <option value="ja">Japanese (日本語)</option>
-                        <option value="tl">Tagalog (Filipino)</option>
-                        <option value="es">Spanish (Español)</option>
-                        <option value="fr">French (Français)</option>
-                        <option value="de">German (Deutsch)</option>
-                      </select>
-                    </div>
+                      <div className="section-divider">
+                        <div className="section-divider-line" />
+                        <span className="section-divider-text">Voice Settings</span>
+                        <div className="section-divider-line" />
+                      </div>
 
-                    <div className="form-group">
-                      <label className="form-label" style={{ fontWeight: 600 }}>Default Voice Model / Pitch</label>
-                      <select
-                        className="input-field"
-                        value={ttsVoiceModel}
-                        onChange={(e) => setTtsVoiceModel(e.target.value)}
-                        style={{ width: '100%', marginTop: '0.35rem' }}
-                      >
-                        <option value="female">Female Voice</option>
-                        <option value="male">Male Voice</option>
-                        <option value="neutral">Neutral Voice</option>
-                        <option value="deep">Deep Voice</option>
-                      </select>
-                    </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1.25rem' }}>
+                        <div className="form-group">
+                          <label className="form-label" style={{ fontWeight: 600 }}>Default Spoken Language</label>
+                          <select
+                            id="tts-default-language"
+                            className="form-input"
+                            value={ttsLanguage}
+                            onChange={(e) => setTtsLanguage(e.target.value)}
+                            style={{ width: '100%', marginTop: '0.35rem' }}
+                          >
+                            <option value="en">English (US)</option>
+                            <option value="ja">Japanese (日本語)</option>
+                            <option value="tl">Tagalog (Filipino)</option>
+                            <option value="es">Spanish (Español)</option>
+                            <option value="fr">French (Français)</option>
+                            <option value="de">German (Deutsch)</option>
+                          </select>
+                        </div>
 
-                    <div className="form-group">
-                      <label className="form-label" style={{ fontWeight: 600 }}>Default Character Persona</label>
-                      <select
-                        className="input-field"
-                        value={ttsPersona}
-                        onChange={(e) => setTtsPersona(e.target.value)}
-                        style={{ width: '100%', marginTop: '0.35rem' }}
-                      >
-                        <option value="default">Default Natural</option>
-                        <option value="announcer">Hype Stadium Announcer</option>
-                        <option value="error_mod">Glitched / ERROR-MOD</option>
-                        <option value="calm">Calm & Chill</option>
-                      </select>
-                    </div>
+                        <div className="form-group">
+                          <label className="form-label" style={{ fontWeight: 600 }}>Default Voice Model / Pitch</label>
+                          <select
+                            id="tts-default-voice-model"
+                            className="form-input"
+                            value={ttsVoiceModel}
+                            onChange={(e) => setTtsVoiceModel(e.target.value)}
+                            style={{ width: '100%', marginTop: '0.35rem' }}
+                          >
+                            <option value="female">Female Voice</option>
+                            <option value="male">Male Voice</option>
+                            <option value="neutral">Neutral Voice</option>
+                            <option value="deep">Deep Voice</option>
+                          </select>
+                        </div>
 
-                    <div className="form-group">
-                      <label className="form-label" style={{ fontWeight: 600 }}>Max Characters Per Message</label>
-                      <input
-                        type="number"
-                        className="input-field"
-                        value={ttsMaxChars}
-                        onChange={(e) => setTtsMaxChars(Number(e.target.value))}
-                        style={{ width: '100%', marginTop: '0.35rem' }}
-                      />
-                    </div>
-                  </div>
+                        <div className="form-group">
+                          <label className="form-label" style={{ fontWeight: 600 }}>Default Character Persona</label>
+                          <select
+                            id="tts-default-persona"
+                            className="form-input"
+                            value={ttsPersona}
+                            onChange={(e) => setTtsPersona(e.target.value)}
+                            style={{ width: '100%', marginTop: '0.35rem' }}
+                          >
+                            <option value="default">Default Natural</option>
+                            <option value="announcer">Hype Stadium Announcer</option>
+                            <option value="error_mod">Glitched / ERROR-MOD</option>
+                            <option value="calm">Calm & Chill</option>
+                          </select>
+                        </div>
 
-                  <div className="form-group">
-                    <label className="form-label" style={{ fontWeight: 600 }}>Ignored Message Prefixes</label>
-                    <input
-                      type="text"
-                      className="input-field"
-                      value={ttsIgnoredPrefixes}
-                      onChange={(e) => setTtsIgnoredPrefixes(e.target.value)}
-                      placeholder="!, //, ("
-                      style={{ width: '100%', marginTop: '0.35rem' }}
-                    />
-                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginTop: '0.25rem' }}>
-                      Messages starting with these symbols will not be spoken aloud by TTS.
-                    </span>
-                  </div>
+                        <div className="form-group">
+                          <label className="form-label" style={{ fontWeight: 600 }}>Max Characters Per Message</label>
+                          <input
+                            id="tts-max-chars"
+                            type="number"
+                            className="form-input"
+                            value={ttsMaxChars}
+                            onChange={(e) => setTtsMaxChars(Number(e.target.value))}
+                            style={{ width: '100%', marginTop: '0.35rem' }}
+                          />
+                        </div>
+                      </div>
 
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginTop: '0.5rem', paddingTop: '1rem', borderTop: '1px solid var(--border-color)' }}>
-                    <button
-                      className="btn btn-primary"
-                      onClick={saveTtsSettings}
-                      disabled={saveTtsStatus === 'saving'}
-                    >
-                      {saveTtsStatus === 'saving' ? '⏳ Saving...' : '💾 Save TTS Settings'}
-                    </button>
-                    {saveTtsStatus === 'saved' && <span style={{ color: '#22c55e', fontSize: '0.875rem' }}>✓ Settings saved successfully!</span>}
-                    {saveTtsStatus === 'error' && <span style={{ color: '#ef4444', fontSize: '0.875rem' }}>❌ Failed to save settings.</span>}
-                  </div>
-                </div>
+                      <div className="form-group" style={{ marginTop: '0.25rem' }}>
+                        <label className="form-label" style={{ fontWeight: 600 }}>Ignored Message Prefixes</label>
+                        <input
+                          id="tts-ignored-prefixes"
+                          type="text"
+                          className="form-input"
+                          value={ttsIgnoredPrefixes}
+                          onChange={(e) => setTtsIgnoredPrefixes(e.target.value)}
+                          placeholder="!, //, ("
+                          style={{ width: '100%', marginTop: '0.35rem' }}
+                        />
+                        <span className="form-hint">
+                          Messages starting with these symbols will not be spoken aloud by TTS.
+                        </span>
+                      </div>
+
+                      <div className="section-divider" style={{ marginTop: '1rem' }}>
+                        <div className="section-divider-line" />
+                        <span className="section-divider-text">Save Detailed Settings</span>
+                        <div className="section-divider-line" />
+                      </div>
+
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                        <button
+                          id="save-tts-settings-btn"
+                          className="btn btn-secondary btn-sm"
+                          onClick={saveTtsSettings}
+                          disabled={saveTtsStatus === 'saving'}
+                        >
+                          {saveTtsStatus === 'saving' ? '⏳ Saving...' : '💾 Save TTS Settings'}
+                        </button>
+                        {saveTtsStatus === 'saved' && <span style={{ color: '#22c55e', fontSize: '0.875rem' }}>✓ Saved!</span>}
+                        {saveTtsStatus === 'error' && <span style={{ color: '#ef4444', fontSize: '0.875rem' }}>❌ Failed to save.</span>}
+                      </div>
+                    </>
+                  )}
+                </FeatureCard>
               </div>
             </div>
           )}
