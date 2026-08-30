@@ -129,7 +129,7 @@ async function getOrCreateActiveBoss(guildId) {
   const gameLabel = featureRow?.config?.game_name || 'Gaming Realm';
   const charName = rawOverrideName || bossData.bossName;
 
-  let finalBossName = rawOverrideName ? (rawOverrideName.startsWith('ERROR-MOD:') ? rawOverrideName : `ERROR-MOD: Corrupted ${rawOverrideName}`) : bossData.bossName;
+  let finalBossName = rawOverrideName || bossData.bossName;
   let finalBossTitle = featureRow?.config?.boss_title || `System Threat (${gameLabel})`;
   let finalLore = featureRow?.config?.lore || (rawOverrideName ? `A space-time realm rift merged ${gameLabel} data with ENOS core protocols. ${charName} has manifested in the server! Coordinate your triad skills to neutralize!` : bossData.lore);
   let finalMaxHp = featureRow?.config?.override_hp || featureRow?.config?.max_hp || bossHp;

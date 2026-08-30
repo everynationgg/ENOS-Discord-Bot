@@ -39,12 +39,12 @@ export async function POST(req: NextRequest) {
 
     const body = await req.json();
     const guildId = getGuildId(req, body);
-    const { action, customName, gameName, customHp, customImageUrl: rawImageUrl, customBgUrl: rawBgUrl } = body;
+    const { action, customName, gameName, customTitle, customLore, customHp, customImageUrl: rawImageUrl, customBgUrl: rawBgUrl } = body;
     const currentWeek = getWeekIdentifier();
-    const resolvedImageUrl = await resolveDirectImageUrl(rawImageUrl);
-    const resolvedBgUrl = await resolveDirectImageUrl(rawBgUrl);
+    const resolvedImageUrl = await resolveDirectImageUrl(rawImageUrl || body.config?.custom_image_url);
+    const resolvedBgUrl = await resolveDirectImageUrl(rawBgUrl || body.config?.custom_bg_url);
 
-    if (action === 'spawn' || action === 'spawn_staged') {
+    if (action === 'spawn' || action === 'spawn_staged' || action === 'deploy_staged') {
       // Check if Guild Admin pre-staged next week's boss config in guild_config or passed in body
       const { data: featureRow } = await supabaseAdmin
         .from('guild_config')
@@ -58,7 +58,7 @@ export async function POST(req: NextRequest) {
       const charName = customName && customName.trim() ? customName.trim() : 'Corrupted Anomaly';
       const gameLabel = gameName && gameName.trim() ? gameName.trim() : 'Gaming Realm';
 
-      let bossName = charName.startsWith('ERROR-MOD:') ? charName : `ERROR-MOD: Corrupted ${charName}`;
+      let bossName = charName;
       let bossTitle = `System Threat (${gameLabel})`;
       let lore = `A space-time realm rift merged ${gameLabel} data with ENOS core protocols. ${charName} has manifested in the server! Coordinate your triad skills to neutralize!`;
       let hp = customHp ? parseInt(customHp, 10) : 150000;
@@ -252,7 +252,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: true, action: 'update_image', boss: updatedBoss });
     }
 
-    if (action === 'refresh') {
+    if (action === 'refresh' || action === 'push_live') {
       const { data: featureRow } = await supabaseAdmin
         .from('guild_config')
         .select('config')
@@ -268,23 +268,43 @@ export async function POST(req: NextRequest) {
         .eq('is_overkill', false)
         .maybeSingle();
 
-      const cfgName = featureRow?.config?.override_name || featureRow?.config?.boss_name;
-      const cfgGame = featureRow?.config?.game_name;
-      const cfgTitle = featureRow?.config?.boss_title;
-      const cfgLore = featureRow?.config?.lore;
-      const cfgHp = featureRow?.config?.override_hp || featureRow?.config?.max_hp;
-      const cfgImg = featureRow?.config?.custom_image_url;
-      const cfgBg = featureRow?.config?.custom_bg_url;
+      const cfgName = customName || body.config?.override_name || featureRow?.config?.override_name || featureRow?.config?.boss_name;
+      const cfgGame = gameName || body.config?.game_name || featureRow?.config?.game_name;
+      const cfgTitle = customTitle || body.config?.boss_title || featureRow?.config?.boss_title;
+      const cfgLore = customLore || body.config?.lore || featureRow?.config?.lore;
+      const cfgHp = customHp || body.config?.override_hp || featureRow?.config?.override_hp || featureRow?.config?.max_hp;
+      const cfgImg = resolvedImageUrl || body.config?.custom_image_url || featureRow?.config?.custom_image_url;
+      const cfgBg = resolvedBgUrl || body.config?.custom_bg_url || featureRow?.config?.custom_bg_url;
 
       const rawCharName = cfgName || (existingBoss ? existingBoss.boss_name.replace(/^ERROR-MOD:\s*Corrupted\s*/i, '') : 'Anomaly');
       const gameLabel = cfgGame || 'Gaming Realm';
 
-      const newBossName = cfgName ? (cfgName.startsWith('ERROR-MOD:') ? cfgName : `ERROR-MOD: Corrupted ${cfgName}`) : (existingBoss?.boss_name || `ERROR-MOD: Corrupted ${rawCharName}`);
+      const newBossName = cfgName ? cfgName : (existingBoss?.boss_name || rawCharName);
       const newBossTitle = cfgTitle || (cfgGame ? `System Threat (${gameLabel})` : (existingBoss?.boss_title || `System Threat (${gameLabel})`));
       const newLore = cfgLore || (existingBoss?.lore || `A space-time realm rift merged ${gameLabel} data with ENOS core protocols. ${rawCharName} has manifested in the server! Coordinate your triad skills to neutralize!`);
       const newMaxHp = cfgHp ? Number(cfgHp) : (existingBoss?.max_hp || 150000);
       const newImg = cfgImg ? await resolveDirectImageUrl(cfgImg) : existingBoss?.custom_image_url;
       const newBg = cfgBg ? await resolveDirectImageUrl(cfgBg) : existingBoss?.custom_bg_url;
+
+      // Sync settings to guild_config so dashboard state and bot configs remain perfectly matched
+      const mergedConfig = {
+        ...(featureRow?.config || {}),
+        ...(body.config || {}),
+      };
+      if (cfgGame) mergedConfig.game_name = cfgGame;
+      if (cfgName) mergedConfig.override_name = cfgName;
+      if (cfgTitle) mergedConfig.boss_title = cfgTitle;
+      if (cfgLore) mergedConfig.lore = cfgLore;
+      if (cfgHp) mergedConfig.override_hp = Number(cfgHp);
+      if (newImg) mergedConfig.custom_image_url = newImg;
+      if (newBg) mergedConfig.custom_bg_url = newBg;
+
+      await supabaseAdmin.from('guild_config').upsert({
+        guild_id: guildId,
+        feature_key: 'weekly_boss',
+        config: mergedConfig,
+        updated_at: new Date().toISOString(),
+      });
 
       if (existingBoss) {
         const { data: updatedBoss, error } = await supabaseAdmin
@@ -294,6 +314,10 @@ export async function POST(req: NextRequest) {
             boss_title: newBossTitle,
             lore: newLore,
             max_hp: newMaxHp,
+            current_hp: newMaxHp,
+            is_defeated: false,
+            mom_buff: false,
+            dad_debuff: false,
             custom_image_url: newImg,
             custom_bg_url: newBg,
             last_action: '🔄 Boss Card refreshed from Admin Dashboard!',
@@ -306,7 +330,7 @@ export async function POST(req: NextRequest) {
         if (error) {
           return NextResponse.json({ error: error.message }, { status: 500 });
         }
-        return NextResponse.json({ success: true, action: 'refresh', boss: updatedBoss });
+        return NextResponse.json({ success: true, action: 'refresh', message: 'Boss updated and deployed live to Discord!', boss: updatedBoss });
       } else {
         const { data: newBoss, error } = await supabaseAdmin
           .from('boss_seasons')
@@ -332,14 +356,14 @@ export async function POST(req: NextRequest) {
         if (error) {
           return NextResponse.json({ error: error.message }, { status: 500 });
         }
-        return NextResponse.json({ success: true, action: 'refresh', boss: newBoss });
+        return NextResponse.json({ success: true, action: 'refresh', message: 'Boss spawned and deployed live to Discord!', boss: newBoss });
       }
     }
 
-    if (action === 'end') {
+    if (action === 'end' || action === 'slay') {
       await supabaseAdmin
         .from('boss_seasons')
-        .update({ is_defeated: true, current_hp: 0 })
+        .update({ is_defeated: true, current_hp: 0, last_action: '💥 Boss slain by Admin command!' })
         .eq('guild_id', guildId)
         .eq('week_identifier', currentWeek);
 
@@ -349,7 +373,73 @@ export async function POST(req: NextRequest) {
         .eq('guild_id', guildId)
         .eq('week_identifier', currentWeek);
 
-      return NextResponse.json({ success: true, action: 'end' });
+      return NextResponse.json({ success: true, action: 'slay', message: 'Boss successfully slain!' });
+    }
+
+    if (action === 'revive') {
+      const { data: existingBoss } = await supabaseAdmin
+        .from('boss_seasons')
+        .select('*')
+        .eq('guild_id', guildId)
+        .eq('week_identifier', currentWeek)
+        .eq('is_overkill', false)
+        .maybeSingle();
+
+      if (existingBoss) {
+        const { data: revived, error: revErr } = await supabaseAdmin
+          .from('boss_seasons')
+          .update({
+            current_hp: existingBoss.max_hp,
+            is_defeated: false,
+            mom_buff: false,
+            dad_debuff: false,
+            last_action: '🔄 Admin revived the Weekly Boss with full HP!',
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', existingBoss.id)
+          .select()
+          .single();
+
+        if (revErr) return NextResponse.json({ error: revErr.message }, { status: 500 });
+        return NextResponse.json({ success: true, action: 'revive', message: 'Boss revived with full HP!', boss: revived });
+      } else {
+        return NextResponse.json({ error: 'No active boss season found to revive' }, { status: 404 });
+      }
+    }
+
+    if (action === 'reroll') {
+      const loreOptions = [
+        'A temporal rupture shattered the boundary between dimensions. An anomaly has consolidated within the arena! Coordinate triad skills to purge the corruption.',
+        'Data fragments from corrupted save states coalesced into a rogue system entity. Its code is self-replicating—unleash combined class synergy to shut it down.',
+        'An ancient server glitch woke from long dormancy. The anomaly feeds on raw bandwidth and seeks to rewrite the community laws. Strike now before it fully binds!',
+      ];
+      const randomLore = loreOptions[Math.floor(Math.random() * loreOptions.length)];
+
+      const { data: existingBoss } = await supabaseAdmin
+        .from('boss_seasons')
+        .select('*')
+        .eq('guild_id', guildId)
+        .eq('week_identifier', currentWeek)
+        .eq('is_overkill', false)
+        .maybeSingle();
+
+      if (existingBoss) {
+        const { data: rerolled, error: rErr } = await supabaseAdmin
+          .from('boss_seasons')
+          .update({
+            lore: randomLore,
+            last_action: '🎲 Boss lore rerolled by Admin!',
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', existingBoss.id)
+          .select()
+          .single();
+
+        if (rErr) return NextResponse.json({ error: rErr.message }, { status: 500 });
+        return NextResponse.json({ success: true, action: 'reroll', message: 'Boss lore rerolled successfully!', boss: rerolled });
+      } else {
+        return NextResponse.json({ error: 'No active boss season found to reroll lore' }, { status: 404 });
+      }
     }
 
     if (action === 'overkill') {
@@ -396,7 +486,7 @@ export async function POST(req: NextRequest) {
       }
 
       // Bot worker will detect this DB change via Realtime and post the full canvas card
-      return NextResponse.json({ success: true, action: 'overkill', boss: overkillBoss });
+      return NextResponse.json({ success: true, action: 'overkill', message: 'Overkill mode activated!', boss: overkillBoss });
     }
 
     return NextResponse.json({ error: 'Invalid action' }, { status: 400 });

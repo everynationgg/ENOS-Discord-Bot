@@ -110,25 +110,59 @@ export async function POST(req: NextRequest) {
         const gameLabel = config?.game_name || 'Gaming Realm';
         const charName = rawName || 'Anomaly';
 
-        const bossName = rawName ? (rawName.startsWith('ERROR-MOD:') ? rawName : `ERROR-MOD: Corrupted ${rawName}`) : undefined;
+        const bossName = rawName ? rawName : undefined;
         const bossTitle = config?.boss_title || (config?.game_name ? `System Threat (${gameLabel})` : undefined);
         const lore = config?.lore || (config?.override_name || config?.game_name ? `A space-time realm rift merged ${gameLabel} data with ENOS core protocols. ${charName} has manifested in the server! Coordinate your triad skills to neutralize!` : undefined);
-        const maxHp = config?.override_hp || config?.max_hp;
+        const maxHp = config?.override_hp || config?.max_hp || 150000;
 
-        const updatePayload: any = { updated_at: new Date().toISOString() };
+        const updatePayload: any = {
+          updated_at: new Date().toISOString(),
+          last_action: '🎨 Live Boss configuration updated from Admin Dashboard!',
+        };
         if (bossName) updatePayload.boss_name = bossName;
         if (bossTitle) updatePayload.boss_title = bossTitle;
         if (lore) updatePayload.lore = lore;
-        if (maxHp) updatePayload.max_hp = Number(maxHp);
-        if (config?.custom_image_url) updatePayload.custom_image_url = config.custom_image_url;
-        if (config?.custom_bg_url) updatePayload.custom_bg_url = config.custom_bg_url;
+        if (maxHp) {
+          updatePayload.max_hp = Number(maxHp);
+          updatePayload.current_hp = Number(maxHp);
+          updatePayload.is_defeated = false;
+        }
+        if (config?.custom_image_url !== undefined) updatePayload.custom_image_url = config.custom_image_url || null;
+        if (config?.custom_bg_url !== undefined) updatePayload.custom_bg_url = config.custom_bg_url || null;
 
-        await supabaseAdmin
+        const { data: existing } = await supabaseAdmin
           .from('boss_seasons')
-          .update(updatePayload)
+          .select('id')
           .eq('guild_id', guildId)
           .eq('week_identifier', currentWeek)
-          .eq('is_overkill', false);
+          .eq('is_overkill', false)
+          .maybeSingle();
+
+        if (existing) {
+          await supabaseAdmin
+            .from('boss_seasons')
+            .update(updatePayload)
+            .eq('id', existing.id);
+        } else {
+          await supabaseAdmin
+            .from('boss_seasons')
+            .insert({
+              guild_id: guildId,
+              week_identifier: currentWeek,
+              boss_name: bossName || charName,
+              boss_title: bossTitle || `System Threat (${gameLabel})`,
+              lore: lore || `A space-time realm rift merged ${gameLabel} data with ENOS core protocols. ${charName} has manifested in the server! Coordinate your triad skills to neutralize!`,
+              max_hp: Number(maxHp),
+              current_hp: Number(maxHp),
+              is_defeated: false,
+              is_overkill: false,
+              mom_buff: false,
+              dad_debuff: false,
+              custom_image_url: config?.custom_image_url || null,
+              custom_bg_url: config?.custom_bg_url || null,
+              last_action: '⚡ Admin deployed Weekly Boss from Dashboard!',
+            });
+        }
       } catch (e) {
         console.error('[CONFIG API] Failed to auto-sync boss_seasons:', e);
       }

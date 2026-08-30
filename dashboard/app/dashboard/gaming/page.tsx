@@ -1589,12 +1589,17 @@ function BossCardForm({ config, setConfig }: { config: any; setConfig: (key: str
     if (!confirm(`Confirm action: ${action}?`)) return;
     setActionLoading(action);
     try {
-      const body: any = { action };
-      if (action === 'force_spawn') {
-        body.boss_name = bossName;
-        body.hp = baseHP;
-        body.image_url = imageUrl;
-      }
+      const body: any = {
+        action,
+        config,
+        customName: bossName,
+        gameName,
+        customTitle: config.boss_title,
+        customLore: config.lore,
+        customHp: baseHP,
+        customImageUrl: imageUrl,
+        customBgUrl: bgUrl,
+      };
       const res = await fetch('/api/gaming/boss/action', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1641,6 +1646,16 @@ function BossCardForm({ config, setConfig }: { config: any; setConfig: (key: str
           ⚡ Admin Controls (Guild 1111851610474291240)
         </div>
         <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            className="btn btn-sm"
+            style={{ backgroundColor: '#10b981', color: '#fff', border: 'none', fontWeight: 600 }}
+            disabled={actionLoading === 'push_live'}
+            onClick={() => handleBossAction('push_live')}
+            title="Deploy current Live settings immediately to Discord"
+          >
+            {actionLoading === 'push_live' ? 'Deploying...' : '⚡ Push Live Now'}
+          </button>
           <button
             type="button"
             className="btn btn-sm"
