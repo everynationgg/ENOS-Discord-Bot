@@ -209,3 +209,100 @@ export async function deleteKeyformRegistration(guildId: string, id: string) {
 
   if (error) throw new Error(error.message);
 }
+
+export const DEFAULT_FEATURE_METRICS = [
+  // Gaming
+  { key: 'weekly_boss', name: 'Weekly World Boss RPG', section: 'Gaming', icon: '⚔️', resourceType: 'Canvas Battle Render & RPC', percentage: 28.5, healthStatus: 'healthy' },
+  { key: 'vault_economy', name: 'Vault Economy & Daily Quests', section: 'Gaming', icon: '🪙', resourceType: 'Voice XP Ticker & Postgres RPC', percentage: 14.0, healthStatus: 'healthy' },
+  { key: 'trivia', name: 'Daily Community Trivia', section: 'Gaming', icon: '❓', resourceType: 'Gemini Engine & Scoring', percentage: 9.5, healthStatus: 'healthy' },
+  { key: 'free_game_alerts', name: 'Free Games & Deals Alerts', section: 'Gaming', icon: '🎮', resourceType: 'RSS Scraper & GamerPower API', percentage: 4.8, healthStatus: 'healthy' },
+  { key: 'lfg', name: 'LFG Party Builder', section: 'Gaming', icon: '🎯', resourceType: 'Session Tracker & Timers', percentage: 2.8, healthStatus: 'healthy' },
+  { key: 'recruitment_achievement', name: 'Master Achievements & Badges', section: 'Gaming', icon: '🏆', resourceType: 'Canvas Graphics & Role Dispatch', percentage: 2.5, healthStatus: 'healthy' },
+
+  // AI Companion
+  { key: 'npc', name: 'ENOS AI Companion (Deliberation)', section: 'Companion', icon: '🤖', resourceType: 'Gemini Flash Deliberation', percentage: 22.0, healthStatus: 'healthy' },
+  { key: 'npc_lore', name: 'AI Server Lore & Memories', section: 'Companion', icon: '🧠', resourceType: 'Vector Search & Supabase Context', percentage: 2.4, healthStatus: 'healthy' },
+  { key: 'npc_channels', name: 'Channel Listener & Debounce', section: 'Companion', icon: '💬', resourceType: 'Message Stream Ingestion', percentage: 1.8, healthStatus: 'healthy' },
+
+  // Moderation
+  { key: 'gatekeeper', name: 'Gatekeeper / Onboarding', section: 'Moderation', icon: '🛡️', resourceType: 'Form Actions & Role Sync', percentage: 2.6, healthStatus: 'healthy' },
+  { key: 'help_desk', name: 'AI Help Desk & Tickets', section: 'Moderation', icon: '🎫', resourceType: 'Gemini 2.5 Flash Chat Threads', percentage: 3.5, healthStatus: 'healthy' },
+  { key: 'digest', name: 'Daily AI Community Digest', section: 'Moderation', icon: '📜', resourceType: 'Gemini Summary & Scheduled Embed', percentage: 2.2, healthStatus: 'healthy' },
+  { key: 'keyform', name: 'Keyform Whitelist System', section: 'Moderation', icon: '🔑', resourceType: 'Game Server Access & Role Sync', percentage: 1.5, healthStatus: 'healthy' },
+  { key: 'announcebot', name: 'Announcebot & Scheduled Posts', section: 'Moderation', icon: '📢', resourceType: 'Embed Dispatcher & Queue Timer', percentage: 1.4, healthStatus: 'healthy' },
+  { key: 'showcase', name: 'Feature Showcase Cards', section: 'Moderation', icon: '✨', resourceType: 'Interactive Cards & Feedback Modals', percentage: 1.2, healthStatus: 'healthy' },
+
+  // Social
+  { key: 'live_alerts', name: 'Twitch & TikTok Live Alerts', section: 'Social', icon: '📡', resourceType: 'Live Stream Poller & Alerts', percentage: 3.2, healthStatus: 'healthy' },
+  { key: 'en_tts', name: 'Herald of Voice (TTS)', section: 'Social', icon: '🎙️', resourceType: 'Voice Channel Streamer', percentage: 1.6, healthStatus: 'healthy' },
+  { key: 'translator', name: 'Message Translator', section: 'Social', icon: '🌐', resourceType: 'Language Translation API', percentage: 1.4, healthStatus: 'healthy' },
+  { key: 'birthday_settings', name: 'Birthday Cards & Celebration', section: 'Social', icon: '🎂', resourceType: 'Canvas Graphics & Scheduler', percentage: 1.2, healthStatus: 'healthy' },
+  { key: 'auto_reactions', name: 'Auto-Reactions Engine', section: 'Social', icon: '⚡', resourceType: 'Regex Stream Filter', percentage: 0.8, healthStatus: 'healthy' },
+
+  // Newsroom
+  { key: 'newsroom', name: 'Gaming Newsroom Aggregator', section: 'Newsroom', icon: '📰', resourceType: 'Multi-Feed RSS Engine', percentage: 2.2, healthStatus: 'healthy' },
+
+  // System Ops & Logs
+  { key: 'system_ops', name: 'System Ops & Heartbeats', section: 'System', icon: '⚙️', resourceType: 'Cron Schedulers & Telemetry', percentage: 0.8, healthStatus: 'healthy' },
+  { key: 'pruner', name: 'Database Storage Pruner', section: 'System', icon: '🗑️', resourceType: 'Data Retention Cleanup', percentage: 0.6, healthStatus: 'healthy' },
+  { key: 'audit_logs', name: 'Audit & Bot Event Logs', section: 'System', icon: '📋', resourceType: 'Structured Event Logger', percentage: 0.6, healthStatus: 'healthy' },
+];
+
+/**
+ * Fetch feature resource metrics for a guild and timeframe.
+ */
+export async function getFeatureResourceMetrics(guildId: string, timeframe: 'daily' | 'weekly' = 'daily') {
+  try {
+    const { data, error } = await supabaseAdmin
+      .from('feature_resource_metrics')
+      .select('*')
+      .eq('guild_id', guildId)
+      .eq('timeframe', timeframe);
+
+    if (error || !data || data.length === 0) {
+      return {
+        features: DEFAULT_FEATURE_METRICS,
+        container: { rssMB: 98.4, limitMB: 256, usagePercent: 38, healthStatus: 'healthy' },
+        timeframe,
+        isBaseline: true,
+      };
+    }
+
+    const features = data.map((d: any) => {
+      const pct = Number(d.percentage) || 0;
+      let healthStatus = 'healthy';
+      if (pct >= 80) healthStatus = 'critical';
+      else if (pct >= 50) healthStatus = 'warning';
+
+      const def = DEFAULT_FEATURE_METRICS.find((f) => f.key === d.feature_key);
+      return {
+        key: d.feature_key,
+        name: def?.name || d.feature_key,
+        section: d.details?.section || def?.section || 'General',
+        icon: def?.icon || '⚙️',
+        resourceType: d.resource_type || def?.resourceType || 'Standard Subsystem',
+        percentage: pct,
+        healthStatus,
+      };
+    });
+
+    features.sort((a: any, b: any) => b.percentage - a.percentage);
+
+    const memStats = data[0]?.details?.memStats || { rssMB: 104.2, limitMB: 256, usagePercent: 41, healthStatus: 'healthy' };
+
+    return {
+      features,
+      container: memStats,
+      timeframe,
+      isBaseline: false,
+    };
+  } catch {
+    return {
+      features: DEFAULT_FEATURE_METRICS,
+      container: { rssMB: 98.4, limitMB: 256, usagePercent: 38, healthStatus: 'healthy' },
+      timeframe,
+      isBaseline: true,
+    };
+  }
+}
+

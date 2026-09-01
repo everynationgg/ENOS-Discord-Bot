@@ -237,6 +237,7 @@ function initCrons(client) {
   // ─── Bot Health Heartbeat: Every 5 minutes ────────────────────────────────────
   cron.schedule('*/5 * * * *', async () => {
     try {
+      const { syncTelemetry } = require('./metrics');
       const guilds = client.guilds.cache.map(g => g.id);
       if (guilds.length === 0 && process.env.DISCORD_GUILD_ID) {
         guilds.push(process.env.DISCORD_GUILD_ID);
@@ -246,6 +247,7 @@ function initCrons(client) {
           { guild_id: guildId, last_seen: new Date().toISOString() },
           { onConflict: 'guild_id' }
         );
+        await syncTelemetry(guildId, supabase);
       }
     } catch (err) {
       logger.error('[CRON] Health heartbeat failed:', err.message);
