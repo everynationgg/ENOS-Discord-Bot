@@ -95,31 +95,47 @@ async function handleHelpDeskStart(interaction) {
 }
 
 /**
- * Handles the "Close Chat" button click.
- * @param {import('discord.js').ButtonInteraction} interaction
+ * Handles closing a Help Desk support thread, generating an AI summary, and dispatching the transcript report.
+ * @param {import('discord.js').ThreadChannel} thread
+ * @param {string} triggerReason
  */
-async function handleHelpDeskClose(interaction) {
-  const thread = interaction.channel;
+async function closeAndReportHelpDeskSession(thread, triggerReason = 'Manual "Close Chat" Button') {
   if (!thread || !thread.isThread()) return;
-
-  await interaction.deferUpdate().catch(() => {});
 
   try {
     // 1. Fetch messages for transcript compilation
-    const messages = await thread.messages.fetch({ limit: 100 });
-    const sorted = [...messages.values()].reverse();
+    const messages = await thread.messages.fetch({ limit: 100 }).catch(() => null);
+    if (!messages || messages.size === 0) {
+      await thread.delete('Support session closed (empty)').catch(() => {});
+      return;
+    }
 
+    const sorted = [...messages.values()].reverse();
+    const userMessages = sorted.filter(m => !m.system && !m.author.bot);
+    const botMessages = sorted.filter(m => !m.system && m.author.id === thread.client.user.id && m.content);
+
+    // If no real conversation happened (user opened and closed immediately)
+    if (userMessages.length === 0) {
+      await thread.send({ content: '👋 Support session closed. No messages were sent.' }).catch(() => {});
+      setTimeout(async () => {
+        await thread.delete('Support session closed (empty)').catch(() => {});
+      }, 2000);
+      return;
+    }
+
+    // 2. Build full timestamped transcript
     let transcript = `==================================================\n`;
     transcript += `         ENOS AI SUPPORT DESK TRANSCRIPT          \n`;
     transcript += `==================================================\n`;
     transcript += `Thread Name: ${thread.name} (${thread.id})\n`;
     transcript += `Guild ID:    ${thread.guildId}\n`;
     transcript += `Closed At:   ${new Date().toISOString()}\n`;
+    transcript += `Reason:      ${triggerReason}\n`;
+    transcript += `Total Msgs:  ${sorted.length}\n`;
     transcript += `==================================================\n\n`;
 
     for (const msg of sorted) {
-      // Ignore bot welcome templates or buttons
-      if (msg.author.bot && (msg.embeds.length > 0 || msg.components.length > 0)) continue;
+      if (msg.author.bot && (msg.embeds.length > 0 || msg.components.length > 0) && !msg.content) continue;
       const timestamp = msg.createdAt.toISOString().replace('T', ' ').substring(0, 19);
       const sender = msg.author.tag;
       const content = msg.content || (msg.attachments.size > 0 ? '[Attachment]' : '[System Message]');
@@ -129,31 +145,143 @@ async function handleHelpDeskClose(interaction) {
     const buffer = Buffer.from(transcript, 'utf-8');
     const fileAttachment = new AttachmentBuilder(buffer, { name: `transcript-${thread.id}.txt` });
 
-    // 2. Fetch config to find log channel
+    // 3. Generate concise AI summary of the conversation
+    let aiSummary = 'User engaged with AI Help Desk support assistant.';
+    try {
+      if (process.env.GEMINI_API_KEY && userMessages.length > 0) {
+        const convoSnippet = sorted
+          .filter(m => !m.system && m.content)
+          .map(m => `[${m.author.username}]: ${m.content}`)
+          .slice(-10)
+          .join('\n');
+
+        const summaryModel = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+        const summaryPrompt = `Summarize this Discord community support conversation in 1-2 brief, professional sentences. State what the user needed and what answer/solution was given:\n\n${convoSnippet}`;
+        const summaryRes = await summaryModel.generateContent(summaryPrompt);
+        const text = summaryRes.response.text().trim();
+        if (text) aiSummary = text;
+      }
+    } catch (sumErr) {
+      logger.warn(`[HELPDESK] Summary generation notice: ${sumErr.message}`);
+    }
+
+    // 4. Resolve destination log channel with fallbacks
     const featureConfig = await getFeatureConfig(thread.guildId, 'help_desk');
-    const logChannelId = featureConfig?.config?.transcript_channel_id;
+    const config = featureConfig?.config || {};
+    const logChannelId = config.transcript_channel_id || config.launcher_channel_id || thread.parentId;
+
+    const firstUserMsg = userMessages[0];
+    const targetUserId = firstUserMsg?.author?.id;
+    const authorTag = firstUserMsg?.author?.tag || thread.name.replace('💬-', '');
+
+    const reportEmbed = {
+      title: `📑 AI Support Session Report`,
+      description: `Support session **\`${thread.name}\`** has concluded.`,
+      color: 0x8B5CF6, // Electric Violet
+      fields: [
+        {
+          name: '👤 User',
+          value: targetUserId ? `<@${targetUserId}> (\`${authorTag}\`)` : `\`${authorTag}\``,
+          inline: true,
+        },
+        {
+          name: '📊 Exchanges',
+          value: `💬 ${userMessages.length} user / ${botMessages.length} AI msgs`,
+          inline: true,
+        },
+        {
+          name: '🔒 Closed Via',
+          value: triggerReason,
+          inline: true,
+        },
+        {
+          name: '🤖 AI Executive Summary',
+          value: aiSummary,
+          inline: false,
+        },
+      ],
+      footer: { text: `Thread ID: ${thread.id} • ENOS Help Desk` },
+      timestamp: new Date().toISOString(),
+    };
 
     if (logChannelId) {
       const logChannel = await thread.guild.channels.fetch(logChannelId).catch(() => null);
       if (logChannel) {
-        const authorName = thread.name.replace('💬-', '');
         await logChannel.send({
-          content: `🔒 **Support Session Closed**: \`${thread.name}\` (User: \`${authorName}\`) has been closed. Attached is the chat transcript.`,
-          files: [fileAttachment]
-        }).catch(() => {});
+          embeds: [reportEmbed],
+          files: [fileAttachment],
+        }).catch((sendErr) => {
+          logger.error(`[HELPDESK] Failed to send report to logChannel ${logChannelId}: ${sendErr.message}`);
+        });
+      } else {
+        logger.warn(`[HELPDESK] Log channel ${logChannelId} could not be resolved in guild ${thread.guildId}`);
       }
     }
 
-    // 3. Send goodbye and delete thread
+    // 5. Send goodbye and delete thread
     await thread.send({ content: '👋 Thank you for using the AI Help Desk. Closing this channel...' }).catch(() => {});
     setTimeout(async () => {
       await thread.delete('Support thread closed').catch(() => {});
     }, 3000);
 
   } catch (err) {
-    logger.error('[HELPDESK] Failed to close session:', err.message);
-    // Fallback deletion to keep server clean
-    await thread.delete('Support thread closed (force)').catch(() => {});
+    logger.error('[HELPDESK] Failed to close and report session:', err.message);
+    await thread.delete('Support thread closed (force cleanup)').catch(() => {});
+  }
+}
+
+/**
+ * Handles the "Close Chat" button click.
+ * @param {import('discord.js').ButtonInteraction} interaction
+ */
+async function handleHelpDeskClose(interaction) {
+  const thread = interaction.channel;
+  if (!thread || !thread.isThread()) return;
+
+  await interaction.deferUpdate().catch(() => {});
+  await closeAndReportHelpDeskSession(thread, 'Manual "Close Chat" Button');
+}
+
+/**
+ * Periodically scans and auto-closes inactive Help Desk support threads.
+ * @param {import('discord.js').Client} client
+ */
+async function checkInactiveHelpDeskThreads(client) {
+  try {
+    for (const guild of client.guilds.cache.values()) {
+      const featureConfig = await getFeatureConfig(guild.id, 'help_desk');
+      if (!featureConfig?.enabled) continue;
+
+      const config = featureConfig.config || {};
+      const launcherChannelId = config.launcher_channel_id;
+      if (!launcherChannelId) continue;
+
+      const launcherChannel = await guild.channels.fetch(launcherChannelId).catch(() => null);
+      if (!launcherChannel || !launcherChannel.threads) continue;
+
+      const activeThreads = await launcherChannel.threads.fetchActive().catch(() => null);
+      if (!activeThreads || !activeThreads.threads) continue;
+
+      const timeoutMinutes = config.inactivity_timeout_minutes || 30;
+      const timeoutMs = timeoutMinutes * 60 * 1000;
+      const now = Date.now();
+
+      for (const thread of activeThreads.threads.values()) {
+        if (!thread.name.startsWith('💬-')) continue;
+
+        // Fetch last message timestamp
+        const lastMessages = await thread.messages.fetch({ limit: 1 }).catch(() => null);
+        const lastMsg = lastMessages?.first();
+        const lastActivityTime = lastMsg ? lastMsg.createdTimestamp : thread.createdTimestamp;
+
+        if (now - lastActivityTime > timeoutMs) {
+          logger.info(`[HELPDESK] Inactivity timeout reached for thread ${thread.name} (${thread.id}). Auto-closing...`);
+          await closeAndReportHelpDeskSession(thread, `Inactivity Auto-Timeout (${timeoutMinutes}m)`);
+        }
+      }
+    }
+  } catch (err) {
+    logger.error('[HELPDESK] checkInactiveHelpDeskThreads error:', err.message);
   }
 }
 
@@ -376,5 +504,7 @@ async function handleHelpDeskChatMessage(message) {
 module.exports = {
   handleHelpDeskStart,
   handleHelpDeskClose,
-  handleHelpDeskChatMessage
+  handleHelpDeskChatMessage,
+  closeAndReportHelpDeskSession,
+  checkInactiveHelpDeskThreads,
 };

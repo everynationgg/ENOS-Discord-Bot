@@ -13,6 +13,7 @@ const { loadBirthdayQueue, dispatchBirthdays } = require('../modules/social/birt
 const { checkAndProcessTrivia } = require('../modules/gaming/trivia');
 const { checkAndDispatchDeals, cleanExpiredDeals } = require('../modules/gaming/freeDeals');
 const { checkAndDispatchNewsroom } = require('../modules/newsroom/engine');
+const { checkInactiveHelpDeskThreads } = require('../modules/moderation/helpdesk');
 
 /**
  * Initializes all scheduled cron jobs.
@@ -249,8 +250,9 @@ function initCrons(client) {
         );
         await syncTelemetry(guildId, supabase);
       }
+      await checkInactiveHelpDeskThreads(client);
     } catch (err) {
-      logger.error('[CRON] Health heartbeat failed:', err.message);
+      logger.error('[CRON] Health heartbeat / helpdesk check failed:', err.message);
     }
   });
 
