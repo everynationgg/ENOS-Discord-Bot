@@ -318,6 +318,14 @@ async function buildPersonalCombatPayload(guildId, userId, combatResult = null) 
   const maxSlayPoints = boss.is_overkill ? 15 : 10;
   const projectedPoints = Math.round((apUsed / 5) * maxSlayPoints);
 
+  const apRemaining = playerState.ap_remaining ?? 0;
+  let apStatusText = `⚡ **Your AP Remaining**: \`${apRemaining}/5 AP\` ${playerState.is_locked ? '*(Class locked for week)*' : '*(Can swap class)*'}`;
+  if (apRemaining > 0 && apRemaining < 3) {
+    apStatusText += `\n💡 *Tip: You have ${apRemaining} AP left — use Basic Attack (1 AP each) to finish your weekly AP!*`;
+  } else if (apRemaining === 0) {
+    apStatusText += `\n🎉 *All 5 AP spent for this week! Great battle!*`;
+  }
+
   const embed = new EmbedBuilder()
     .setColor(combatResult?.leveledUp ? 0xfacc15 : (boss.is_overkill ? 0xef4444 : 0x38bdf8))
     .setTitle(`🗡️ Personal Arena — ${classTitles[activeClass]}`)
@@ -327,17 +335,34 @@ async function buildPersonalCombatPayload(guildId, userId, combatResult = null) 
       `❤️ **HP Status**: ${hpBar} **${hpPct}%** (\`${Number(boss.current_hp).toLocaleString()} / ${Number(boss.max_hp).toLocaleString()} HP\`)\n` +
       `🛡️ **M.O.M. Buff**: ${boss.mom_buff ? '✅ **ACTIVE** (Ready for Nuke)' : '❌ Inactive'} | 🔨 **D.A.D. Debuff**: ${boss.dad_debuff ? '✅ **ACTIVE**' : '❌ Inactive'}\n` +
       `⚔️ **Last Action**: ${boss.last_action || 'None'}\n\n` +
-      `⚡ **Your AP Remaining**: \`${playerState.ap_remaining}/5 AP\` ${playerState.is_locked ? '*(Class locked for week)*' : '*(Can swap class)*'}\n` +
+      `${apStatusText}\n` +
       `📊 **Projected Slay Reward**: \`${projectedPoints} / ${maxSlayPoints} Points (₱${projectedPoints})\` *(Spend 5 AP for full reward!)*\n\n` +
       `⏱️ *Note: This combat view will stay active for 60 seconds after your last action.*`
     )
     .setImage(`attachment://${filename}`)
     .setFooter({ text: `ENOS Personal Combat Panel • ${currentWeek}` });
 
+  const canBasic = apRemaining >= 1;
+  const canSkill = apRemaining >= 3;
+
   const actionRow = new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId('boss_act:basic').setLabel(moves.basic).setStyle(ButtonStyle.Primary).setEmoji('⚔️'),
-    new ButtonBuilder().setCustomId('boss_act:skill').setLabel(moves.skill).setStyle(ButtonStyle.Danger).setEmoji('🔥'),
-    new ButtonBuilder().setCustomId('boss_profile').setLabel('My Stats').setStyle(ButtonStyle.Secondary).setEmoji('👤')
+    new ButtonBuilder()
+      .setCustomId('boss_act:basic')
+      .setLabel(moves.basic)
+      .setStyle(ButtonStyle.Primary)
+      .setEmoji('⚔️')
+      .setDisabled(!canBasic),
+    new ButtonBuilder()
+      .setCustomId('boss_act:skill')
+      .setLabel(moves.skill)
+      .setStyle(ButtonStyle.Danger)
+      .setEmoji('🔥')
+      .setDisabled(!canSkill),
+    new ButtonBuilder()
+      .setCustomId('boss_profile')
+      .setLabel('My Stats')
+      .setStyle(ButtonStyle.Secondary)
+      .setEmoji('👤')
   );
 
   if (!playerState.is_locked) {
@@ -552,17 +577,22 @@ module.exports = {
     if (customId.startsWith('boss_join:') || customId === 'boss_engage') {
       await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
+      const playerState = await getPlayerState(guildId, userId);
+
       if (customId.startsWith('boss_join:')) {
         const targetClass = customId.split(':')[1];
-        const res = await setPlayerClass(guildId, userId, targetClass);
-        if (!res.success) {
-          await interaction.editReply({ content: res.message });
-          scheduleEphemeralExpiry(interaction);
-          return;
+        // If player is not locked, or if selecting their current class, set/confirm class
+        if (!playerState?.is_locked || playerState?.class_key === targetClass) {
+          const res = await setPlayerClass(guildId, userId, targetClass);
+          if (!res.success) {
+            await interaction.editReply({ content: res.message });
+            scheduleEphemeralExpiry(interaction);
+            return;
+          }
         }
+        // If player is already locked into a class, allow them to re-enter combat seamlessly with their locked class
       }
 
-      const playerState = await getPlayerState(guildId, userId);
       if (!playerState?.class_key && customId === 'boss_engage') {
         const row = new ActionRowBuilder().addComponents(
           new ButtonBuilder().setCustomId('boss_join:mom').setLabel('Join M.O.M.').setStyle(ButtonStyle.Primary).setEmoji('🛡️'),
@@ -592,6 +622,7 @@ module.exports = {
         new ButtonBuilder().setCustomId('boss_join:kid').setLabel('Pick K.I.D.').setStyle(ButtonStyle.Danger).setEmoji('⚡')
       );
       await interaction.editReply({ content: 'Select your new combat class:', components: [row] });
+      scheduleEphemeralExpiry(interaction);
       return;
     }
 
@@ -610,6 +641,7 @@ module.exports = {
       // Re-render ephemeral combat view (with levelUp state merged inside embed)
       const payload = await buildPersonalCombatPayload(guildId, userId, res);
       await interaction.editReply(payload);
+      scheduleEphemeralExpiry(interaction);
 
       // Update Public Channel Card asynchronously in real-time
       try {

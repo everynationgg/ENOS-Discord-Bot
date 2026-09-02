@@ -353,6 +353,12 @@ async function setPlayerClass(guildId, userId, classKey) {
   const playerState = await getPlayerState(guildId, userId);
 
   if (!playerState) return { success: false, message: 'Failed to fetch player record.' };
+
+  // If player is already this class, treat as success (seamless arena entry)
+  if (playerState.class_key === classKey) {
+    return { success: true, message: `✅ Continuing as **${classKey.toUpperCase()}**!` };
+  }
+
   if (playerState.is_locked) {
     return { success: false, message: '❌ Your class is locked for this week because you have already spent AP!' };
   }
