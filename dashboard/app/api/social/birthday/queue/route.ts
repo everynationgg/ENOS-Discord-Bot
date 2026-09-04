@@ -191,6 +191,87 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: true, deleted: true, dismissed: true });
     }
 
+    if (action === 'send_admin_alert') {
+      const { data: item } = await supabaseAdmin
+        .from('birthday_queue')
+        .select('*')
+        .eq('id', id)
+        .eq('guild_id', guildId)
+        .maybeSingle();
+
+      if (!item) return NextResponse.json({ error: 'Queue item not found' }, { status: 404 });
+
+      const { data: settings } = await supabaseAdmin
+        .from('guild_settings')
+        .select('log_channel_id, birthday_channel_id')
+        .eq('guild_id', guildId)
+        .maybeSingle();
+
+      const { data: gConfig } = await supabaseAdmin
+        .from('guild_config')
+        .select('config')
+        .eq('guild_id', guildId)
+        .eq('feature_key', 'birthday')
+        .maybeSingle();
+
+      const adminChanId = gConfig?.config?.admin_channel_id
+        || gConfig?.config?.notification_channel_id
+        || settings?.log_channel_id
+        || settings?.birthday_channel_id;
+
+      if (!adminChanId) {
+        return NextResponse.json({ error: 'No admin or log channel configured' }, { status: 400 });
+      }
+
+      if (!process.env.DISCORD_TOKEN) {
+        return NextResponse.json({ error: 'Missing DISCORD_TOKEN configuration' }, { status: 500 });
+      }
+
+      const isItemApproved = item.is_approved;
+      const hasNotes = Boolean(item.scratchpad_text?.trim());
+      const statusStr = isItemApproved
+        ? '✅ **Approved & Scheduled** (Ready to release on birthday)'
+        : hasNotes
+        ? '📝 **Draft Ready** (Needs final approval on Dashboard)'
+        : '⚠️ **Needs Review** (Visit Dashboard to customize greeting)';
+
+      const discordRes = await fetch(`https://discord.com/api/v10/channels/${adminChanId}/messages`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bot ${process.env.DISCORD_TOKEN}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          embeds: [{
+            title: '🎂 Upcoming Birthday Reminder',
+            description: `🎉 **Upcoming (${item.target_date})** for <@${item.user_id}>!\n\n` +
+              `• **Status**: ${statusStr}\n` +
+              (item.ign ? `• **IGN**: \`${item.ign}\`\n` : '') +
+              (hasNotes ? `• **Greeting Preview**:\n> *${item.scratchpad_text.slice(0, 150)}${item.scratchpad_text.length > 150 ? '...' : ''}*\n\n` : '\n') +
+              `Manage and authorize greetings on the **ENOS Dashboard** under Social ➜ Birthday Queue.`,
+            color: isItemApproved ? 0x10B981 : 0xF43F5E,
+            timestamp: new Date().toISOString(),
+          }],
+        }),
+      });
+
+      if (!discordRes.ok) {
+        const errText = await discordRes.text();
+        return NextResponse.json({ error: `Discord API error: ${errText}` }, { status: 500 });
+      }
+
+      try {
+        await supabaseAdmin
+          .from('birthday_queue')
+          .update({ admin_alert_sent: true })
+          .eq('id', id);
+      } catch (updateErr) {
+        console.warn('Failed to update admin_alert_sent:', updateErr);
+      }
+
+      return NextResponse.json({ success: true, alert_sent: true });
+    }
+
     let isApproved = typeof is_approved === 'boolean' ? is_approved : false;
     if (action === 'approve') {
       isApproved = true;

@@ -9,7 +9,7 @@ const { checkTwitchLive } = require('../modules/social/twitch');
 const { pruneOldRecords } = require('../modules/system/pruner');
 const { resetDailyQuests } = require('../modules/gaming/vault');
 const { expireOldLFGSessions } = require('../modules/gaming/lfg');
-const { loadBirthdayQueue, dispatchBirthdays } = require('../modules/social/birthdays');
+const { loadBirthdayQueue, checkUpcomingBirthdayAlerts, dispatchBirthdays } = require('../modules/social/birthdays');
 const { checkAndProcessTrivia } = require('../modules/gaming/trivia');
 const { checkAndDispatchDeals, cleanExpiredDeals } = require('../modules/gaming/freeDeals');
 const { checkAndDispatchNewsroom } = require('../modules/newsroom/engine');
@@ -139,6 +139,14 @@ function initCrons(client) {
       logger.error('[CRON] Initial boss canvas sync failed:', err.message);
     }
   })();
+  (async () => {
+    try {
+      await loadBirthdayQueue(client);
+      await checkUpcomingBirthdayAlerts(client);
+    } catch (err) {
+      logger.error('[CRON] Initial birthday queue sync failed:', err.message);
+    }
+  })();
 
   // ─── Daily Quest Reset: Every day at midnight ─────────────────────────────────
   cron.schedule(
@@ -262,8 +270,22 @@ function initCrons(client) {
     async () => {
       try {
         await loadBirthdayQueue(client);
+        await checkUpcomingBirthdayAlerts(client);
       } catch (err) {
         logger.error('[CRON] Birthday queue loading failed:', err.message);
+      }
+    },
+    { timezone: tz }
+  );
+
+  // ─── Birthday Admin Alert Catch-Up: Hourly check ──────────────────────────
+  cron.schedule(
+    '0 * * * *',
+    async () => {
+      try {
+        await checkUpcomingBirthdayAlerts(client);
+      } catch (err) {
+        logger.error('[CRON] Birthday admin alert check failed:', err.message);
       }
     },
     { timezone: tz }

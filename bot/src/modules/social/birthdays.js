@@ -79,8 +79,18 @@ async function loadBirthdayQueue(client) {
           // Verify member is still in the Discord server
           const discordGuild = await client.guilds.fetch(guildId).catch(() => null);
           if (discordGuild) {
-            const member = await discordGuild.members.fetch(bday.user_id).catch(() => null);
-            if (!member) {
+            let memberNotFound = false;
+            try {
+              const member = await discordGuild.members.fetch(bday.user_id);
+              if (!member) memberNotFound = true;
+            } catch (fetchErr) {
+              // Only prune if Discord explicitly reports Unknown Member (Error 10007)
+              if (fetchErr.code === 10007) {
+                memberNotFound = true;
+              }
+            }
+
+            if (memberNotFound) {
               logger.info(`[BIRTHDAYS] Member ${bday.user_id} has left guild ${guildId}. Pruning birthday record.`);
               await supabase.from('member_birthdays').delete().eq('guild_id', guildId).eq('user_id', bday.user_id);
               await supabase.from('birthday_queue').delete().eq('guild_id', guildId).eq('user_id', bday.user_id);
@@ -116,79 +126,174 @@ async function loadBirthdayQueue(client) {
       }
     }
 
-    // 3. 1-Day-Ahead Admin Birthday Notification Alert
-    const { mmDd: mmDdTomorrow, yyyyMmDd: yyyyMmDdTomorrow } = getTargetDates(1);
-    for (const guild of activeGuilds) {
-      const guildId = guild.guild_id;
-      const { data: bdaysTomorrow } = await supabase
-        .from('member_birthdays')
-        .select('user_id, ign')
-        .eq('guild_id', guildId)
-        .eq('birth_date', mmDdTomorrow);
+    // Run upcoming admin alert checks
+    await checkUpcomingBirthdayAlerts(client);
+  } catch (err) {
+    logger.error('[BIRTHDAYS] Queue Loader failed:', err);
+  }
+}
 
-      if (!bdaysTomorrow || bdaysTomorrow.length === 0) continue;
+/**
+ * Checks for upcoming birthdays and sends 1-day ahead reminders (and same-day catch-up) to admins.
+ * Fully idempotent: Checks birthday_queue.admin_alert_sent and bot_event_logs before dispatching.
+ * @param {import('discord.js').Client} client
+ * @returns {Promise<{ alertsSent: number }>}
+ */
+async function checkUpcomingBirthdayAlerts(client) {
+  let alertsSent = 0;
+  try {
+    const { data: activeGuilds, error: guildError } = await supabase
+      .from('guild_settings')
+      .select('guild_id, birthday_channel_id, log_channel_id')
+      .eq('birthday_enabled', true);
 
-      const { data: gSetting } = await supabase
-        .from('guild_settings')
-        .select('birthday_channel_id, log_channel_id')
-        .eq('guild_id', guildId)
-        .maybeSingle();
+    if (guildError || !activeGuilds || activeGuilds.length === 0) return { alertsSent: 0 };
 
-      const { data: gConfig } = await supabase
-        .from('guild_config')
-        .select('config')
-        .eq('guild_id', guildId)
-        .eq('feature_key', 'birthday')
-        .maybeSingle();
+    const { EmbedBuilder } = require('discord.js');
 
-      // Admin alert goes to log_channel_id (private/admin channel), NOT the public birthday channel
-      const adminChannelId = gConfig?.config?.admin_channel_id
-        || gConfig?.config?.notification_channel_id
-        || gSetting?.log_channel_id
-        || gSetting?.birthday_channel_id;
+    // Check tomorrow (offset 1) for standard 1-day ahead reminder, and today (offset 0) for catch-up
+    for (const offset of [1, 0]) {
+      const { mmDd, yyyyMmDd: targetDate } = getTargetDates(offset);
 
-      if (adminChannelId) {
+      for (const guild of activeGuilds) {
+        const guildId = guild.guild_id;
+
+        const { data: bdays, error: bdayErr } = await supabase
+          .from('member_birthdays')
+          .select('user_id, ign')
+          .eq('guild_id', guildId)
+          .eq('birth_date', mmDd);
+
+        if (bdayErr || !bdays || bdays.length === 0) continue;
+
+        const { data: gConfig } = await supabase
+          .from('guild_config')
+          .select('config')
+          .eq('guild_id', guildId)
+          .eq('feature_key', 'birthday')
+          .maybeSingle();
+
+        const adminChannelId = gConfig?.config?.admin_channel_id
+          || gConfig?.config?.notification_channel_id
+          || guild.log_channel_id
+          || guild.birthday_channel_id;
+
+        if (!adminChannelId) continue;
+
         const discordGuild = await client.guilds.fetch(guildId).catch(() => null);
-        const adminChan = discordGuild ? await discordGuild.channels.fetch(adminChannelId).catch(() => null) : null;
+        if (!discordGuild) continue;
 
-        if (adminChan && adminChan.isTextBased()) {
-          const { EmbedBuilder } = require('discord.js');
-          for (const bday of bdaysTomorrow) {
-            // Check if this upcoming birthday was dismissed in the queue
-            const { data: queueItem } = await supabase
-              .from('birthday_queue')
-              .select('is_dismissed')
-              .eq('guild_id', guildId)
-              .eq('user_id', bday.user_id)
-              .eq('target_date', yyyyMmDdTomorrow)
-              .maybeSingle();
+        const adminChan = await discordGuild.channels.fetch(adminChannelId).catch(() => null);
+        if (!adminChan || !adminChan.isTextBased()) continue;
 
-            if (queueItem?.is_dismissed) {
-              logger.info(`[BIRTHDAYS] Skipping 1-day admin alert for user ${bday.user_id} (dismissed in queue).`);
-              continue;
+        for (const bday of bdays) {
+          // Check birthday_queue item
+          const { data: queueItem } = await supabase
+            .from('birthday_queue')
+            .select('*')
+            .eq('guild_id', guildId)
+            .eq('user_id', bday.user_id)
+            .eq('target_date', targetDate)
+            .maybeSingle();
+
+          // Skip if dismissed or already sent publicly
+          if (queueItem?.is_dismissed || queueItem?.is_sent) continue;
+
+          // Check if admin alert was already sent via column
+          if (queueItem?.admin_alert_sent) continue;
+
+          // Also check bot_event_logs for permanent idempotency
+          const { data: existingLog } = await supabase
+            .from('bot_event_logs')
+            .select('id')
+            .eq('guild_id', guildId)
+            .eq('event_type', 'birthday_admin_alert')
+            .filter('details->>target_date', 'eq', targetDate)
+            .filter('details->>user_id', 'eq', bday.user_id)
+            .limit(1);
+
+          if (existingLog && existingLog.length > 0) {
+            // Already alerted in logs; backfill queueItem if needed
+            if (queueItem?.id && !queueItem.admin_alert_sent) {
+              try {
+                await supabase.from('birthday_queue').update({ admin_alert_sent: true }).eq('id', queueItem.id);
+              } catch {}
             }
+            continue;
+          }
 
-            const alertEmbed = new EmbedBuilder()
-              .setColor(0xF43F5E)
-              .setTitle('🎂 Upcoming Birthday Tomorrow!')
-              .setDescription(
-                `🎉 **Tomorrow (${yyyyMmDdTomorrow})** is <@${bday.user_id}>'s birthday!\n\n` +
-                `Please review and approve their custom greeting message on the ENOS Dashboard.`
-              )
-              .setFooter({ text: 'ENOS Birthday System • Admin Alert' })
-              .setTimestamp();
+          const isApproved = queueItem?.is_approved ?? false;
+          const hasCustomNotes = Boolean(queueItem?.scratchpad_text?.trim());
 
-            await adminChan.send({ embeds: [alertEmbed] }).catch((e) =>
-              logger.error(`[BIRTHDAYS] Failed to send 1-day birthday admin alert: ${e.message}`)
-            );
-            logger.info(`[BIRTHDAYS] Sent 1-day ahead admin birthday alert for ${bday.user_id} in channel ${adminChannelId}`);
+          const statusText = isApproved
+            ? '✅ **Approved & Scheduled** (Ready to release on birthday)'
+            : hasCustomNotes
+            ? '📝 **Draft Ready** (Needs final approval on Dashboard)'
+            : '⚠️ **Needs Review** (Visit Dashboard to customize greeting)';
+
+          const title = offset === 1 ? '🎂 Upcoming Birthday Tomorrow!' : '🎂 Community Birthday Today!';
+          const timingDesc = offset === 1
+            ? `🎉 **Tomorrow (${targetDate})** is <@${bday.user_id}>'s birthday!`
+            : `🎉 **Today (${targetDate})** is <@${bday.user_id}>'s birthday!`;
+
+          const alertEmbed = new EmbedBuilder()
+            .setColor(isApproved ? 0x10B981 : 0xF43F5E)
+            .setTitle(title)
+            .setDescription(
+              `${timingDesc}\n\n` +
+              `• **Status**: ${statusText}\n` +
+              (bday.ign ? `• **IGN**: \`${bday.ign}\`\n` : '') +
+              (hasCustomNotes ? `• **Greeting Preview**:\n> *${queueItem.scratchpad_text.slice(0, 150)}${queueItem.scratchpad_text.length > 150 ? '...' : ''}*\n\n` : '\n') +
+              `Please review, transform with AI, or authorize greetings on the **ENOS Dashboard** under Social ➜ Birthday Queue.`
+            )
+            .setFooter({ text: 'ENOS Birthday System • Admin Alert' })
+            .setTimestamp();
+
+          await adminChan.send({ embeds: [alertEmbed] }).catch((e) =>
+            logger.error(`[BIRTHDAYS] Failed to send admin birthday alert: ${e.message}`)
+          );
+          logger.info(`[BIRTHDAYS] Sent upcoming admin birthday alert for ${bday.user_id} in channel ${adminChannelId}`);
+          alertsSent++;
+
+          // Mark as sent in birthday_queue (defensive catch in case migration 027 isn't applied yet)
+          if (queueItem?.id) {
+            try {
+              await supabase
+                .from('birthday_queue')
+                .update({ admin_alert_sent: true })
+                .eq('id', queueItem.id);
+            } catch (queueUpdateErr) {
+              logger.debug(`[BIRTHDAYS] Note: Could not update admin_alert_sent on birthday_queue: ${queueUpdateErr.message}`);
+            }
+          }
+
+          // Always log to bot_event_logs for permanent idempotency
+          try {
+            await supabase
+              .from('bot_event_logs')
+              .insert({
+                guild_id: guildId,
+                event_type: 'birthday_admin_alert',
+                discord_id: bday.user_id,
+                details: {
+                  user_id: bday.user_id,
+                  ign: bday.ign || null,
+                  target_date: targetDate,
+                  offset,
+                  is_approved: isApproved,
+                  channel_id: adminChannelId,
+                },
+              });
+          } catch (logErr) {
+            logger.warn(`[BIRTHDAYS] Could not log birthday_admin_alert: ${logErr.message}`);
           }
         }
       }
     }
   } catch (err) {
-    logger.error('[BIRTHDAYS] Queue Loader failed:', err);
+    logger.error('[BIRTHDAYS] checkUpcomingBirthdayAlerts failed:', err);
   }
+  return { alertsSent };
 }
 
 /**
@@ -287,5 +392,6 @@ async function dispatchBirthdays(client) {
 
 module.exports = {
   loadBirthdayQueue,
+  checkUpcomingBirthdayAlerts,
   dispatchBirthdays,
 };

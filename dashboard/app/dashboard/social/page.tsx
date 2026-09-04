@@ -1208,11 +1208,22 @@ export default function SocialPage() {
                       return (
                         <div key={id} style={{ border: isItemApproved ? '1px solid rgba(16,185,129,0.3)' : '1px solid var(--border-subtle)', background: 'rgba(255,255,255,0.01)', borderRadius: 'var(--radius-md)', padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.75rem', position: 'relative' }}>
                           
-                          {isItemApproved && (
-                            <span className="badge badge-active" style={{ position: 'absolute', top: '1rem', right: '1rem', background: 'rgba(16,185,129,0.15)', color: '#10B981', border: '1px solid rgba(16,185,129,0.3)' }}>
-                              🚀 Approved & Scheduled
-                            </span>
-                          )}
+                          <div style={{ position: 'absolute', top: '1rem', right: '1rem', display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                            {item.admin_alert_sent ? (
+                              <span className="badge" style={{ background: 'rgba(59,130,246,0.15)', color: '#60A5FA', border: '1px solid rgba(59,130,246,0.3)', fontSize: '0.72rem', padding: '0.15rem 0.4rem' }}>
+                                🔔 Admin Alert Sent
+                              </span>
+                            ) : (
+                              <span className="badge" style={{ background: 'rgba(234,179,8,0.15)', color: '#FACC15', border: '1px solid rgba(234,179,8,0.3)', fontSize: '0.72rem', padding: '0.15rem 0.4rem' }}>
+                                ⏳ Alert Pending
+                              </span>
+                            )}
+                            {isItemApproved && (
+                              <span className="badge badge-active" style={{ background: 'rgba(16,185,129,0.15)', color: '#10B981', border: '1px solid rgba(16,185,129,0.3)' }}>
+                                🚀 Approved & Scheduled
+                              </span>
+                            )}
+                          </div>
 
                           <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
                             <div style={{ fontSize: '1.5rem' }}>👤</div>
