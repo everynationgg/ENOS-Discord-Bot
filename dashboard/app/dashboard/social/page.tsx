@@ -307,6 +307,27 @@ export default function SocialPage() {
     }
   };
 
+  const handleSendAdminAlert = async (id: string) => {
+    setCardStatus(prev => ({ ...prev, [id]: 'saving' }));
+    try {
+      const res = await fetch('/api/social/birthday/queue', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, action: 'send_admin_alert' }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Alert trigger failed');
+
+      setCardStatus(prev => ({ ...prev, [id]: 'saved' }));
+      loadQueue();
+      setTimeout(() => setCardStatus(prev => ({ ...prev, [id]: 'idle' })), 2500);
+    } catch (err: any) {
+      alert(`Admin alert failed: ${err.message}`);
+      setCardStatus(prev => ({ ...prev, [id]: 'error' }));
+    }
+  };
+
   const saveTtsSettings = async () => {
     setSaveTtsStatus('saving');
     try {
@@ -1206,61 +1227,71 @@ export default function SocialPage() {
                       const isItemApproved = item.is_approved;
 
                       return (
-                        <div key={id} style={{ border: isItemApproved ? '1px solid rgba(16,185,129,0.3)' : '1px solid var(--border-subtle)', background: 'rgba(255,255,255,0.01)', borderRadius: 'var(--radius-md)', padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.75rem', position: 'relative' }}>
+                        <div key={id} style={{ border: isItemApproved ? '1px solid rgba(16,185,129,0.3)' : '1px solid var(--border-subtle)', background: 'rgba(255,255,255,0.01)', borderRadius: 'var(--radius-md)', padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
                           
-                          <div style={{ position: 'absolute', top: '1rem', right: '1rem', display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                            {item.admin_alert_sent ? (
-                              <span className="badge" style={{ background: 'rgba(59,130,246,0.15)', color: '#60A5FA', border: '1px solid rgba(59,130,246,0.3)', fontSize: '0.72rem', padding: '0.15rem 0.4rem' }}>
-                                🔔 Admin Alert Sent
-                              </span>
-                            ) : (
-                              <span className="badge" style={{ background: 'rgba(234,179,8,0.15)', color: '#FACC15', border: '1px solid rgba(234,179,8,0.3)', fontSize: '0.72rem', padding: '0.15rem 0.4rem' }}>
-                                ⏳ Alert Pending
-                              </span>
-                            )}
-                            {isItemApproved && (
-                              <span className="badge badge-active" style={{ background: 'rgba(16,185,129,0.15)', color: '#10B981', border: '1px solid rgba(16,185,129,0.3)' }}>
-                                🚀 Approved & Scheduled
-                              </span>
-                            )}
-                          </div>
+                          {/* Card Header: User Info & Status Badges */}
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.75rem', flexWrap: 'wrap' }}>
+                            <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', minWidth: '220px', flex: '1 1 auto' }}>
+                              <div style={{ fontSize: '1.5rem', flexShrink: 0 }}>👤</div>
+                              <div>
+                                <div style={{ fontWeight: 600, color: 'var(--text-primary)', wordBreak: 'break-all' }}>
+                                  User Mention: <code style={{ color: 'var(--accent-primary)', fontSize: '0.85rem' }}>&lt;@{item.user_id}&gt;</code>
+                                </div>
+                                <div style={{ fontSize: '0.8125rem', color: 'var(--text-muted)' }}>
+                                  In-Game Name (IGN): <strong style={{ color: 'var(--text-secondary)' }}>{item.ign || 'N/A'}</strong> · Date: <strong style={{ color: 'var(--text-secondary)' }}>{new Date(item.target_date).toLocaleDateString(undefined, { month: 'long', day: 'numeric' })}</strong>
+                                </div>
+                              </div>
+                            </div>
 
-                          <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-                            <div style={{ fontSize: '1.5rem' }}>👤</div>
-                            <div>
-                              <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
-                                User Mention: <code style={{ color: 'var(--accent-primary)', fontSize: '0.85rem' }}>&lt;@{item.user_id}&gt;</code>
-                              </div>
-                              <div style={{ fontSize: '0.8125rem', color: 'var(--text-muted)' }}>
-                                In-Game Name (IGN): <strong style={{ color: 'var(--text-secondary)' }}>{item.ign || 'N/A'}</strong> · Date: <strong style={{ color: 'var(--text-secondary)' }}>{new Date(item.target_date).toLocaleDateString(undefined, { month: 'long', day: 'numeric' })}</strong>
-                              </div>
+                            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap', flexShrink: 0 }}>
+                              {item.admin_alert_sent ? (
+                                <span className="badge" style={{ background: 'rgba(59,130,246,0.15)', color: '#60A5FA', border: '1px solid rgba(59,130,246,0.3)', fontSize: '0.72rem', padding: '0.15rem 0.4rem', whiteSpace: 'nowrap' }}>
+                                  🔔 Admin Alert Sent
+                                </span>
+                              ) : (
+                                <span className="badge" style={{ background: 'rgba(234,179,8,0.15)', color: '#FACC15', border: '1px solid rgba(234,179,8,0.3)', fontSize: '0.72rem', padding: '0.15rem 0.4rem', whiteSpace: 'nowrap' }}>
+                                  ⏳ Alert Pending
+                                </span>
+                              )}
+                              {isItemApproved && (
+                                <span className="badge badge-active" style={{ background: 'rgba(16,185,129,0.15)', color: '#10B981', border: '1px solid rgba(16,185,129,0.3)', fontSize: '0.72rem', padding: '0.15rem 0.4rem', whiteSpace: 'nowrap' }}>
+                                  🚀 Approved & Scheduled
+                                </span>
+                              )}
                             </div>
                           </div>
 
-                          <div className="form-group" style={{ margin: 0, position: 'relative' }}>
+                          {/* Member Traits / Notes Box */}
+                          <div className="form-group" style={{ margin: 0 }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                              <label className="form-label" style={{ fontSize: '0.75rem', margin: 0, fontWeight: 600 }}>
+                                Member Traits & Notes (Input for AI)
+                              </label>
+                              <button
+                                id={`transform-ai-btn-${id}`}
+                                className="btn btn-secondary btn-sm"
+                                onClick={() => handleTransform(id, originalNotes[id] || '', item.user_id, item.ign)}
+                                disabled={isTransforming || status === 'saving'}
+                                style={{ padding: '0.25rem 0.6rem', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}
+                              >
+                                {isTransforming ? '⏳ Transforming...' : '🤖 Transform with AI'}
+                              </button>
+                            </div>
                             <textarea
                               id={`traits-input-${id}`}
                               className="form-textarea"
                               rows={2}
-                              placeholder="Type in traits or fun facts..."
+                              placeholder="Type in traits or fun facts (e.g. loves FPS games, always helpful)..."
                               value={originalNotes[id] || ''}
                               onChange={(e) => setOriginalNotes(prev => ({ ...prev, [id]: e.target.value }))}
                               disabled={isTransforming || status === 'saving'}
                               style={{ width: '100%', fontSize: '0.8125rem' }}
                             />
-                            <button
-                              id={`transform-ai-btn-${id}`}
-                              className="btn btn-secondary btn-sm"
-                              onClick={() => handleTransform(id, originalNotes[id] || '', item.user_id, item.ign)}
-                              disabled={isTransforming || status === 'saving'}
-                              style={{ position: 'absolute', right: '0.5rem', bottom: '0.5rem', padding: '0.2rem 0.5rem', fontSize: '0.75rem' }}
-                            >
-                              {isTransforming ? '⏳ Transforming...' : '🤖 Transform with AI'}
-                            </button>
                           </div>
 
+                          {/* Polished Draft Message Box */}
                           <div className="form-group" style={{ margin: 0 }}>
-                            <label className="form-label" style={{ fontSize: '0.75rem' }}>Edit Draft Message</label>
+                            <label className="form-label" style={{ fontSize: '0.75rem', marginBottom: '0.35rem', fontWeight: 600 }}>Edit Draft Message</label>
                             <textarea
                               id={`draft-input-${id}`}
                               className="form-textarea"
@@ -1273,27 +1304,28 @@ export default function SocialPage() {
                             />
                           </div>
 
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.5rem', borderTop: '1px solid var(--border-subtle)', paddingTop: '0.75rem' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                              <span style={{ fontSize: '0.8125rem', color: status === 'error' ? 'var(--text-danger)' : 'var(--text-muted)' }}>
-                                {
-                                  {
-                                    idle: '',
-                                    saving: '⏳ Processing...',
-                                    saved: '✅ Success!',
-                                    error: '❌ Error occurred',
-                                  }[status]
-                                }
-                              </span>
-                              
+                          {/* Action Buttons Footer */}
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.5rem', borderTop: '1px solid var(--border-subtle)', paddingTop: '0.75rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
                               <button
                                 id={`delete-btn-${id}`}
                                 className="btn btn-danger btn-sm"
                                 onClick={() => handleDelete(id)}
                                 disabled={isTransforming || status === 'saving'}
-                                style={{ padding: '0.25rem 0.5rem' }}
+                                style={{ padding: '0.25rem 0.6rem' }}
                               >
                                 🗑️ Dismiss
+                              </button>
+
+                              <button
+                                id={`alert-btn-${id}`}
+                                className="btn btn-secondary btn-sm"
+                                onClick={() => handleSendAdminAlert(id)}
+                                disabled={isTransforming || status === 'saving'}
+                                style={{ border: '1px solid var(--border-subtle)' }}
+                                title="Send Discord admin reminder now"
+                              >
+                                🔔 Send Admin Alert
                               </button>
 
                               <button
@@ -1316,6 +1348,17 @@ export default function SocialPage() {
                                 {isItemApproved ? '🚀 Re-Approve Wish' : '🚀 Approve & Schedule'}
                               </button>
                             </div>
+
+                            <span style={{ fontSize: '0.8125rem', color: status === 'error' ? 'var(--text-danger)' : 'var(--text-muted)' }}>
+                              {
+                                {
+                                  idle: '',
+                                  saving: '⏳ Processing...',
+                                  saved: '✅ Success!',
+                                  error: '❌ Error occurred',
+                                }[status]
+                              }
+                            </span>
                           </div>
 
                         </div>
