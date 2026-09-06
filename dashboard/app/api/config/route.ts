@@ -10,6 +10,17 @@ function getGuildId(req: NextRequest, body?: any) {
   );
 }
 
+function getWeekIdentifier(date = new Date()) {
+  const tzOffsetMs = 8 * 60 * 60 * 1000;
+  const targetDate = new Date(date.getTime() + tzOffsetMs);
+  const d = new Date(Date.UTC(targetDate.getUTCFullYear(), targetDate.getUTCMonth(), targetDate.getUTCDate()));
+  const dayNum = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  const weekNo = Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
+  return `${d.getUTCFullYear()}-W${String(weekNo).padStart(2, '0')}`;
+}
+
 // GET /api/config — fetch all feature configs for the guild
 export async function GET(req: NextRequest) {
   const session = await auth();
@@ -99,12 +110,7 @@ export async function POST(req: NextRequest) {
     // Auto-sync active boss_seasons row when saving Weekly Boss configuration
     if (feature_key === 'weekly_boss') {
       try {
-        const now = new Date();
-        const year = now.getUTCFullYear();
-        const firstDayOfYear = new Date(Date.UTC(year, 0, 1));
-        const pastDaysOfYear = (now.getTime() - firstDayOfYear.getTime()) / 86400000;
-        const weekNum = Math.ceil((pastDaysOfYear + firstDayOfYear.getUTCDay() + 1) / 7);
-        const currentWeek = `${year}-W${String(weekNum).padStart(2, '0')}`;
+        const currentWeek = getWeekIdentifier();
 
         const rawName = config?.override_name || config?.boss_name;
         const gameLabel = config?.game_name || 'Gaming Realm';
@@ -147,22 +153,32 @@ export async function POST(req: NextRequest) {
             .update(updatePayload)
             .eq('id', existing.id);
         } else {
+          // If pre-staged boss config exists, deploy staged settings instead of old active settings
+          const staged = config?.staged_boss_config;
+          const sName = staged?.override_name || staged?.boss_name;
+          const finalName = sName || bossName || charName;
+          const finalTitle = staged?.boss_title || bossTitle || `System Threat (${staged?.game_name || gameLabel})`;
+          const finalLore = staged?.lore || lore || `A space-time realm rift merged ${staged?.game_name || gameLabel} data with ENOS core protocols. ${finalName} has manifested in the server! Coordinate your triad skills to neutralize!`;
+          const finalHp = Number(staged?.override_hp || staged?.max_hp || maxHp);
+          const finalImg = staged?.custom_image_url || config?.custom_image_url || null;
+          const finalBg = staged?.custom_bg_url || config?.custom_bg_url || null;
+
           await supabaseAdmin
             .from('boss_seasons')
             .insert({
               guild_id: guildId,
               week_identifier: currentWeek,
-              boss_name: bossName || charName,
-              boss_title: bossTitle || `System Threat (${gameLabel})`,
-              lore: lore || `A space-time realm rift merged ${gameLabel} data with ENOS core protocols. ${charName} has manifested in the server! Coordinate your triad skills to neutralize!`,
-              max_hp: Number(maxHp),
-              current_hp: Number(maxHp),
+              boss_name: finalName,
+              boss_title: finalTitle,
+              lore: finalLore,
+              max_hp: finalHp,
+              current_hp: finalHp,
               is_defeated: false,
               is_overkill: false,
               mom_buff: false,
               dad_debuff: false,
-              custom_image_url: config?.custom_image_url || null,
-              custom_bg_url: config?.custom_bg_url || null,
+              custom_image_url: finalImg,
+              custom_bg_url: finalBg,
               last_action: '⚡ Admin deployed Weekly Boss from Dashboard!',
             });
         }

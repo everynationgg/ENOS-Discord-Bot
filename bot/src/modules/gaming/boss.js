@@ -50,7 +50,66 @@ async function getOrCreateActiveBoss(guildId) {
     .limit(1)
     .maybeSingle();
 
-  if (activeBoss) return activeBoss;
+  // Check if Guild Admin pre-staged next week's boss config in guild_config
+  const { data: featureRow } = await supabase
+    .from('guild_config')
+    .select('config')
+    .eq('guild_id', guildId)
+    .eq('feature_key', 'weekly_boss')
+    .maybeSingle();
+
+  const stagedConfig = featureRow?.config?.staged_boss_config;
+
+  if (activeBoss) {
+    // If a staged boss is waiting and hasn't been deployed yet to this season
+    const sName = stagedConfig?.override_name || stagedConfig?.boss_name;
+    if (sName && activeBoss.boss_name !== sName && (stagedConfig.enabled || stagedConfig.enabled === undefined)) {
+      logger.info(`[BOSS] Detected pending staged boss '${sName}' for existing season ${currentWeek}. Promoting...`);
+      const sTitle = stagedConfig.boss_title || activeBoss.boss_title;
+      const sLore = stagedConfig.lore || activeBoss.lore;
+      const sHp = Number(stagedConfig.max_hp || stagedConfig.override_hp || activeBoss.max_hp);
+      const sImg = stagedConfig.custom_image_url || activeBoss.custom_image_url;
+      const sBg = stagedConfig.custom_bg_url || activeBoss.custom_bg_url;
+
+      const existingDamage = Math.max(0, Number(activeBoss.max_hp) - Number(activeBoss.current_hp));
+      const targetCurrentHp = Math.max(1, sHp - existingDamage);
+
+      const { data: updatedBoss } = await supabase
+        .from('boss_seasons')
+        .update({
+          boss_name: sName,
+          boss_title: sTitle,
+          lore: sLore,
+          max_hp: sHp,
+          current_hp: targetCurrentHp,
+          custom_image_url: sImg,
+          custom_bg_url: sBg,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', activeBoss.id)
+        .select()
+        .single();
+
+      // Promote into active config and clear staged_boss_config
+      const updatedConfig = { ...(featureRow?.config || {}) };
+      if (stagedConfig.game_name) updatedConfig.game_name = stagedConfig.game_name;
+      if (sName) updatedConfig.override_name = sName;
+      if (sTitle) updatedConfig.boss_title = sTitle;
+      if (sLore) updatedConfig.lore = sLore;
+      if (sHp) updatedConfig.override_hp = sHp;
+      if (sImg) updatedConfig.custom_image_url = sImg;
+      if (sBg) updatedConfig.custom_bg_url = sBg;
+      delete updatedConfig.staged_boss_config;
+
+      await supabase.from('guild_config').update({
+        config: updatedConfig,
+        updated_at: new Date().toISOString(),
+      }).eq('guild_id', guildId).eq('feature_key', 'weekly_boss');
+
+      return updatedBoss || activeBoss;
+    }
+    return activeBoss;
+  }
 
   // Calculate HP using Rolling Average of past 3 weeks active participants + 20% Busyness Buffer
   const pastWeeks = [];
@@ -114,16 +173,6 @@ async function getOrCreateActiveBoss(guildId) {
 
   // Generate default Boss AI Lore
   const bossData = await generateGlitchBossLore();
-
-  // Check if Guild Admin pre-staged next week's boss config in guild_config
-  const { data: featureRow } = await supabase
-    .from('guild_config')
-    .select('config')
-    .eq('guild_id', guildId)
-    .eq('feature_key', 'weekly_boss')
-    .maybeSingle();
-
-  const stagedConfig = featureRow?.config?.staged_boss_config;
 
   const rawOverrideName = featureRow?.config?.override_name || featureRow?.config?.boss_name;
   const gameLabel = featureRow?.config?.game_name || 'Gaming Realm';
