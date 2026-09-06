@@ -886,8 +886,9 @@ async function spawnAndAnnounceWeeklyBoss(client, guildId, { forceNewPost = fals
   }
   isBossSpawnInProgress = true;
 
+  let boss = null;
   try {
-    const boss = await getOrCreateActiveBoss(guildId);
+    boss = await getOrCreateActiveBoss(guildId);
     if (!boss) return null;
 
     const { buildPublicBossEmbedPayload } = require('../../commands/boss');

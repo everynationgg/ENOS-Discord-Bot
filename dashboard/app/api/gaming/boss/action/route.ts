@@ -112,6 +112,10 @@ export async function POST(req: NextRequest) {
 
       let activeBoss: any = null;
       if (existingBoss) {
+        // Calculate and preserve existing player damage dealt so far
+        const existingDamage = Math.max(0, Number(existingBoss.max_hp) - Number(existingBoss.current_hp));
+        const targetCurrentHp = Math.max(1, hp - existingDamage);
+
         // Update existing row
         const { data: updated, error: updErr } = await supabaseAdmin
           .from('boss_seasons')
@@ -120,7 +124,7 @@ export async function POST(req: NextRequest) {
             boss_title: bossTitle,
             lore,
             max_hp: hp,
-            current_hp: hp,
+            current_hp: targetCurrentHp,
             is_defeated: false,
             mom_buff: false,
             dad_debuff: false,
@@ -141,7 +145,7 @@ export async function POST(req: NextRequest) {
               boss_title: bossTitle,
               lore,
               max_hp: hp,
-              current_hp: hp,
+              current_hp: targetCurrentHp,
               is_defeated: false,
               mom_buff: false,
               dad_debuff: false,
@@ -307,6 +311,9 @@ export async function POST(req: NextRequest) {
       });
 
       if (existingBoss) {
+        const existingDamage = Math.max(0, Number(existingBoss.max_hp || 0) - Number(existingBoss.current_hp || 0));
+        const targetCurrentHp = Math.max(1, newMaxHp - existingDamage);
+
         const { data: updatedBoss, error } = await supabaseAdmin
           .from('boss_seasons')
           .update({
@@ -314,7 +321,7 @@ export async function POST(req: NextRequest) {
             boss_title: newBossTitle,
             lore: newLore,
             max_hp: newMaxHp,
-            current_hp: newMaxHp,
+            current_hp: targetCurrentHp,
             is_defeated: false,
             mom_buff: false,
             dad_debuff: false,

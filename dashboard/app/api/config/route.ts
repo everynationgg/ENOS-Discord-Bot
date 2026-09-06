@@ -124,7 +124,6 @@ export async function POST(req: NextRequest) {
         if (lore) updatePayload.lore = lore;
         if (maxHp) {
           updatePayload.max_hp = Number(maxHp);
-          updatePayload.current_hp = Number(maxHp);
           updatePayload.is_defeated = false;
         }
         if (config?.custom_image_url !== undefined) updatePayload.custom_image_url = config.custom_image_url || null;
@@ -132,13 +131,17 @@ export async function POST(req: NextRequest) {
 
         const { data: existing } = await supabaseAdmin
           .from('boss_seasons')
-          .select('id')
+          .select('id, max_hp, current_hp')
           .eq('guild_id', guildId)
           .eq('week_identifier', currentWeek)
           .eq('is_overkill', false)
           .maybeSingle();
 
         if (existing) {
+          if (maxHp) {
+            const existingDamage = Math.max(0, Number(existing.max_hp || 0) - Number(existing.current_hp || 0));
+            updatePayload.current_hp = Math.max(1, Number(maxHp) - existingDamage);
+          }
           await supabaseAdmin
             .from('boss_seasons')
             .update(updatePayload)
