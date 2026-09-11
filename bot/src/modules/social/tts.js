@@ -1,6 +1,6 @@
 const { Client, GatewayIntentBits, EmbedBuilder, ActionRowBuilder, StringSelectMenuBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const { joinVoiceChannel, createAudioPlayer, createAudioResource, AudioPlayerStatus, getVoiceConnection } = require('@discordjs/voice');
-const { GoogleGenerativeAI } = require('@google/generative-ai');
+const { generateContentWithFallback } = require('../../lib/gemini');
 const gTTS = require('gtts');
 const fs = require('fs');
 const path = require('path');
@@ -9,9 +9,6 @@ const ffmpegPath = require('ffmpeg-static');
 const { execFile } = require('child_process');
 const logger = require('../../lib/logger');
 const { supabase } = require('../../lib/supabase');
-
-// Initialize Gemini Client
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 
 // Dedicated Voice Herald Client Instance
 let voiceBotClient = null;
@@ -167,23 +164,17 @@ async function translateTextWithGemini(rawText, targetLangCode, persona) {
     `Original Input Text: "${cleaned}"\n\n` +
     `Output: Return ONLY the translated spoken sentence in ${langName}. Do NOT include quotes, "Translation:", or "User said:".`;
 
-  const modelsToTry = ['gemini-2.0-flash', 'gemini-1.5-flash-latest', 'gemini-1.5-pro-latest'];
-
-  for (const modelName of modelsToTry) {
-    try {
-      const model = genAI.getGenerativeModel({ model: modelName });
-      const res = await model.generateContent(prompt);
-      const translation = res.response.text().trim();
-      if (translation) {
-        logger.info(`[EN TTS] Translated via ${modelName}: "${cleaned}" -> "${translation}" (${langName})`);
-        return translation;
-      }
-    } catch (err) {
-      logger.warn(`[EN TTS] Model ${modelName} error (${err.message}). Trying fallback...`);
+  try {
+    const translation = await generateContentWithFallback(prompt);
+    if (translation) {
+      logger.info(`[EN TTS] Translated via Gemini: "${cleaned}" -> "${translation}" (${langName})`);
+      return translation;
     }
+  } catch (err) {
+    logger.warn(`[EN TTS] Gemini translation error: ${err.message}. Trying safety fallback...`);
   }
 
-  // Final guaranteed fallback if all Gemini models hit 429 quota limits
+  // Final guaranteed fallback if all Gemini models hit 429 quota limits or rate limits
   return await fallbackGoogleTranslate(cleaned, targetLangCode);
 }
 

@@ -1,8 +1,5 @@
-const { GoogleGenerativeAI } = require('@google/generative-ai');
+const { generateContentWithFallback } = require('../../lib/gemini');
 const logger = require('../../lib/logger');
-
-// Initialize Gemini client (same model and setup as ready heartbeat and digest)
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 
 // In-memory spam cooldown tracker (Key: guildId-userId, Value: timestamp)
 const cooldowns = new Map();
@@ -25,20 +22,8 @@ Text to translate:
 ${text}
 """`;
 
-  const modelsToTry = ['gemini-2.5-flash', 'gemini-flash-latest'];
-  let lastError;
-
-  for (const modelName of modelsToTry) {
-    try {
-      const model = genAI.getGenerativeModel({ model: modelName });
-      const result = await model.generateContent(prompt);
-      const responseText = result.response.text();
-      if (responseText) return responseText.trim();
-    } catch (err) {
-      logger.warn(`[TRANSLATOR] Model ${modelName} failed or quota exceeded: ${err.message}. Trying fallback...`);
-      lastError = err;
-    }
-  }
+  const translation = await generateContentWithFallback(prompt);
+  if (translation) return translation;
 
   return '⚠️ Gemini API limit reached. Please try again in a few seconds.';
 }

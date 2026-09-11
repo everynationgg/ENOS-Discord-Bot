@@ -1,9 +1,7 @@
 const { EmbedBuilder } = require('discord.js');
-const { GoogleGenerativeAI } = require('@google/generative-ai');
+const { generateContentWithFallback } = require('../../lib/gemini');
 const { supabase, getFeatureConfig } = require('../../lib/supabase');
 const logger = require('../../lib/logger');
-
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 
 /**
  * Runs the daily digest: scrapes configured channels, passes to Gemini, posts summary.
@@ -99,24 +97,10 @@ ${rawText.substring(0, 8000)}
 `.trim();
 
   // ─── 3. Call Gemini ───────────────────────────────────────────────────────
-  let summaryText = '';
-  const modelsToTry = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-flash-latest'];
-  let lastError;
-
-  for (const modelName of modelsToTry) {
-    try {
-      const model = genAI.getGenerativeModel({ model: modelName });
-      const result = await model.generateContent(prompt);
-      summaryText = result.response.text().trim();
-      if (summaryText) break;
-    } catch (err) {
-      logger.warn(`[DIGEST] Model ${modelName} error: ${err.message}. Trying fallback...`);
-      lastError = err;
-    }
-  }
+  const summaryText = await generateContentWithFallback(prompt);
 
   if (!summaryText) {
-    logger.error('[DIGEST] Gemini API failed across models:', lastError?.message);
+    logger.error('[DIGEST] Gemini API failed across all available models.');
     return;
   }
 
