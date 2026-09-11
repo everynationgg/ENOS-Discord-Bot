@@ -15,13 +15,33 @@ export default auth((req) => {
       pathname.startsWith('/terms') ||
       pathname.startsWith('/privacy')
     ) {
+      // If already logged in and visiting /login without error, route to server selection
+      if (pathname === '/login' && req.auth && !req.nextUrl.searchParams.has('error')) {
+        return NextResponse.redirect(new URL('/select-server', req.url));
+      }
       return NextResponse.next();
     }
 
-    // Require auth for all /dashboard routes and root
-    if (pathname.startsWith('/dashboard') || pathname === '/') {
+    // Require auth for /select-server, /dashboard routes, and root
+    if (pathname.startsWith('/select-server') || pathname.startsWith('/dashboard') || pathname === '/') {
       if (!req.auth) {
         return NextResponse.redirect(new URL('/login', req.url));
+      }
+    }
+
+    // Allow /select-server once authenticated
+    if (pathname.startsWith('/select-server')) {
+      return NextResponse.next();
+    }
+
+    // Require server selection for /dashboard and root
+    if (pathname.startsWith('/dashboard') || pathname === '/') {
+      const selectedGuild = req.cookies.get('enos_guild_id')?.value || req.nextUrl.searchParams.get('guild_id');
+      if (!selectedGuild) {
+        return NextResponse.redirect(new URL('/select-server', req.url));
+      }
+      if (pathname === '/') {
+        return NextResponse.redirect(new URL(`/dashboard?guild_id=${selectedGuild}`, req.url));
       }
     }
 

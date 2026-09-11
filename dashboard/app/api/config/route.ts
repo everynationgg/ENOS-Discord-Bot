@@ -6,6 +6,7 @@ function getGuildId(req: NextRequest, body?: any) {
   return (
     req.nextUrl.searchParams.get('guild_id') ||
     body?.guild_id ||
+    req.cookies.get('enos_guild_id')?.value ||
     process.env.DISCORD_GUILD_ID!
   );
 }
