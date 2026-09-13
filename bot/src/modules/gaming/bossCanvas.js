@@ -2,10 +2,10 @@ const { createCanvas, loadImage } = require('@napi-rs/canvas');
 const logger = require('../../lib/logger');
 
 const imageBufferCache = new Map();
-const CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutes cache
+const CACHE_TTL_MS = 2 * 60 * 1000; // 2 minutes cache to protect Fly.io 256MB memory cap
 
 /**
- * Evicts expired image buffers and enforces maximum memory cache size limit.
+ * Evicts expired image buffers and strictly enforces a 5-entry limit to prevent memory creep.
  */
 function pruneImageBufferCache() {
   const now = Date.now();
@@ -15,11 +15,11 @@ function pruneImageBufferCache() {
     }
   }
 
-  // Cap max entries at 50 to prevent memory allocation creep
-  if (imageBufferCache.size > 50) {
+  // Cap max entries at 5 to protect Fly.io 256MB memory limit
+  if (imageBufferCache.size > 5) {
     const oldestKeys = Array.from(imageBufferCache.entries())
       .sort((a, b) => a[1].timestamp - b[1].timestamp)
-      .slice(0, imageBufferCache.size - 50)
+      .slice(0, imageBufferCache.size - 5)
       .map(([k]) => k);
     for (const key of oldestKeys) {
       imageBufferCache.delete(key);
@@ -466,7 +466,9 @@ async function renderBossImage(data) {
   }
 
   ctx.restore();
-  return canvas.toBuffer('image/png');
+  const outBuffer = canvas.toBuffer('image/png');
+  pruneImageBufferCache();
+  return outBuffer;
 }
 
 module.exports = { renderBossImage };

@@ -568,23 +568,32 @@ async function handleTriviaAnswerClick(interaction) {
     })
     .eq('id', dropId);
 
-  // Update user's lifetime points
-  const { data: currentPoints } = await supabase
-    .from('trivia_points')
-    .select('points')
-    .eq('guild_id', interaction.guild.id)
-    .eq('discord_id', interaction.user.id)
-    .maybeSingle();
+  // Update user's lifetime points atomically via RPC
+  const { error: rpcErr } = await supabase.rpc('increment_trivia_points', {
+    p_guild_id: interaction.guild.id,
+    p_discord_id: interaction.user.id,
+    p_delta: winnerPoints,
+  });
 
-  const newPointsTotal = (currentPoints?.points || 0) + winnerPoints;
-  await supabase
-    .from('trivia_points')
-    .upsert({
-      guild_id: interaction.guild.id,
-      discord_id: interaction.user.id,
-      points: newPointsTotal,
-      updated_at: new Date().toISOString(),
-    }, { onConflict: 'guild_id,discord_id' });
+  if (rpcErr) {
+    logger.warn('[TRIVIA] increment_trivia_points RPC fallback:', rpcErr.message);
+    const { data: currentPoints } = await supabase
+      .from('trivia_points')
+      .select('points')
+      .eq('guild_id', interaction.guild.id)
+      .eq('discord_id', interaction.user.id)
+      .maybeSingle();
+
+    const newPointsTotal = (currentPoints?.points || 0) + winnerPoints;
+    await supabase
+      .from('trivia_points')
+      .upsert({
+        guild_id: interaction.guild.id,
+        discord_id: interaction.user.id,
+        points: newPointsTotal,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'guild_id,discord_id' });
+  }
 
   // Record point transaction
   await supabase.from('trivia_transactions').insert({
