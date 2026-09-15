@@ -139,10 +139,16 @@ async function triggerTriviaDrop(client, guildId) {
     const allowedChannels = config.allowed_channels || [];
     const closeTime = config.close_time || '23:59';
 
-    const chosen = chooseWeightedChannel(allowedChannels);
+    let chosen = chooseWeightedChannel(allowedChannels);
     if (!chosen) {
-      logger.warn(`[TRIVIA] No allowed channels configured for guild ${guildId}.`);
-      return false;
+      const fallbackChannelId = config.notification_channel_id;
+      if (fallbackChannelId) {
+        logger.info(`[TRIVIA] No allowed_channels configured. Falling back to alert channel ${fallbackChannelId}`);
+        chosen = { channel_id: fallbackChannelId, topic: 'General Knowledge' };
+      } else {
+        logger.warn(`[TRIVIA] No allowed channels or fallback configured for guild ${guildId}.`);
+        return false;
+      }
     }
 
     const guild = await client.guilds.fetch(guildId).catch(() => null);

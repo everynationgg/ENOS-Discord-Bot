@@ -250,9 +250,14 @@ async function triggerInstantDrop(guildId: string) {
   const allowedChannels = config.allowed_channels || [];
   const closeTime = config.close_time || '22:00';
 
-  const chosen = chooseWeightedChannel(allowedChannels);
+  let chosen = chooseWeightedChannel(allowedChannels);
   if (!chosen) {
-    throw new Error('No allowed channels configured for trivia drops. Please add a channel whitelist in Trivia settings.');
+    const fallbackChannelId = config.notification_channel_id;
+    if (fallbackChannelId) {
+      chosen = { channel_id: fallbackChannelId, topic: 'General Knowledge' };
+    } else {
+      throw new Error('No allowed channels configured for trivia drops. Please add a channel whitelist in Trivia settings.');
+    }
   }
 
   // Generate question via Gemini AI

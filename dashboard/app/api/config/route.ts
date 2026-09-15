@@ -98,7 +98,35 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Invalid payload' }, { status: 400 });
     }
 
-    await upsertFeatureConfig(guildId, feature_key, enabled, config || {});
+    // Fetch existing feature config to safely merge and prevent destructive overwrites on toggle
+    const { data: existingRow } = await supabaseAdmin
+      .from('guild_config')
+      .select('config')
+      .eq('guild_id', guildId)
+      .eq('feature_key', feature_key)
+      .maybeSingle();
+
+    const existingConfig = existingRow?.config || {};
+    const incomingConfig = config || {};
+
+    // Merge incoming with existing
+    const mergedConfig: Record<string, any> = { ...existingConfig, ...incomingConfig };
+
+    // Guard: If incoming config is missing or has empty allowed_channels, retain existing allowed_channels
+    if (
+      (!Array.isArray(incomingConfig.allowed_channels) || incomingConfig.allowed_channels.length === 0) &&
+      Array.isArray(existingConfig.allowed_channels) &&
+      existingConfig.allowed_channels.length > 0
+    ) {
+      mergedConfig.allowed_channels = existingConfig.allowed_channels;
+    }
+
+    // Retain notification_channel_id if incoming omitted it
+    if (!incomingConfig.notification_channel_id && existingConfig.notification_channel_id) {
+      mergedConfig.notification_channel_id = existingConfig.notification_channel_id;
+    }
+
+    await upsertFeatureConfig(guildId, feature_key, enabled, mergedConfig);
 
     // Automatically drop the Daily Quest Hub card to Discord when saving Vault Economy settings
     if (feature_key === 'vault_economy') {

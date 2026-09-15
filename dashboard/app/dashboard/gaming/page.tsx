@@ -1479,6 +1479,17 @@ function TriviaCardForm({ config, setConfig, setTriviaRefreshKey }: { config: an
           />
           <span className="form-hint">Auto-posts & updates Top 5 trivia points leaderboard</span>
         </div>
+        <div className="form-group">
+          <label className="form-label">Notification / Alert Channel ID (Optional)</label>
+          <input
+            id="trivia-notif-channel"
+            className="form-input"
+            placeholder="e.g. 1530883419678969856"
+            value={config.notification_channel_id || ''}
+            onChange={(e) => setConfig('notification_channel_id', e.target.value)}
+          />
+          <span className="form-hint">Posts & sweeps live trivia alerts in your daily quests channel</span>
+        </div>
       </div>
 
       <div className="section-divider">
