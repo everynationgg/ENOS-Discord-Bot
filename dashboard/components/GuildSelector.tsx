@@ -76,7 +76,7 @@ export default function GuildSelector() {
     const singleGuild = guilds[0];
     if (!singleGuild) return null;
     return (
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginLeft: '12px' }}>
+      <div className="guild-selector-wrapper" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginLeft: '12px' }}>
         <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Server:</span>
         <span
           style={{
@@ -115,7 +115,7 @@ export default function GuildSelector() {
   }
 
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginLeft: '12px' }}>
+    <div className="guild-selector-wrapper" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginLeft: '12px' }}>
       <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Server:</span>
       <select
         value={selectedGuildId}

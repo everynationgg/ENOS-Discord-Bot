@@ -168,6 +168,10 @@ module.exports = {
           const { handleTtsComponent } = require('../commands/tts');
           return await handleTtsComponent(interaction);
         }
+        if (interaction.customId.startsWith('tempvoice_setup:')) {
+          const { showTempVoiceModal } = require('../modules/social/tempVoice');
+          return await showTempVoiceModal(interaction);
+        }
         return;
       }
 
@@ -191,6 +195,10 @@ module.exports = {
         if (interaction.customId.startsWith('game_registration_modal:')) {
           const { handleKeyformModalSubmit } = require('../modules/moderation/keyform');
           return await handleKeyformModalSubmit(interaction);
+        }
+        if (interaction.customId.startsWith('tempvoice_modal:')) {
+          const { handleTempVoiceModalSubmit } = require('../modules/social/tempVoice');
+          return await handleTempVoiceModalSubmit(interaction);
         }
         return;
       }

@@ -15,13 +15,22 @@ interface ImageUploaderProps {
 
 /**
  * Resizes an image client-side on a Canvas to compress payload < 500KB.
- * Returns a Blob ready for upload.
+ * Preserves alpha transparency for PNG and WebP images.
+ * Returns a Blob ready for upload along with matching file extension.
  */
-async function optimizeImage(file: File, maxDim = 1200): Promise<Blob> {
+async function optimizeImage(file: File, maxDim = 1200): Promise<{ blob: Blob; ext: string }> {
   // SVG doesn't need scaling
   if (file.type === 'image/svg+xml') {
-    return file;
+    return { blob: file, ext: 'svg' };
   }
+  if (file.type === 'image/gif') {
+    return { blob: file, ext: 'gif' };
+  }
+
+  const isPng = file.type === 'image/png';
+  const isWebp = file.type === 'image/webp';
+  const targetMime = isPng ? 'image/png' : isWebp ? 'image/webp' : 'image/jpeg';
+  const targetExt = isPng ? 'png' : isWebp ? 'webp' : 'jpg';
 
   return new Promise((resolve) => {
     const img = new Image();
@@ -32,7 +41,7 @@ async function optimizeImage(file: File, maxDim = 1200): Promise<Blob> {
 
       let { width, height } = img;
       if (width <= maxDim && height <= maxDim && file.size < 1048576) {
-        resolve(file);
+        resolve({ blob: file, ext: targetExt });
         return;
       }
 
@@ -54,29 +63,29 @@ async function optimizeImage(file: File, maxDim = 1200): Promise<Blob> {
 
       const ctx = canvas.getContext('2d');
       if (!ctx) {
-        resolve(file);
+        resolve({ blob: file, ext: targetExt });
         return;
       }
 
       ctx.drawImage(img, 0, 0, width, height);
 
-      // Compress as JPEG to ensure payload stays under Vercel 4.5MB limit
+      // Preserve PNG/WebP alpha transparency; compress JPEG for photographic uploads
       canvas.toBlob(
         (blob) => {
           if (blob) {
-            resolve(blob);
+            resolve({ blob, ext: targetExt });
           } else {
-            resolve(file);
+            resolve({ blob: file, ext: targetExt });
           }
         },
-        'image/jpeg',
-        0.82
+        targetMime,
+        targetMime === 'image/jpeg' ? 0.82 : 0.92
       );
     };
 
     img.onerror = () => {
       URL.revokeObjectURL(url);
-      resolve(file);
+      resolve({ blob: file, ext: targetExt });
     };
 
     img.src = url;
@@ -107,10 +116,11 @@ export default function ImageUploader({
     setErrorMessage(null);
 
     try {
-      // 1. Client-side optimization/resizing
-      const optimizedBlob = await optimizeImage(file, maxDimension);
+      // 1. Client-side optimization/resizing while preserving transparency
+      const { blob: optimizedBlob, ext } = await optimizeImage(file, maxDimension);
       const formData = new FormData();
-      const fileName = file.name.replace(/\.[^/.]+$/, '') + '.jpg';
+      const baseName = file.name.replace(/\.[^/.]+$/, '');
+      const fileName = `${baseName}.${ext}`;
       formData.append('file', optimizedBlob, fileName);
 
       // 2. Upload to /api/upload

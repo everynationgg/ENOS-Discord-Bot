@@ -1,5 +1,6 @@
 const { Events } = require('discord.js');
 const { handleVoiceJoin, handleVoiceLeave } = require('../modules/gaming/vault');
+const { handleVoiceJoinHub, handleVoiceLeaveTemp } = require('../modules/social/tempVoice');
 const { isFeatureEnabled } = require('../lib/supabase');
 const logger = require('../lib/logger');
 
@@ -107,6 +108,18 @@ module.exports = {
 
     const guildId = newState.guild?.id || oldState.guild?.id;
     if (!guildId) return;
+
+    // Dynamic temporary voice channel handling (creation & auto-cleanup)
+    if (newState.channelId && (!oldState.channelId || oldState.channelId !== newState.channelId)) {
+      await handleVoiceJoinHub(newState, client).catch((err) =>
+        logger.error('[VOICE] handleVoiceJoinHub error:', err.message || err)
+      );
+    }
+    if (oldState.channelId && (!newState.channelId || oldState.channelId !== newState.channelId)) {
+      await handleVoiceLeaveTemp(oldState, client).catch((err) =>
+        logger.error('[VOICE] handleVoiceLeaveTemp error:', err.message || err)
+      );
+    }
 
     const vaultEnabled = await isFeatureEnabled(guildId, 'vault');
     if (!vaultEnabled) return;

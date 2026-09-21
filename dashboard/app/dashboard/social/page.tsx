@@ -55,6 +55,13 @@ export default function SocialPage() {
   const [loadingTts, setLoadingTts] = useState(false);
   const [saveTtsStatus, setSaveTtsStatus] = useState<SaveStatus>('idle');
 
+  // Dynamic Temporary Voice Channel state
+  const [tempVoiceEnabled, setTempVoiceEnabled] = useState(false);
+  const [tempVoiceHubId, setTempVoiceHubId] = useState('');
+  const [tempVoiceTemplate, setTempVoiceTemplate] = useState("🎮 {username}'s Room");
+  const [tempVoiceLimit, setTempVoiceLimit] = useState(0);
+  const [saveTempVoiceStatus, setSaveTempVoiceStatus] = useState<SaveStatus>('idle');
+
   useEffect(() => {
     if (activeTab === 'auto_reactions') {
       setLoadingReactions(true);
@@ -106,6 +113,13 @@ export default function SocialPage() {
       .then((r) => r.json())
       .then((d) => { 
         setConfigs(d); 
+        const tv = d['temp_voice'];
+        if (tv) {
+          setTempVoiceEnabled(tv.enabled ?? false);
+          if (tv.config?.hub_channel_id) setTempVoiceHubId(tv.config.hub_channel_id);
+          if (tv.config?.default_name_template) setTempVoiceTemplate(tv.config.default_name_template);
+          if (tv.config?.default_user_limit !== undefined) setTempVoiceLimit(tv.config.default_user_limit);
+        }
         setLoading(false); 
       })
       .catch(() => setLoading(false));
@@ -357,6 +371,53 @@ export default function SocialPage() {
     }
   };
 
+  const saveTempVoiceSettings = async () => {
+    setSaveTempVoiceStatus('saving');
+    try {
+      const res = await fetch('/api/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          feature_key: 'temp_voice',
+          enabled: tempVoiceEnabled,
+          config: {
+            hub_channel_id: tempVoiceHubId,
+            default_name_template: tempVoiceTemplate,
+            default_user_limit: Number(tempVoiceLimit) || 0,
+          },
+        }),
+      });
+
+      if (res.ok) {
+        setSaveTempVoiceStatus('saved');
+        setTimeout(() => setSaveTempVoiceStatus('idle'), 2500);
+      } else {
+        setSaveTempVoiceStatus('error');
+      }
+    } catch {
+      setSaveTempVoiceStatus('error');
+    }
+  };
+
+  const toggleTempVoice = async (nextEnabled: boolean) => {
+    setTempVoiceEnabled(nextEnabled);
+    try {
+      await fetch('/api/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          feature_key: 'temp_voice',
+          enabled: nextEnabled,
+          config: {
+            hub_channel_id: tempVoiceHubId,
+            default_name_template: tempVoiceTemplate,
+            default_user_limit: Number(tempVoiceLimit) || 0,
+          },
+        }),
+      });
+    } catch {}
+  };
+
   if (loading) {
     return (
       <div className="page-wrapper">
@@ -430,6 +491,13 @@ export default function SocialPage() {
           >
             🎙️ EN TTS & Voice Herald
           </button>
+          <button
+            className={`sidebar-item ${activeTab === 'temp_voice' ? 'active' : ''}`}
+            onClick={() => setActiveTab('temp_voice')}
+            id="sidebar-social-tempvoice"
+          >
+            🔊 Dynamic Voice Channels
+          </button>
         </aside>
 
         {/* Detail Content Area */}
@@ -469,6 +537,11 @@ export default function SocialPage() {
               <div className="overview-item">
                 <h3>🎙️ EN TTS &amp; Voice Herald</h3>
                 <p>Summons a dedicated Text-to-Speech sub-bot into voice channels to read messages aloud with configurable language, pitch, and character persona.</p>
+              </div>
+
+              <div className="overview-item">
+                <h3>🔊 Dynamic Voice Channels (Join to Create)</h3>
+                <p>Enables members to click a starter channel to automatically spawn customized, self-cleaning voice rooms with in-channel setup modals and creator controls.</p>
               </div>
             </div>
           )}
@@ -1521,6 +1594,142 @@ export default function SocialPage() {
                         {saveTtsStatus === 'error' && <span style={{ color: '#ef4444', fontSize: '0.875rem' }}>❌ Failed to save.</span>}
                       </div>
                     </>
+                  )}
+                </FeatureCard>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'temp_voice' && (
+            <div className="split-layout-detail">
+              <div className="feature-instructions">
+                <h3>Dynamic Voice Channels Guide</h3>
+                <p>
+                  Allows community members to spawn private or public temporary voice rooms on demand:
+                </p>
+                <ol>
+                  <li>
+                    Select your <strong>Starter Hub Voice Channel</strong> (e.g. <code>➕ Create VC</code>).
+                  </li>
+                  <li>
+                    When a member clicks that channel in Discord, ENOS automatically creates a new voice room right underneath it and moves them in.
+                  </li>
+                  <li>
+                    ENOS pings the room owner in the voice chat with a <strong>⚙️ Setup Room / Privacy</strong> button.
+                  </li>
+                  <li>
+                    Clicking the button pops up a Discord modal allowing the owner to rename the room, set user limits, and mark it Private with <code>@friend</code> whitelisting.
+                  </li>
+                  <li>
+                    The owner receives in-channel <strong>Kick</strong>, <strong>Mute</strong>, and <strong>Deafen</strong> powers. The room automatically deletes when everyone leaves.
+                  </li>
+                </ol>
+                <div className="tip-box">
+                  <strong>💡 Zero Clutter:</strong><br />
+                  Temporary channels vanish instantly when empty, keeping your server sidebar clean.
+                </div>
+              </div>
+
+              <div className="feature-form-card" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                <FeatureCard
+                  id="temp-voice"
+                  icon="🔊"
+                  title="Dynamic Voice Channels"
+                  description="Auto-spawning, self-cleaning temporary voice rooms with modal setup and creator controls"
+                  featureKey="temp_voice"
+                  initialEnabled={tempVoiceEnabled}
+                  initialConfig={{
+                    hub_channel_id: tempVoiceHubId,
+                    default_name_template: tempVoiceTemplate,
+                    default_user_limit: tempVoiceLimit,
+                  }}
+                  onToggle={toggleTempVoice}
+                >
+                  {() => (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: '1rem' }}>
+                      <div className="form-group">
+                        <label className="form-label" style={{ fontWeight: 600 }}>Starter Voice Channel (Hub)</label>
+                        <select
+                          id="tempvoice-hub-select"
+                          className="form-input"
+                          value={tempVoiceHubId}
+                          onChange={(e) => setTempVoiceHubId(e.target.value)}
+                          style={{ width: '100%', marginTop: '0.35rem' }}
+                        >
+                          <option value="">Select Starter Hub Channel...</option>
+                          {channels
+                            .filter((c) => c.type === 2 || c.name.includes('🔊') || !c.name.startsWith('#'))
+                            .map((c) => (
+                              <option key={c.id} value={c.id}>
+                                {c.name}
+                              </option>
+                            ))}
+                          {channels
+                            .filter((c) => c.type !== 2 && !c.name.includes('🔊') && c.name.startsWith('#'))
+                            .map((c) => (
+                              <option key={c.id} value={c.id}>
+                                {c.name}
+                              </option>
+                            ))}
+                        </select>
+                        <span className="form-hint">
+                          When members click into this voice channel, ENOS spawns their temporary room right below it.
+                        </span>
+                      </div>
+
+                      <div className="form-group">
+                        <label className="form-label" style={{ fontWeight: 600 }}>Default Room Name Template</label>
+                        <input
+                          id="tempvoice-template-input"
+                          type="text"
+                          className="form-input"
+                          value={tempVoiceTemplate}
+                          onChange={(e) => setTempVoiceTemplate(e.target.value)}
+                          placeholder="🎮 {username}'s Room"
+                          style={{ width: '100%', marginTop: '0.35rem' }}
+                        />
+                        <span className="form-hint">
+                          Use <code>{'{username}'}</code> as a placeholder for the member&apos;s name.
+                        </span>
+                      </div>
+
+                      <div className="form-group">
+                        <label className="form-label" style={{ fontWeight: 600 }}>Default Player Limit</label>
+                        <input
+                          id="tempvoice-limit-input"
+                          type="number"
+                          min={0}
+                          max={99}
+                          className="form-input"
+                          value={tempVoiceLimit}
+                          onChange={(e) => setTempVoiceLimit(Number(e.target.value))}
+                          placeholder="0 for unlimited"
+                          style={{ width: '100%', marginTop: '0.35rem' }}
+                        />
+                        <span className="form-hint">
+                          Set to 0 for unlimited, or specify a default capacity (e.g. 4 or 5).
+                        </span>
+                      </div>
+
+                      <div className="section-divider" style={{ marginTop: '1rem' }}>
+                        <div className="section-divider-line" />
+                        <span className="section-divider-text">Save Configuration</span>
+                        <div className="section-divider-line" />
+                      </div>
+
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                        <button
+                          id="save-tempvoice-settings-btn"
+                          className="btn btn-secondary btn-sm"
+                          onClick={saveTempVoiceSettings}
+                          disabled={saveTempVoiceStatus === 'saving'}
+                        >
+                          {saveTempVoiceStatus === 'saving' ? '⏳ Saving...' : '💾 Save Voice Settings'}
+                        </button>
+                        {saveTempVoiceStatus === 'saved' && <span style={{ color: '#22c55e', fontSize: '0.875rem' }}>✓ Saved!</span>}
+                        {saveTempVoiceStatus === 'error' && <span style={{ color: '#ef4444', fontSize: '0.875rem' }}>❌ Failed to save.</span>}
+                      </div>
+                    </div>
                   )}
                 </FeatureCard>
               </div>

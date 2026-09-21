@@ -32,13 +32,15 @@ export async function GET(req: NextRequest) {
         const channelList: any[] = [];
 
         const topChannels = channels
-          .filter((c: any) => c.type === 0 || c.type === 5 || c.type === 15)
+          .filter((c: any) => c.type === 0 || c.type === 2 || c.type === 5 || c.type === 15)
           .sort((a: any, b: any) => a.name.localeCompare(b.name));
 
         for (const c of topChannels) {
+          let prefix = '# ';
+          if (c.type === 2) prefix = '🔊 ';
           channelList.push({
             id: c.id,
-            name: c.type === 15 ? `💬 Forum: ${c.name} (Creates New Threads)` : `# ${c.name}`,
+            name: c.type === 15 ? `💬 Forum: ${c.name} (Creates New Threads)` : `${prefix}${c.name}`,
             type: c.type,
           });
 

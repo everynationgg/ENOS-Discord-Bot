@@ -48,5 +48,13 @@ module.exports = {
     } catch (vErr) {
       logger.error('[READY] Failed to initialize voice tracking:', vErr.message);
     }
+
+    // Initialize temporary voice channel system & cleanup abandoned rooms
+    try {
+      const { initTempVoiceCleanup } = require('../modules/social/tempVoice');
+      await initTempVoiceCleanup(client);
+    } catch (tvErr) {
+      logger.error('[READY] Failed to initialize temp voice cleanup:', tvErr.message);
+    }
   },
 };
