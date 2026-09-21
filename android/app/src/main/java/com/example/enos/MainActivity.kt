@@ -129,6 +129,7 @@ class MainActivity : ComponentActivity() {
         })
 
         if (savedInstanceState == null) {
+            webView.clearCache(true)
             webView.loadUrl("https://enos-discord-bot.vercel.app")
         } else {
             webView.restoreState(savedInstanceState)
