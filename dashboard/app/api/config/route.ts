@@ -136,6 +136,32 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // Auto-sync configured streamers to live_alerts table for bot poller
+    if (feature_key === 'live_alerts' && Array.isArray(config?.streamers)) {
+      try {
+        const channelId = config.alert_channel_id || '1148233610206400643';
+        const pingRoleId = config.ping_role_id || null;
+        for (const s of config.streamers) {
+          const cleanHandle = (s.handle || '').replace(/^@/, '').trim();
+          if (cleanHandle && s.platform) {
+            await supabaseAdmin.from('live_alerts').upsert(
+              {
+                guild_id: guildId,
+                platform: s.platform.toLowerCase(),
+                handle: cleanHandle,
+                display_name: (s.display_name || cleanHandle).trim(),
+                alert_channel_id: channelId,
+                ping_role_id: pingRoleId,
+              },
+              { onConflict: 'guild_id,platform,handle' }
+            );
+          }
+        }
+      } catch (e) {
+        console.error('[CONFIG API] Failed to auto-sync live_alerts:', e);
+      }
+    }
+
     // Auto-sync active boss_seasons row when saving Weekly Boss configuration
     if (feature_key === 'weekly_boss') {
       try {
