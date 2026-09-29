@@ -82,8 +82,8 @@ function buildLFGButtons(guildId, voiceChannelId, inviteUrl = null, isClosed = f
 }
 
 /**
- * /lfg create — shows modal for session creation immediately
- * @param {import('discord.js').ChatInputCommandInteraction} interaction
+ * /lfg create or launcher button click — shows modal for session creation immediately
+ * @param {import('discord.js').ChatInputCommandInteraction|import('discord.js').ButtonInteraction} interaction
  */
 async function handleLFGCreate(interaction) {
   const enabled = await isFeatureEnabled(interaction.guild.id, 'lfg');
@@ -91,11 +91,11 @@ async function handleLFGCreate(interaction) {
     return replyEphemeralAndAutoDelete(interaction, { content: '❌ LFG system is not enabled on this server.', ephemeral: true });
   }
 
-  // Block command usage if not in any voice channel
+  // Block command or button usage if not in any voice channel
   const memberVoiceChannelId = interaction.member.voice?.channelId;
   if (!memberVoiceChannelId) {
     return replyEphemeralAndAutoDelete(interaction, {
-      content: '❌ You must join a voice channel first before you can create an LFG party session.',
+      content: '❌ **You must be in a voice channel to start an LFG party!**\nJoin any voice room or hop into `🎤┊Create VC` first so players know where to connect.',
       ephemeral: true
     });
   }
@@ -194,16 +194,21 @@ async function handleLFGModalSubmit(interaction) {
     matchedGame = 'Others';
   }
 
-  // Fetch config for voice channel mapping, LFG channel, and role mappings
+  // 1. Dynamic Voice Binding: Host must be in a voice channel
+  const memberVoiceChannelId = interaction.member.voice?.channelId;
+  if (!memberVoiceChannelId) {
+    return editEphemeralAndAutoDelete(interaction, '❌ You must be in a voice channel to host an LFG party. Please join or create a voice room and try again.');
+  }
+
+  const voiceChannelId = memberVoiceChannelId;
+  const voiceChannelMention = `<#${voiceChannelId}>`;
+
+  // Fetch config for LFG channel and role mappings
   const featureConfig = await getFeatureConfig(guildId, 'lfg');
   const config = featureConfig?.config || {};
   const lfgChannelId = config.lfg_channel_id;
-  const voiceMappings = config.voice_mappings || {};
   const roleMappings = config.role_mappings || {};
   const sessionTTLMinutes = config.session_ttl_minutes || 120;
-
-  const voiceChannelId = voiceMappings[matchedGame] || voiceMappings['Others'] || null;
-  const voiceChannelMention = voiceChannelId ? `<#${voiceChannelId}>` : 'Not configured';
 
   // 2. Role Resolution & Validation
   let resolvedRole = null;
@@ -385,11 +390,7 @@ async function handleLFGModalSubmit(interaction) {
 
   let replyText = `✅ LFG session posted in <#${targetChannel.id}>!`;
   if (voiceChannelId) {
-    if (voiceMoved) {
-      replyText += `\n🔊 Automatically transferred you to <#${voiceChannelId}>.`;
-    } else {
-      replyText += `\n⚠️ Connect to a voice channel first to enable auto-transfer.`;
-    }
+    replyText += `\n🔊 Linked to your voice room <#${voiceChannelId}>.`;
   }
 
   await editEphemeralAndAutoDelete(interaction, replyText);

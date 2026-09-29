@@ -86,6 +86,10 @@ module.exports = {
           }
           return;
         }
+        if (interaction.customId === 'lfg_launcher_create') {
+          const { handleLFGCreate } = require('../modules/gaming/lfg');
+          return await handleLFGCreate(interaction);
+        }
         if (interaction.customId === 'verify_here') {
           return await handleVerifyButton(interaction);
         }

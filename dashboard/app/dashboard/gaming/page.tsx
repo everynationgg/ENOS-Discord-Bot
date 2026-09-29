@@ -1977,6 +1977,139 @@ function BossCardForm({ config, setConfig }: { config: any; setConfig: (key: str
   );
 }
 
+function LFGCardForm({ config, setConfig }: { config: any; setConfig: (key: string, val: any) => void }) {
+  const [dispatchingLauncher, setDispatchingLauncher] = useState(false);
+  const [launcherStatus, setLauncherStatus] = useState('');
+
+  const handleDeployLauncher = async () => {
+    if (!config.lfg_channel_id) return;
+    setDispatchingLauncher(true);
+    setLauncherStatus('Deploying LFG Launcher card to Discord...');
+    try {
+      const res = await fetch('/api/gaming/lfg/action', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'deploy_lfg_launcher',
+          lfg_channel_id: config.lfg_channel_id,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setLauncherStatus('✅ LFG Launcher card successfully posted to Discord!');
+      } else {
+        setLauncherStatus(`❌ Failed: ${data.error || 'Unknown error'}`);
+      }
+    } catch (e: any) {
+      setLauncherStatus(`❌ Error: ${e.message}`);
+    } finally {
+      setDispatchingLauncher(false);
+    }
+  };
+
+  return (
+    <>
+      <div className="section-divider">
+        <div className="section-divider-line" />
+        <span className="section-divider-text">Channels & Interactive Launcher</span>
+        <div className="section-divider-line" />
+      </div>
+
+      <div className="form-group">
+        <label className="form-label">LFG Post Channel ID</label>
+        <input
+          id="lfg-channel"
+          className="form-input"
+          placeholder="Channel ID where launcher and party cards live"
+          value={config.lfg_channel_id || ''}
+          onChange={(e) => setConfig('lfg_channel_id', e.target.value)}
+        />
+        <div style={{ marginTop: '0.5rem' }}>
+          <button
+            type="button"
+            className="btn btn-primary btn-sm"
+            disabled={!config.lfg_channel_id || dispatchingLauncher}
+            onClick={handleDeployLauncher}
+            style={{ backgroundColor: '#8b5cf6', border: 'none', fontWeight: 600, fontSize: '0.8rem', width: '100%' }}
+          >
+            {dispatchingLauncher ? 'Deploying to Discord...' : '🚀 Deploy / Refresh LFG Launcher Post'}
+          </button>
+          {launcherStatus && (
+            <div style={{
+              marginTop: '0.4rem',
+              fontSize: '0.8rem',
+              fontWeight: 500,
+              color: launcherStatus.startsWith('✅') ? '#34d399' : launcherStatus.startsWith('❌') ? '#f87171' : '#facc15'
+            }}>
+              {launcherStatus}
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="section-divider">
+        <div className="section-divider-line" />
+        <span className="section-divider-text">Session Settings</span>
+        <div className="section-divider-line" />
+      </div>
+
+      <div className="form-group">
+        <label className="form-label">
+          Session TTL: <strong style={{ color: 'var(--accent-primary)' }}>{config.session_ttl_minutes ?? 120} min</strong>
+        </label>
+        <input
+          id="lfg-ttl"
+          type="range"
+          className="form-slider"
+          min={30} max={480} step={30}
+          value={config.session_ttl_minutes ?? 120}
+          onChange={(e) => setConfig('session_ttl_minutes', parseInt(e.target.value))}
+        />
+        <div className="slider-labels">
+          <span className="form-hint">30 min</span>
+          <span className="form-hint">8 hours</span>
+        </div>
+      </div>
+
+      <div className="section-divider">
+        <div className="section-divider-line" />
+        <span className="section-divider-text">Game Role Mappings (Optional Ping Roles)</span>
+        <div className="section-divider-line" />
+      </div>
+
+      <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', marginBottom: '0.75rem', lineHeight: 1.4 }}>
+        💡 <strong>Voice rooms are dynamic:</strong> Parties automatically link to whichever voice channel the creator is sitting in (including temporary voice rooms). Optionally specify Discord Role IDs below to restrict ping permissions for specific games.
+      </p>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', gap: '0.5rem', marginBottom: '0.5rem', paddingRight: '0.25rem' }}>
+        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 'bold' }}>Game</span>
+        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 'bold' }}>Allowed Role ID (Optional)</span>
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+        {GAME_BRANCHES.map((game) => {
+          const roleMappings = config.role_mappings || {};
+          return (
+            <div key={game} style={{ display: 'grid', gridTemplateColumns: '140px 1fr', gap: '0.5rem', alignItems: 'center' }}>
+              <span style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', fontWeight: 500 }}>
+                {game}
+              </span>
+              <input
+                id={`lfg-role-${game.toLowerCase().replace(/\s+/g, '-')}`}
+                className="form-input"
+                placeholder="Discord Role ID (optional)"
+                value={roleMappings[game] || ''}
+                onChange={(e) => setConfig('role_mappings', { ...roleMappings, [game]: e.target.value })}
+                style={{ padding: '0.375rem 0.625rem', fontSize: '0.8125rem' }}
+              />
+            </div>
+          );
+        })}
+      </div>
+    </>
+  );
+}
+
 export default function GamingPage() {
   const [configs, setConfigs] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(true);
@@ -2102,16 +2235,18 @@ export default function GamingPage() {
               <div className="feature-instructions">
                 <h3>LFG Configuration Guide</h3>
                 <p>
-                  The Looking-For-Group (LFG) finder helps players invite others to connect directly to server voice channels.
+                  The Looking-For-Group (LFG) finder helps players squad up and jump straight into voice channels together.
                 </p>
                 <ol>
-                  <li>Create a text channel (e.g. <code>#lfg-posts</code>) and copy its ID into <strong>LFG Post Channel ID</strong>.</li>
-                  <li>Set <strong>Session TTL</strong> (Time To Live) to define how long an active LFG invite card remains active before auto-expiring.</li>
-                  <li>In the <strong>Voice Channel Mappings</strong> section, input the voice channel ID matching each game branch to generate direct invite buttons routing players into their voice calls.</li>
+                  <li>Create or designate a read-only Discord channel (e.g. <code>#lfg-posts</code>) and paste its ID into <strong>LFG Post Channel ID</strong>.</li>
+                  <li>Click <strong>🚀 Deploy / Refresh LFG Launcher Post</strong> to post the permanent <code>[ 🎮 Look For Group ]</code> button card.</li>
+                  <li>Members click the button to open the party creator modal without typing slash commands.</li>
+                  <li><strong>Dynamic Voice Channels:</strong> Party cards automatically bind to whichever voice room the creator is currently sitting in (including temporary voice rooms spawned from <code>🎤┊Create VC</code>).</li>
+                  <li>Set <strong>Session TTL</strong> to define how long an active party card stays posted before auto-deleting.</li>
                 </ol>
                 <div className="tip-box">
-                  <strong>💡 Copying voice IDs:</strong><br />
-                  Enable Developer Mode in Discord, right-click the voice channel in your server panel, and select <strong>Copy Channel ID</strong>.
+                  <strong>💡 Copying Channel IDs:</strong><br />
+                  Enable Developer Mode in Discord settings, right-click the text channel in your server panel, and select <strong>Copy Channel ID</strong>.
                 </div>
               </div>
 
@@ -2120,107 +2255,12 @@ export default function GamingPage() {
                   id="lfg"
                   icon="🔍"
                   title="LFG — Group Finder"
-                  description="Dynamic party cards with a direct VC invite button. References pre-existing voice channels."
+                  description="Dynamic party cards with an interactive Discord launcher button. Connects directly to creator's voice channel."
                   featureKey="lfg"
                   initialEnabled={lfgConfig.enabled ?? false}
                   initialConfig={lfgConfig.config ?? {}}
                 >
-                  {(config, setConfig) => (
-                    <>
-                      <div className="section-divider">
-                        <div className="section-divider-line" />
-                        <span className="section-divider-text">Channels</span>
-                        <div className="section-divider-line" />
-                      </div>
-
-                      <div className="form-group">
-                        <label className="form-label">LFG Post Channel ID</label>
-                        <input
-                          id="lfg-channel"
-                          className="form-input"
-                          placeholder="Channel where LFG cards are posted"
-                          value={config.lfg_channel_id || ''}
-                          onChange={(e) => setConfig('lfg_channel_id', e.target.value)}
-                        />
-                      </div>
-
-                      <div className="section-divider">
-                        <div className="section-divider-line" />
-                        <span className="section-divider-text">Session Settings</span>
-                        <div className="section-divider-line" />
-                      </div>
-
-                      <div className="form-group">
-                        <label className="form-label">
-                          Session TTL: <strong style={{ color: 'var(--accent-primary)' }}>{config.session_ttl_minutes ?? 120} min</strong>
-                        </label>
-                        <input
-                          id="lfg-ttl"
-                          type="range"
-                          className="form-slider"
-                          min={30} max={480} step={30}
-                          value={config.session_ttl_minutes ?? 120}
-                          onChange={(e) => setConfig('session_ttl_minutes', parseInt(e.target.value))}
-                        />
-                        <div className="slider-labels">
-                          <span className="form-hint">30 min</span>
-                          <span className="form-hint">8 hours</span>
-                        </div>
-                      </div>
-
-                      <div className="section-divider">
-                        <div className="section-divider-line" />
-                        <span className="section-divider-text">Voice Channel Mappings</span>
-                        <div className="section-divider-line" />
-                      </div>
-
-                      <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr 1fr 1fr', gap: '0.5rem', marginBottom: '0.5rem', paddingRight: '0.25rem' }}>
-                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 'bold' }}>Game</span>
-                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 'bold' }}>Voice Channel ID</span>
-                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 'bold' }}>Allowed Role ID</span>
-                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 'bold' }}>Default Voice Status</span>
-                      </div>
-
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                        {GAME_BRANCHES.map((game) => {
-                          const voiceMappings = config.voice_mappings || {};
-                          const roleMappings = config.role_mappings || {};
-                          const defaultStatuses = config.default_statuses || {};
-                          return (
-                            <div key={game} style={{ display: 'grid', gridTemplateColumns: '120px 1fr 1fr 1fr', gap: '0.5rem', alignItems: 'center' }}>
-                              <span style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', fontWeight: 500 }}>
-                                {game}
-                              </span>
-                              <input
-                                id={`lfg-vc-${game.toLowerCase().replace(/\s+/g, '-')}`}
-                                className="form-input"
-                                placeholder="Voice Channel ID"
-                                value={voiceMappings[game] || ''}
-                                onChange={(e) => setConfig('voice_mappings', { ...voiceMappings, [game]: e.target.value })}
-                                style={{ padding: '0.375rem 0.625rem', fontSize: '0.8125rem' }}
-                              />
-                              <input
-                                id={`lfg-role-${game.toLowerCase().replace(/\s+/g, '-')}`}
-                                className="form-input"
-                                placeholder="Allowed Role ID"
-                                value={roleMappings[game] || ''}
-                                onChange={(e) => setConfig('role_mappings', { ...roleMappings, [game]: e.target.value })}
-                                style={{ padding: '0.375rem 0.625rem', fontSize: '0.8125rem' }}
-                              />
-                              <input
-                                id={`lfg-status-${game.toLowerCase().replace(/\s+/g, '-')}`}
-                                className="form-input"
-                                placeholder="e.g. Chilling"
-                                value={defaultStatuses[game] || ''}
-                                onChange={(e) => setConfig('default_statuses', { ...defaultStatuses, [game]: e.target.value })}
-                                style={{ padding: '0.375rem 0.625rem', fontSize: '0.8125rem' }}
-                              />
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </>
-                  )}
+                  {(config, setConfig) => <LFGCardForm config={config} setConfig={setConfig} />}
                 </FeatureCard>
               </div>
             </div>

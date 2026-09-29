@@ -154,9 +154,12 @@ async function handleVoiceJoinHub(newState, client) {
       logger.warn(`[TEMP VOICE] Could not move member ${member.id} into ${newChannel.id}:`, err.message);
     });
 
-    // Send the rich room control panel in the room's integrated text chat
+    // Send the rich room control panel in the room's integrated text chat with explicit creator mention
     const panelPayload = buildControlPanelPayload(newChannel, member.id);
-    await newChannel.send(panelPayload).catch((err) => {
+    await newChannel.send({
+      content: `👑 Welcome <@${member.id}>! Your personal voice channel is ready.\nUse the controls below to manage your room:`,
+      ...panelPayload,
+    }).catch((err) => {
       logger.warn(`[TEMP VOICE] Failed to send setup prompt in ${newChannel.id}:`, err.message);
     });
 
