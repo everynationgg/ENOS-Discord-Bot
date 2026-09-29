@@ -296,12 +296,12 @@ async function buildPersonalCombatPayload(guildId, userId, combatResult = null) 
   const attachment = new AttachmentBuilder(buffer, { name: filename });
 
   const moveNames = {
-    mom: { basic: 'Slipper Throw (1 AP)', skill: 'Guilt Trip (3 AP)' },
-    dad: { basic: 'Dad Slap (1 AP)', skill: 'Dad Joke (3 AP)' },
-    kid: { basic: 'iPad Throw (1 AP)', skill: 'Grocery Meltdown (3 AP)' },
+    mom: { skill: 'Attack (Guilt Trip 5 AP)' },
+    dad: { skill: 'Attack (Dad Joke 5 AP)' },
+    kid: { skill: 'Attack (Grocery Meltdown 5 AP)' },
   };
 
-  const moves = moveNames[activeClass] || { basic: 'Basic Attack (1 AP)', skill: 'Class Skill (3 AP)' };
+  const moves = moveNames[activeClass] || { skill: 'Attack (Class Skill 5 AP)' };
 
   const classTitles = { mom: '🛡️ M.O.M. (Buff Support)', dad: '🔨 D.A.D. (Debuff Setup)', kid: '⚡ K.I.D. (Nuke Combo)' };
 
@@ -320,10 +320,12 @@ async function buildPersonalCombatPayload(guildId, userId, combatResult = null) 
 
   const apRemaining = playerState.ap_remaining ?? 0;
   let apStatusText = `⚡ **Your AP Remaining**: \`${apRemaining}/5 AP\` ${playerState.is_locked ? '*(Class locked for week)*' : '*(Can swap class)*'}`;
-  if (apRemaining > 0 && apRemaining < 3) {
-    apStatusText += `\n💡 *Tip: You have ${apRemaining} AP left — use Basic Attack (1 AP each) to finish your weekly AP!*`;
+  if (apRemaining >= 5) {
+    apStatusText += `\n💡 *Tip: Click Attack below to strike the boss and spend all 5 AP for full rewards!*`;
+  } else if (apRemaining > 0) {
+    apStatusText += `\n💡 *Tip: Click Attack below to strike the boss and spend your remaining AP for full rewards!*`;
   } else if (apRemaining === 0) {
-    apStatusText += `\n🎉 *All 5 AP spent for this week! Great battle!*`;
+    apStatusText += `\n🎉 *Weekly attack complete! All AP spent. Great battle!*`;
   }
 
   const embed = new EmbedBuilder()
@@ -342,22 +344,15 @@ async function buildPersonalCombatPayload(guildId, userId, combatResult = null) 
     .setImage(`attachment://${filename}`)
     .setFooter({ text: `ENOS Personal Combat Panel • ${currentWeek}` });
 
-  const canBasic = apRemaining >= 1;
-  const canSkill = apRemaining >= 3;
+  const canAttack = apRemaining >= 1;
 
   const actionRow = new ActionRowBuilder().addComponents(
-    new ButtonBuilder()
-      .setCustomId('boss_act:basic')
-      .setLabel(moves.basic)
-      .setStyle(ButtonStyle.Primary)
-      .setEmoji('⚔️')
-      .setDisabled(!canBasic),
     new ButtonBuilder()
       .setCustomId('boss_act:skill')
       .setLabel(moves.skill)
       .setStyle(ButtonStyle.Danger)
       .setEmoji('🔥')
-      .setDisabled(!canSkill),
+      .setDisabled(!canAttack),
     new ButtonBuilder()
       .setCustomId('boss_profile')
       .setLabel('My Stats')
@@ -557,16 +552,16 @@ module.exports = {
         .setColor(0x38bdf8)
         .setTitle('📖 Weekly Boss Skill & Synergy Guide')
         .setDescription(
-          `**Combat Triad Classes & Moves**:\n` +
-          `• 🛡️ **M.O.M.**: Basic \`Slipper Throw\` (1 AP) | Skill \`Guilt Trip\` (3 AP) ➔ Applies **M.O.M. Buff**\n` +
-          `• 🔨 **D.A.D.**: Basic \`Dad Slap\` (1 AP) | Skill \`Dad Joke\` (3 AP) ➔ Applies **D.A.D. Debuff**\n` +
-          `• ⚡ **K.I.D.**: Basic \`iPad Throw\` (1 AP) | Skill \`Grocery Meltdown\` (3 AP) ➔ Consumes Setups\n\n` +
+          `**Combat Triad Classes & Attacks**:\n` +
+          `• 🛡️ **M.O.M.**: Attack \`Guilt Trip\` (5 AP) ➔ Deals 23,000 DMG + Applies **M.O.M. Buff**\n` +
+          `• 🔨 **D.A.D.**: Attack \`Dad Joke\` (5 AP) ➔ Deals 23,000 DMG + Applies **D.A.D. Debuff**\n` +
+          `• ⚡ **K.I.D.**: Attack \`Grocery Meltdown\` (5 AP) ➔ Consumes Setups for massive combo DMG\n\n` +
           `**Damage Scaling Math**:\n` +
-          `• ⚔️ **Basic Attack (1 AP)**: 4,000 DMG flat\n` +
-          `• 🔥 **Solo Skill (3 AP)**: 15,000 DMG + applies state\n` +
-          `• 💥 **2-Class Combo (3 AP + 1 State)**: 30,000 DMG\n` +
-          `• ⚡ **Full Triad Meltdown (3 AP + Both States)**: 60,000 DMG!\n\n` +
-          `*Note: Defeating the main boss unlocks Overkill Mode with 1.5x bonus points & XP!*`
+          `• 🔥 **M.O.M. / D.A.D. Attack (5 AP)**: 23,000 DMG + applies buff/debuff\n` +
+          `• 💥 **K.I.D. Solo Attack (5 AP)**: 23,000 DMG\n` +
+          `• ⚡ **K.I.D. 2-Class Combo (5 AP + 1 Active Buff)**: 38,000 DMG\n` +
+          `• 🚀 **K.I.D. Full Triad Meltdown (5 AP + Both Buffs)**: 68,000 DMG!\n\n` +
+          `*Note: Each player gets 1 decisive strike per week! Spend all 5 AP for full Vault Coin rewards.*`
         );
       const replyMsg = await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral, fetchReply: true });
       setTimeout(() => replyMsg.delete().catch(() => {}), 10000);

@@ -61,9 +61,9 @@ async function getOrCreateActiveBoss(guildId) {
   const stagedConfig = featureRow?.config?.staged_boss_config;
 
   if (activeBoss) {
-    // If a staged boss is waiting and hasn't been deployed yet to this season
+    // If a staged boss is waiting and hasn't been deployed yet to this season (never overwrite active overkill or defeated bosses)
     const sName = stagedConfig?.override_name || stagedConfig?.boss_name;
-    if (sName && activeBoss.boss_name !== sName && (stagedConfig.enabled || stagedConfig.enabled === undefined)) {
+    if (sName && !activeBoss.is_overkill && !activeBoss.is_defeated && activeBoss.boss_name !== sName && (stagedConfig.enabled || stagedConfig.enabled === undefined)) {
       logger.info(`[BOSS] Detected pending staged boss '${sName}' for existing season ${currentWeek}. Promoting...`);
       const sTitle = stagedConfig.boss_title || activeBoss.boss_title;
       const sLore = stagedConfig.lore || activeBoss.lore;
@@ -503,12 +503,13 @@ async function executeCombatAction(guildId, userId, actionType) {
     return { success: false, message: '❌ You must pick a class before performing an attack!' };
   }
 
-  const apCost = actionType === 'skill' ? 3 : 1;
+  // Spend up to 5 AP, but allow players with 1-4 AP during transition week to spend all remaining AP as though it were 5
+  const apCost = actionType === 'basic' ? 1 : Math.min(5, playerState.ap_remaining);
 
-  if (playerState.ap_remaining < apCost) {
+  if (playerState.ap_remaining < 1) {
     return {
       success: false,
-      message: `❌ You do not have enough AP! Action costs **${apCost} AP**, but you only have **${playerState.ap_remaining} AP** remaining this week.`,
+      message: '❌ You do not have any AP remaining! You have **0 AP** left this week.',
     };
   }
 
@@ -533,34 +534,34 @@ async function executeCombatAction(guildId, userId, actionType) {
     else skillName = 'iPad Throw';
     baseDmg = 4000;
   } else {
-    // 3 AP Skill
+    // 5 AP Signature Skill (combines skill + 2 basic attacks)
     if (classKey === 'mom') {
       skillName = 'Guilt Trip';
-      baseDmg = 15000;
+      baseDmg = 23000;
       newMomBuff = true;
     } else if (classKey === 'dad') {
       skillName = 'Dad Joke';
-      baseDmg = 15000;
+      baseDmg = 23000;
       newDadDebuff = true;
     } else if (classKey === 'kid') {
       skillName = 'Grocery Meltdown';
       if (boss.mom_buff && boss.dad_debuff) {
         // Full Triad Meltdown Combo
-        baseDmg = 60000;
+        baseDmg = 68000;
         isSynergy = true;
         synergyType = 'full';
         newMomBuff = false;
         newDadDebuff = false;
       } else if (boss.mom_buff || boss.dad_debuff) {
         // 2-Class Partial Combo
-        baseDmg = 30000;
+        baseDmg = 38000;
         isSynergy = true;
         synergyType = 'partial';
         if (boss.mom_buff) newMomBuff = false;
         if (boss.dad_debuff) newDadDebuff = false;
       } else {
         // Solo Skill
-        baseDmg = 15000;
+        baseDmg = 23000;
       }
     }
   }
@@ -576,14 +577,14 @@ async function executeCombatAction(guildId, userId, actionType) {
     totalDmg *= 2;
   }
 
-  // Points per AP spent (AP-scaled, not damage-based): 2 pts per AP, 1.5x overkill bonus
-  // This is only used for the transaction log display — weekly_points are set at boss defeat
+  // Points per AP spent: treated as full 5 AP during transition for full rewards
+  const rewardApBasis = actionType === 'basic' ? 1 : 5;
   const pointsMultiplier = boss.is_overkill ? 1.5 : 1.0;
-  const pointsEarned = Math.round(apCost * 2 * pointsMultiplier);
+  const pointsEarned = Math.round(rewardApBasis * 2 * pointsMultiplier);
 
   // XP Math: 100 XP per AP spent + stat_xp_boost (+1% per point, max 10%)
   const xpMultiplier = 1 + (Math.min(10, profile.stat_xp_boost || 0) * 0.01);
-  const baseXp = apCost * 100;
+  const baseXp = rewardApBasis * 100;
   const xpEarned = Math.round(baseXp * xpMultiplier * pointsMultiplier);
 
   // User Account XP & Level Up Math (Lv 1-100 Curve: 150 + 25L + 7L^1.35)
@@ -614,7 +615,7 @@ async function executeCombatAction(guildId, userId, actionType) {
   if (apConserved) actionText += ' ⚡ (0 AP SPENT!)';
   if (isSynergy) actionText += ` 🔥 (${synergyType.toUpperCase()} COMBO!)`;
 
-  const apContribPoints = Math.round(actualApDeducted * 2 * pointsMultiplier);
+  const apContribPoints = Math.round((apConserved ? 0 : rewardApBasis) * 2 * pointsMultiplier);
   let newAp = Math.max(0, playerState.ap_remaining - actualApDeducted);
 
   // Try atomic RPC function first
