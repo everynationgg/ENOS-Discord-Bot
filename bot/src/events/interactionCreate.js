@@ -168,6 +168,18 @@ module.exports = {
           const { handleTtsComponent } = require('../commands/tts');
           return await handleTtsComponent(interaction);
         }
+        if (interaction.customId.startsWith('tempvoice_lock:')) {
+          const { handleTempVoiceLockToggle } = require('../modules/social/tempVoice');
+          return await handleTempVoiceLockToggle(interaction);
+        }
+        if (interaction.customId.startsWith('tempvoice_rename:')) {
+          const { showTempVoiceRenameModal } = require('../modules/social/tempVoice');
+          return await showTempVoiceRenameModal(interaction);
+        }
+        if (interaction.customId.startsWith('tempvoice_limit:')) {
+          const { showTempVoiceLimitModal } = require('../modules/social/tempVoice');
+          return await showTempVoiceLimitModal(interaction);
+        }
         if (interaction.customId.startsWith('tempvoice_setup:')) {
           const { showTempVoiceModal } = require('../modules/social/tempVoice');
           return await showTempVoiceModal(interaction);
@@ -196,9 +208,26 @@ module.exports = {
           const { handleKeyformModalSubmit } = require('../modules/moderation/keyform');
           return await handleKeyformModalSubmit(interaction);
         }
+        if (interaction.customId.startsWith('tempvoice_rename_modal:')) {
+          const { handleTempVoiceRenameSubmit } = require('../modules/social/tempVoice');
+          return await handleTempVoiceRenameSubmit(interaction);
+        }
+        if (interaction.customId.startsWith('tempvoice_limit_modal:')) {
+          const { handleTempVoiceLimitSubmit } = require('../modules/social/tempVoice');
+          return await handleTempVoiceLimitSubmit(interaction);
+        }
         if (interaction.customId.startsWith('tempvoice_modal:')) {
           const { handleTempVoiceModalSubmit } = require('../modules/social/tempVoice');
           return await handleTempVoiceModalSubmit(interaction);
+        }
+        return;
+      }
+
+      // ─── User Select Menus ────────────────────────────────────────────────────
+      if (interaction.isUserSelectMenu()) {
+        if (interaction.customId.startsWith('tempvoice_invite:')) {
+          const { handleTempVoiceInviteSelect } = require('../modules/social/tempVoice');
+          return await handleTempVoiceInviteSelect(interaction);
         }
         return;
       }

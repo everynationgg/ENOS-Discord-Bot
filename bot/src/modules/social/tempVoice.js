@@ -8,6 +8,8 @@ const {
   TextInputBuilder,
   TextInputStyle,
   MessageFlags,
+  EmbedBuilder,
+  UserSelectMenuBuilder,
 } = require('discord.js');
 const { supabase, getFeatureConfig } = require('../../lib/supabase');
 const logger = require('../../lib/logger');
@@ -152,19 +154,9 @@ async function handleVoiceJoinHub(newState, client) {
       logger.warn(`[TEMP VOICE] Could not move member ${member.id} into ${newChannel.id}:`, err.message);
     });
 
-    // Send the setup notification message in the room's integrated text chat
-    const setupRow = new ActionRowBuilder().addComponents(
-      new ButtonBuilder()
-        .setCustomId(`tempvoice_setup:${newChannel.id}`)
-        .setLabel('Setup Room / Privacy')
-        .setEmoji('⚙️')
-        .setStyle(ButtonStyle.Primary)
-    );
-
-    await newChannel.send({
-      content: `👑 **Hey <@${member.id}>!** Your private voice channel is ready.\nClick below to customize your room name, capacity, or privacy settings:`,
-      components: [setupRow],
-    }).catch((err) => {
+    // Send the rich room control panel in the room's integrated text chat
+    const panelPayload = buildControlPanelPayload(newChannel, member.id);
+    await newChannel.send(panelPayload).catch((err) => {
       logger.warn(`[TEMP VOICE] Failed to send setup prompt in ${newChannel.id}:`, err.message);
     });
 
@@ -368,6 +360,317 @@ async function handleTempVoiceModalSubmit(interaction) {
 }
 
 /**
+ * Generates the rich interactive control panel payload for a temporary voice channel.
+ * @param {import('discord.js').VoiceChannel} channel
+ * @param {string} ownerId
+ * @param {boolean|null} [overrideLocked=null]
+ */
+function buildControlPanelPayload(channel, ownerId, overrideLocked = null) {
+  const guild = channel.guild;
+  const everyonePerm = channel.permissionOverwrites.cache.get(guild.roles.everyone.id);
+  const isLocked = overrideLocked !== null
+    ? overrideLocked
+    : (everyonePerm ? everyonePerm.deny.has(PermissionFlagsBits.Connect) : false);
+
+  const currentLimit = channel.userLimit || 0;
+
+  const embed = new EmbedBuilder()
+    .setColor(isLocked ? 0xef4444 : 0x38bdf8)
+    .setTitle('🎮 Voice Room Control Panel')
+    .setDescription(
+      `👑 **Owner:** <@${ownerId}>\n` +
+      `Use the buttons below to lock/unlock, rename, or adjust player capacity. Use the dropdown to invite friends!`
+    )
+    .addFields(
+      {
+        name: '🔒 Privacy',
+        value: isLocked ? '🔒 **Private (Locked)**\n*Only whitelisted members can join*' : '🌐 **Public (Unlocked)**\n*Anyone in the server can join*',
+        inline: true,
+      },
+      {
+        name: '👥 Player Limit',
+        value: currentLimit > 0 ? `\`${currentLimit} Members\`` : '`Unlimited`',
+        inline: true,
+      }
+    )
+    .setFooter({ text: 'ENOS Dynamic Voice • Auto-deletes when empty' });
+
+  const buttonRow = new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId(`tempvoice_lock:${channel.id}`)
+      .setLabel(isLocked ? 'Unlock Room' : 'Lock Room')
+      .setEmoji(isLocked ? '🔓' : '🔒')
+      .setStyle(isLocked ? ButtonStyle.Success : ButtonStyle.Danger),
+    new ButtonBuilder()
+      .setCustomId(`tempvoice_rename:${channel.id}`)
+      .setLabel('Rename')
+      .setEmoji('✏️')
+      .setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder()
+      .setCustomId(`tempvoice_limit:${channel.id}`)
+      .setLabel('Limit')
+      .setEmoji('👥')
+      .setStyle(ButtonStyle.Secondary)
+  );
+
+  const inviteRow = new ActionRowBuilder().addComponents(
+    new UserSelectMenuBuilder()
+      .setCustomId(`tempvoice_invite:${channel.id}`)
+      .setPlaceholder('➕ Select friends to invite / whitelist...')
+      .setMinValues(1)
+      .setMaxValues(10)
+  );
+
+  return {
+    embeds: [embed],
+    components: [buttonRow, inviteRow],
+  };
+}
+
+/**
+ * Toggles a temporary voice room between Public and Private via button click.
+ * @param {import('discord.js').ButtonInteraction} interaction
+ */
+async function handleTempVoiceLockToggle(interaction) {
+  const channelId = interaction.customId.split(':')[1];
+  const guild = interaction.guild;
+  if (!guild) return;
+
+  const tempRecord = activeTempChannels.get(channelId);
+  const isOwner = tempRecord && tempRecord.ownerId === interaction.user.id;
+  const isAdmin = interaction.memberPermissions?.has(PermissionFlagsBits.Administrator);
+
+  if (!isOwner && !isAdmin) {
+    return interaction.reply({
+      content: '❌ Only the creator of this voice channel can configure room settings.',
+      flags: MessageFlags.Ephemeral,
+    });
+  }
+
+  const channel = guild.channels.cache.get(channelId) || (await guild.channels.fetch(channelId).catch(() => null));
+  if (!channel) {
+    return interaction.reply({ content: '❌ This voice channel no longer exists.', flags: MessageFlags.Ephemeral });
+  }
+
+  const everyonePerm = channel.permissionOverwrites.cache.get(guild.roles.everyone.id);
+  const isCurrentlyLocked = everyonePerm ? everyonePerm.deny.has(PermissionFlagsBits.Connect) : false;
+  const willBeLocked = !isCurrentlyLocked;
+
+  try {
+    await channel.permissionOverwrites.edit(guild.roles.everyone, {
+      ViewChannel: true,
+      Connect: !willBeLocked,
+    });
+
+    const ownerId = tempRecord?.ownerId || interaction.user.id;
+    const payload = buildControlPanelPayload(channel, ownerId, willBeLocked);
+
+    await interaction.update(payload);
+    await interaction.followUp({
+      content: willBeLocked
+        ? '🔒 **Room is now Private (Locked)!** Non-whitelisted members can no longer join.'
+        : '🌐 **Room is now Public (Unlocked)!** Anyone in the server can join.',
+      flags: MessageFlags.Ephemeral,
+    });
+  } catch (err) {
+    logger.error('[TEMP VOICE] Failed to toggle lock:', err.message || err);
+    if (!interaction.replied && !interaction.deferred) {
+      await interaction.reply({ content: '❌ Failed to change room privacy.', flags: MessageFlags.Ephemeral }).catch(() => {});
+    }
+  }
+}
+
+/**
+ * Displays a quick rename modal to the room creator.
+ * @param {import('discord.js').ButtonInteraction} interaction
+ */
+async function showTempVoiceRenameModal(interaction) {
+  const channelId = interaction.customId.split(':')[1];
+  const tempRecord = activeTempChannels.get(channelId);
+  const isOwner = tempRecord && tempRecord.ownerId === interaction.user.id;
+  const isAdmin = interaction.memberPermissions?.has(PermissionFlagsBits.Administrator);
+
+  if (!isOwner && !isAdmin) {
+    return interaction.reply({
+      content: '❌ Only the creator of this voice channel can rename the room.',
+      flags: MessageFlags.Ephemeral,
+    });
+  }
+
+  const channel = interaction.guild?.channels.cache.get(channelId);
+  const currentName = channel ? channel.name : 'Gaming Room';
+
+  const modal = new ModalBuilder()
+    .setCustomId(`tempvoice_rename_modal:${channelId}`)
+    .setTitle('Rename Voice Room');
+
+  const nameInput = new TextInputBuilder()
+    .setCustomId('new_name')
+    .setLabel('New Room Name')
+    .setStyle(TextInputStyle.Short)
+    .setValue(currentName)
+    .setMaxLength(50)
+    .setRequired(true);
+
+  modal.addComponents(new ActionRowBuilder().addComponents(nameInput));
+  await interaction.showModal(modal);
+}
+
+/**
+ * Handles submission of room rename modal.
+ * @param {import('discord.js').ModalSubmitInteraction} interaction
+ */
+async function handleTempVoiceRenameSubmit(interaction) {
+  const channelId = interaction.customId.split(':')[1];
+  const guild = interaction.guild;
+  if (!guild) return;
+
+  const channel = guild.channels.cache.get(channelId) || (await guild.channels.fetch(channelId).catch(() => null));
+  if (!channel) {
+    return interaction.reply({ content: '❌ This voice channel no longer exists.', flags: MessageFlags.Ephemeral });
+  }
+
+  const newName = interaction.fields.getTextInputValue('new_name')?.trim();
+  if (!newName) {
+    return interaction.reply({ content: '❌ Room name cannot be empty.', flags: MessageFlags.Ephemeral });
+  }
+
+  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+  try {
+    await channel.setName(newName);
+    await interaction.editReply({ content: `✅ Renamed room to **${newName}**!` });
+  } catch (err) {
+    logger.error('[TEMP VOICE] Failed to rename channel:', err.message || err);
+    await interaction.editReply({ content: '❌ Discord rate limits room renames to 2 per 10 minutes. Please try again shortly.' });
+  }
+}
+
+/**
+ * Displays a player capacity limit modal to the room creator.
+ * @param {import('discord.js').ButtonInteraction} interaction
+ */
+async function showTempVoiceLimitModal(interaction) {
+  const channelId = interaction.customId.split(':')[1];
+  const tempRecord = activeTempChannels.get(channelId);
+  const isOwner = tempRecord && tempRecord.ownerId === interaction.user.id;
+  const isAdmin = interaction.memberPermissions?.has(PermissionFlagsBits.Administrator);
+
+  if (!isOwner && !isAdmin) {
+    return interaction.reply({
+      content: '❌ Only the creator of this voice channel can set player limits.',
+      flags: MessageFlags.Ephemeral,
+    });
+  }
+
+  const channel = interaction.guild?.channels.cache.get(channelId);
+  const currentLimit = channel && channel.userLimit > 0 ? String(channel.userLimit) : '';
+
+  const modal = new ModalBuilder()
+    .setCustomId(`tempvoice_limit_modal:${channelId}`)
+    .setTitle('Set Room Player Limit');
+
+  const limitInput = new TextInputBuilder()
+    .setCustomId('new_limit')
+    .setLabel('Player Limit (0 for unlimited, max 99)')
+    .setStyle(TextInputStyle.Short)
+    .setValue(currentLimit)
+    .setPlaceholder('e.g. 4 or 0 for unlimited')
+    .setMaxLength(2)
+    .setRequired(true);
+
+  modal.addComponents(new ActionRowBuilder().addComponents(limitInput));
+  await interaction.showModal(modal);
+}
+
+/**
+ * Handles submission of player limit modal.
+ * @param {import('discord.js').ModalSubmitInteraction} interaction
+ */
+async function handleTempVoiceLimitSubmit(interaction) {
+  const channelId = interaction.customId.split(':')[1];
+  const guild = interaction.guild;
+  if (!guild) return;
+
+  const channel = guild.channels.cache.get(channelId) || (await guild.channels.fetch(channelId).catch(() => null));
+  if (!channel) {
+    return interaction.reply({ content: '❌ This voice channel no longer exists.', flags: MessageFlags.Ephemeral });
+  }
+
+  const limitRaw = interaction.fields.getTextInputValue('new_limit')?.trim();
+  const limitNum = parseInt(limitRaw, 10);
+  const safeLimit = !isNaN(limitNum) && limitNum >= 0 && limitNum <= 99 ? limitNum : 0;
+
+  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+  try {
+    await channel.setUserLimit(safeLimit);
+    await interaction.editReply({
+      content: safeLimit > 0
+        ? `👥 Room capacity set to **${safeLimit} members**.`
+        : '👥 Room capacity set to **Unlimited**.',
+    });
+  } catch (err) {
+    logger.error('[TEMP VOICE] Failed to set limit:', err.message || err);
+    await interaction.editReply({ content: '❌ Failed to update player limit.' });
+  }
+}
+
+/**
+ * Handles member selection from the Discord UserSelectMenu to whitelist friends.
+ * @param {import('discord.js').UserSelectMenuInteraction} interaction
+ */
+async function handleTempVoiceInviteSelect(interaction) {
+  const channelId = interaction.customId.split(':')[1];
+  const guild = interaction.guild;
+  if (!guild) return;
+
+  const tempRecord = activeTempChannels.get(channelId);
+  const isOwner = tempRecord && tempRecord.ownerId === interaction.user.id;
+  const isAdmin = interaction.memberPermissions?.has(PermissionFlagsBits.Administrator);
+
+  if (!isOwner && !isAdmin) {
+    return interaction.reply({
+      content: '❌ Only the creator of this voice channel can invite members.',
+      flags: MessageFlags.Ephemeral,
+    });
+  }
+
+  const channel = guild.channels.cache.get(channelId) || (await guild.channels.fetch(channelId).catch(() => null));
+  if (!channel) {
+    return interaction.reply({ content: '❌ This voice channel no longer exists.', flags: MessageFlags.Ephemeral });
+  }
+
+  const selectedUserIds = interaction.values || [];
+  if (selectedUserIds.length === 0) {
+    return interaction.reply({ content: '❌ No members selected.', flags: MessageFlags.Ephemeral });
+  }
+
+  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+
+  try {
+    for (const userId of selectedUserIds) {
+      await channel.permissionOverwrites.edit(userId, {
+        ViewChannel: true,
+        Connect: true,
+        Speak: true,
+      }).catch((err) => logger.warn(`[TEMP VOICE] Overwrite notice for user ${userId}:`, err.message));
+    }
+
+    const mentions = selectedUserIds.map((id) => `<@${id}>`).join(', ');
+    await interaction.editReply({
+      content: `✅ Successfully whitelisted ${mentions}!\nThey can now connect to your room even when it is locked.`,
+    });
+
+    // Post friendly notice in channel chat
+    await channel.send({
+      content: `👋 <@${interaction.user.id}> invited ${mentions} to join the room!`,
+    }).catch(() => {});
+  } catch (err) {
+    logger.error('[TEMP VOICE] Failed to invite users:', err.message || err);
+    await interaction.editReply({ content: '❌ Failed to whitelist selected members.' });
+  }
+}
+
+/**
  * Scans for and purges any abandoned empty temporary voice channels on startup.
  * @param {import('discord.js').Client} client
  */
@@ -411,6 +714,13 @@ module.exports = {
   unregisterTempChannel,
   handleVoiceJoinHub,
   handleVoiceLeaveTemp,
+  buildControlPanelPayload,
+  handleTempVoiceLockToggle,
+  showTempVoiceRenameModal,
+  handleTempVoiceRenameSubmit,
+  showTempVoiceLimitModal,
+  handleTempVoiceLimitSubmit,
+  handleTempVoiceInviteSelect,
   showTempVoiceModal,
   handleTempVoiceModalSubmit,
   initTempVoiceCleanup,
