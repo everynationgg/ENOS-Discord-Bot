@@ -15,12 +15,12 @@ const apiKey = process.env.GEMINI_API_KEY || '';
 const genAI = new GoogleGenerativeAI(apiKey);
 
 // Static safety net if the models endpoint is down or unreachable
-// Note: gemini-2.0-flash was shut down June 1 2026 — not included here.
 const DEFAULT_FLASH_MODELS = [
   'gemini-2.5-flash',
   'gemini-flash-latest',
+  'gemini-flash-lite-latest',
+  'gemini-3.5-flash-lite',
   'gemini-3.8-flash',
-  'gemini-2.5-flash-lite',
 ];
 
 // In-memory cache of model names, refreshed periodically
@@ -81,14 +81,18 @@ async function getAvailableFlashModels(forceRefresh = false) {
     // Intelligent sort:
     // 1. Primary stable workhorse 'gemini-2.5-flash' first (high free-tier quota & lowest latency)
     // 2. Evergreen alias 'gemini-flash-latest' next
-    // 3. Standard Flash models next (higher version first)
-    // 4. Experimental / Omni / preview models lower
-    // 5. Lite models last
+    // 3. Fast high-quota lite models ('gemini-flash-lite-latest', 'gemini-3.5-flash-lite') next
+    // 4. Standard Flash models next (higher version first)
+    // 5. Experimental / Omni / preview models lower
     const sorted = rawModels.sort((a, b) => {
       if (a === 'gemini-2.5-flash') return -1;
       if (b === 'gemini-2.5-flash') return 1;
       if (a === 'gemini-flash-latest') return -1;
       if (b === 'gemini-flash-latest') return 1;
+      if (a === 'gemini-flash-lite-latest') return -1;
+      if (b === 'gemini-flash-lite-latest') return 1;
+      if (a === 'gemini-3.5-flash-lite') return -1;
+      if (b === 'gemini-3.5-flash-lite') return 1;
 
       const aIsOmni = a.includes('omni');
       const bIsOmni = b.includes('omni');
@@ -99,11 +103,6 @@ async function getAvailableFlashModels(forceRefresh = false) {
       const bIsPreview = b.includes('preview');
       if (!aIsPreview && bIsPreview) return -1;
       if (aIsPreview && !bIsPreview) return 1;
-
-      const aIsLite = a.includes('lite');
-      const bIsLite = b.includes('lite');
-      if (!aIsLite && bIsLite) return -1;
-      if (aIsLite && !bIsLite) return 1;
 
       return b.localeCompare(a, undefined, { numeric: true });
     });

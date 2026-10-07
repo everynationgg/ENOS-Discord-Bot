@@ -125,9 +125,9 @@ async function fallbackGoogleTranslate(text, targetLangCode) {
     if (!contentType.includes('application/json')) return text;
     const data = await res.json();
     if (data && data[0] && Array.isArray(data[0])) {
-      const translated = data[0].map((item) => item[0]).filter(Boolean).join(' ').trim();
+      const translated = data[0].map((item) => item[0]).filter(Boolean).join('').trim();
       if (translated) {
-        logger.info(`[EN TTS] Translated via Google Translate Fallback: "${text}" -> "${translated}" (${targetLangCode})`);
+        logger.info(`[EN TTS] Translated via Google Translate: "${text}" -> "${translated}" (${targetLangCode})`);
         return translated;
       }
     }
@@ -314,23 +314,29 @@ async function processSpeechQueue(guildId) {
   try {
     let textToSpeak = rawText;
 
-    // Fast-path: Only translate or rewrite if explicitly required:
-    // 1. Target language is not English, OR
-    // 2. Character persona is not default (e.g. Announcer, Glitched, Calm), OR
-    // 3. Text contains non-Latin scripts (e.g. Japanese kanji/kana, Cyrillic, Arabic)
-    const hasNonLatin = /[^\u0000-\u024F]/.test(rawText);
-    const requiresAiProcessing = session.language !== 'en' || session.persona !== 'default' || hasNonLatin;
-
-    if (requiresAiProcessing) {
+    // Translation pipeline:
+    // If a stylized persona is selected, try Gemini first for character flavor (e.g. Announcer, Glitched, Calm).
+    // If persona is default OR if Gemini times out / hits rate limits, use high-speed Google Translate
+    // (<250ms, zero-cost, auto-detects Tagalog, Japanese, Spanish, etc. and translates to target language).
+    if (session.persona !== 'default') {
       try {
         const translated = await Promise.race([
           translateTextWithGemini(rawText, session.language, session.persona),
-          new Promise((_, reject) => setTimeout(() => reject(new Error('TTS translation timeout')), 3500)),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('TTS persona timeout')), 3000)),
         ]);
-        if (translated) textToSpeak = translated;
+        if (translated) {
+          textToSpeak = translated;
+        } else {
+          textToSpeak = await fallbackGoogleTranslate(rawText, session.language);
+        }
       } catch (err) {
-        logger.warn(`[EN TTS] Translation skipped/timed out (${err.message}); speaking original text.`);
+        logger.warn(`[EN TTS] Persona styling skipped (${err.message}); falling back to standard translation.`);
+        textToSpeak = await fallbackGoogleTranslate(rawText, session.language);
       }
+    } else {
+      // Default persona: Direct high-speed translation.
+      // Auto-detects input language and translates to session.language in ~150ms with 0 Gemini quota usage.
+      textToSpeak = await fallbackGoogleTranslate(rawText, session.language);
     }
 
     const rawAudioFile = await generateTtsAudioFile(textToSpeak, session.language);
