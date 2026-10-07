@@ -109,14 +109,20 @@ function cleanTextForSpeech(text) {
     .trim();
 }
 
+// Queue Constraints
+const MAX_QUEUE_SIZE = 5;
+const MAX_QUEUE_AGE_MS = 30000; // 30 seconds
+
 /**
  * Fallback translation using Google Translate HTTP endpoint (Zero API key / limits)
  */
 async function fallbackGoogleTranslate(text, targetLangCode) {
   try {
     const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=${targetLangCode}&dt=t&q=${encodeURIComponent(text)}`;
-    const res = await fetch(url);
+    const res = await fetch(url, { signal: AbortSignal.timeout(2500) });
     if (!res.ok) return text;
+    const contentType = res.headers.get('content-type') || '';
+    if (!contentType.includes('application/json')) return text;
     const data = await res.json();
     if (data && data[0] && Array.isArray(data[0])) {
       const translated = data[0].map((item) => item[0]).filter(Boolean).join(' ').trim();
@@ -126,13 +132,13 @@ async function fallbackGoogleTranslate(text, targetLangCode) {
       }
     }
   } catch (err) {
-    logger.warn('[EN TTS] Google Translate HTTP fallback error:', err.message);
+    logger.warn('[EN TTS] Google Translate HTTP fallback notice:', err.message);
   }
   return text;
 }
 
 /**
- * Translates input text using Gemini 2.0 / 1.5 Flash with fallback model chain & Google Translate HTTP safety net
+ * Translates input text using Gemini Flash with fallback model chain & Google Translate HTTP safety net
  */
 async function translateTextWithGemini(rawText, targetLangCode, persona) {
   const cleaned = cleanTextForSpeech(rawText);
@@ -165,7 +171,7 @@ async function translateTextWithGemini(rawText, targetLangCode, persona) {
     `Output: Return ONLY the translated spoken sentence in ${langName}. Do NOT include quotes, "Translation:", or "User said:".`;
 
   try {
-    const translation = await generateContentWithFallback(prompt);
+    const translation = await generateContentWithFallback(prompt, { timeoutMs: 3000 });
     if (translation) {
       logger.info(`[EN TTS] Translated via Gemini: "${cleaned}" -> "${translation}" (${langName})`);
       return translation;
@@ -179,7 +185,7 @@ async function translateTextWithGemini(rawText, targetLangCode, persona) {
 }
 
 /**
- * Synthesizes audio file for target translation using gTTS
+ * Synthesizes audio file for target translation using gTTS with safety timeout
  */
 function generateTtsAudioFile(text, langCode) {
   const gttsLangMap = {
@@ -195,22 +201,42 @@ function generateTtsAudioFile(text, langCode) {
 
   return new Promise((resolve) => {
     const tempPath = path.join(os.tmpdir(), `tts_${Date.now()}_${Math.random().toString(36).substring(7)}.mp3`);
+    let settled = false;
+
+    const timeout = setTimeout(() => {
+      if (!settled) {
+        settled = true;
+        logger.warn('[EN TTS] gTTS generation timed out after 6000ms');
+        resolve(null);
+      }
+    }, 6000);
 
     const attemptSave = (langToUse) => {
       try {
         const gtts = new gTTS(text, langToUse);
         gtts.save(tempPath, (err) => {
+          if (settled) return;
           if (err && langToUse !== 'en') {
             attemptSave('en');
+          } else if (err) {
+            settled = true;
+            clearTimeout(timeout);
+            logger.warn('[EN TTS] gTTS save error:', err.message);
+            resolve(null);
           } else {
+            settled = true;
+            clearTimeout(timeout);
             resolve(tempPath);
           }
         });
       } catch (e) {
+        if (settled) return;
         if (langToUse !== 'en') {
           attemptSave('en');
         } else {
-          resolve(tempPath);
+          settled = true;
+          clearTimeout(timeout);
+          resolve(null);
         }
       }
     };
@@ -224,7 +250,7 @@ function generateTtsAudioFile(text, langCode) {
  */
 function applyAudioEffects(inputPath, voiceModel, persona) {
   return new Promise((resolve) => {
-    if (!ffmpegPath) return resolve(inputPath);
+    if (!ffmpegPath || !inputPath || !fs.existsSync(inputPath)) return resolve(inputPath);
 
     const outputPath = path.join(os.tmpdir(), `tts_fx_${Date.now()}_${Math.random().toString(36).substring(7)}.mp3`);
     let filters = [];
@@ -254,7 +280,7 @@ function applyAudioEffects(inputPath, voiceModel, persona) {
     const filterString = filters.join(',');
     const args = ['-y', '-i', inputPath, '-af', filterString, outputPath];
 
-    execFile(ffmpegPath, args, (err) => {
+    execFile(ffmpegPath, args, { timeout: 5000 }, (err) => {
       if (err) {
         logger.warn('[EN TTS] FFmpeg audio filter fallback:', err.message);
         resolve(inputPath);
@@ -273,33 +299,75 @@ async function processSpeechQueue(guildId) {
   const session = activeSessions.get(guildId);
   if (!session || session.isPlaying || session.queue.length === 0) return;
 
+  const item = session.queue.shift();
+  if (!item) return;
+
+  // Stale check: Drop messages waiting in queue for over 30s to prevent stale backlog
+  if (Date.now() - item.timestamp > MAX_QUEUE_AGE_MS) {
+    logger.warn(`[EN TTS] Dropping stale queued message (>30s old): "${item.text.substring(0, 30)}"`);
+    return processSpeechQueue(guildId);
+  }
+
   session.isPlaying = true;
-  const rawText = session.queue.shift();
+  const rawText = item.text;
 
   try {
-    const translatedText = await translateTextWithGemini(rawText, session.language, session.persona);
-    if (!translatedText) {
+    let textToSpeak = rawText;
+
+    // Fast-path: Only translate or rewrite if explicitly required:
+    // 1. Target language is not English, OR
+    // 2. Character persona is not default (e.g. Announcer, Glitched, Calm), OR
+    // 3. Text contains non-Latin scripts (e.g. Japanese kanji/kana, Cyrillic, Arabic)
+    const hasNonLatin = /[^\u0000-\u024F]/.test(rawText);
+    const requiresAiProcessing = session.language !== 'en' || session.persona !== 'default' || hasNonLatin;
+
+    if (requiresAiProcessing) {
+      try {
+        const translated = await Promise.race([
+          translateTextWithGemini(rawText, session.language, session.persona),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('TTS translation timeout')), 3500)),
+        ]);
+        if (translated) textToSpeak = translated;
+      } catch (err) {
+        logger.warn(`[EN TTS] Translation skipped/timed out (${err.message}); speaking original text.`);
+      }
+    }
+
+    const rawAudioFile = await generateTtsAudioFile(textToSpeak, session.language);
+    if (!rawAudioFile || !fs.existsSync(rawAudioFile)) {
       session.isPlaying = false;
       return processSpeechQueue(guildId);
     }
 
-    const rawAudioFile = await generateTtsAudioFile(translatedText, session.language);
     const finalAudioFile = await applyAudioEffects(rawAudioFile, session.voiceModel, session.persona);
-
     const resource = createAudioResource(finalAudioFile);
 
     session.player.play(resource);
 
-    const onFinish = () => {
+    let finished = false;
+    const safeFinish = () => {
+      if (finished) return;
+      finished = true;
+      clearTimeout(watchdogTimer);
       session.isPlaying = false;
-      fs.unlink(finalAudioFile, () => {});
+      if (finalAudioFile) {
+        fs.unlink(finalAudioFile, () => {});
+      }
       processSpeechQueue(guildId);
     };
 
-    session.player.once(AudioPlayerStatus.Idle, onFinish);
+    // Cap playback time between 5s and 25s based on text length to prevent stuck state
+    const maxDurationMs = Math.min(25000, Math.max(5000, (rawText.length / 8) * 1000 + 4000));
+    const watchdogTimer = setTimeout(() => {
+      logger.warn(`[EN TTS] Audio playback watchdog triggered after ${maxDurationMs}ms; advancing queue.`);
+      try { session.player?.stop(true); } catch (_) {}
+      safeFinish();
+    }, maxDurationMs);
+
+    session.player.once(AudioPlayerStatus.Idle, safeFinish);
     session.player.once('error', (err) => {
       logger.error('[EN TTS] Audio Player Error:', err.message);
-      onFinish();
+      safeFinish();
     });
   } catch (err) {
     logger.error('[EN TTS] Speech queue processing error:', err.message);
@@ -485,7 +553,13 @@ function queueTextMessage(guildId, textChannelId, rawText) {
   const cleaned = cleanTextForSpeech(rawText);
   if (!cleaned) return;
 
-  session.queue.push(cleaned);
+  // Cap queue to prevent runaway backlog
+  if (session.queue.length >= MAX_QUEUE_SIZE) {
+    logger.warn(`[EN TTS] Queue full (${MAX_QUEUE_SIZE}); dropping oldest message.`);
+    session.queue.shift();
+  }
+
+  session.queue.push({ text: cleaned, timestamp: Date.now() });
   processSpeechQueue(guildId);
 }
 
@@ -502,7 +576,11 @@ function enqueueTtsText(guildId, text) {
   if (!session) return false;
   const cleaned = cleanTextForSpeech(text);
   if (!cleaned) return false;
-  session.queue.push(cleaned);
+  if (session.queue.length >= MAX_QUEUE_SIZE) {
+    logger.warn(`[EN TTS] Queue full (${MAX_QUEUE_SIZE}); dropping oldest message.`);
+    session.queue.shift();
+  }
+  session.queue.push({ text: cleaned, timestamp: Date.now() });
   processSpeechQueue(guildId);
   return true;
 }

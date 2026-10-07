@@ -16,12 +16,10 @@ const genAI = new GoogleGenerativeAI(apiKey);
 
 // Static safety net if the models endpoint is down or unreachable
 const DEFAULT_FLASH_MODELS = [
-  'gemini-flash-latest',
   'gemini-2.5-flash',
-  'gemini-3.8-flash',
-  'gemini-3.7-flash',
-  'gemini-3.6-flash',
-  'gemini-3.5-flash',
+  'gemini-flash-latest',
+  'gemini-2.5-flash-lite',
+  'gemini-2.0-flash',
 ];
 
 // In-memory cache of model names, refreshed periodically
@@ -32,9 +30,10 @@ const CACHE_TTL_MS = 12 * 60 * 60 * 1000; // 12 hours
 /**
  * Fetches the live list of active models supporting generateContent from Google,
  * filters to text/Flash models, and ranks them:
- * 1. gemini-flash-latest (evergreen alias)
- * 2. Stable numbered flash models (newest first, e.g. 3.8 > 3.7 > 2.5)
- * 3. Lite / specialized flash models
+ * 1. gemini-2.5-flash (primary stable workhorse with high free-tier quota)
+ * 2. gemini-flash-latest (evergreen alias)
+ * 3. Stable numbered flash models
+ * 4. Lite / specialized flash models
  *
  * @param {boolean} [forceRefresh=false]
  * @returns {Promise<string[]>}
@@ -79,11 +78,14 @@ async function getAvailableFlashModels(forceRefresh = false) {
     }
 
     // Intelligent sort:
-    // 1. Evergreen alias 'gemini-flash-latest' first
-    // 2. Standard Flash models next (higher version first)
-    // 3. Experimental / Omni / preview models lower
-    // 4. Lite models last
+    // 1. Primary stable workhorse 'gemini-2.5-flash' first (high free-tier quota & lowest latency)
+    // 2. Evergreen alias 'gemini-flash-latest' next
+    // 3. Standard Flash models next (higher version first)
+    // 4. Experimental / Omni / preview models lower
+    // 5. Lite models last
     const sorted = rawModels.sort((a, b) => {
+      if (a === 'gemini-2.5-flash') return -1;
+      if (b === 'gemini-2.5-flash') return 1;
       if (a === 'gemini-flash-latest') return -1;
       if (b === 'gemini-flash-latest') return 1;
 
@@ -142,17 +144,23 @@ function invalidateModel(modelName) {
  * @param {string|object} prompt
  * @param {object} [options={}]
  * @param {object} [options.modelParams] Extra parameters passed to genAI.getGenerativeModel
+ * @param {number} [options.timeoutMs=5000] Per-model timeout in milliseconds
  * @param {boolean} [options.throwOnError=false] If true, throws when all models fail
  * @returns {Promise<string|null>} The generated text, or null if all models failed
  */
 async function generateContentWithFallback(prompt, options = {}) {
   const models = await getAvailableFlashModels();
   let lastError = null;
+  const candidateModels = models.slice(0, 3);
+  const timeoutMs = options.timeoutMs || 5000;
 
-  for (const modelName of models) {
+  for (const modelName of candidateModels) {
     try {
       const model = genAI.getGenerativeModel({ model: modelName, ...(options.modelParams || {}) });
-      const result = await model.generateContent(prompt);
+      const result = await Promise.race([
+        model.generateContent(prompt),
+        new Promise((_, reject) => setTimeout(() => reject(new Error(`Model request timed out after ${timeoutMs}ms`)), timeoutMs)),
+      ]);
       const text = result?.response?.text();
       if (text) {
         return text.trim();
@@ -160,14 +168,15 @@ async function generateContentWithFallback(prompt, options = {}) {
     } catch (err) {
       lastError = err;
       const errMsg = err.message || '';
+      const isQuotaExceeded = errMsg.includes('429') && (errMsg.includes('Quota exceeded') || errMsg.includes('PerDayPerProject'));
       const isRetiredOrNotFound =
         errMsg.includes('404') ||
         errMsg.includes('not found') ||
         errMsg.includes('no longer available') ||
         errMsg.includes('not supported for generateContent');
 
-      if (isRetiredOrNotFound) {
-        logger.warn(`[GEMINI] Model "${modelName}" is unavailable/retired (${errMsg}). Evicting and falling back...`);
+      if (isRetiredOrNotFound || isQuotaExceeded) {
+        logger.warn(`[GEMINI] Model "${modelName}" is unavailable/exhausted (${errMsg}). Evicting and falling back...`);
         invalidateModel(modelName);
       } else {
         logger.warn(`[GEMINI] Model "${modelName}" failed (${errMsg}). Trying next candidate...`);
@@ -179,7 +188,6 @@ async function generateContentWithFallback(prompt, options = {}) {
   if (options.throwOnError && lastError) {
     throw lastError;
   }
-  return null;
 }
 
 module.exports = {
