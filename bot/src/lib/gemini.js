@@ -15,11 +15,12 @@ const apiKey = process.env.GEMINI_API_KEY || '';
 const genAI = new GoogleGenerativeAI(apiKey);
 
 // Static safety net if the models endpoint is down or unreachable
+// Note: gemini-2.0-flash was shut down June 1 2026 — not included here.
 const DEFAULT_FLASH_MODELS = [
   'gemini-2.5-flash',
   'gemini-flash-latest',
+  'gemini-3.8-flash',
   'gemini-2.5-flash-lite',
-  'gemini-2.0-flash',
 ];
 
 // In-memory cache of model names, refreshed periodically
