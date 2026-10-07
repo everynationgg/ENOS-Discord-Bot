@@ -408,13 +408,17 @@ async function processNewsroomCategory(client, guildId, categoryId, { forceRun =
     if (!activeSources.length) return;
 
     // Fetch posted article history from Supabase (or fallback to persistent config.posted_guids)
-    const { data: postedRows } = await supabase
+    const { data: postedRows, error: postedErr } = await supabase
       .from('newsroom_posts')
       .select('article_guid, title')
       .eq('guild_id', guildId)
       .eq('category', categoryId.toLowerCase())
       .order('posted_at', { ascending: false })
       .limit(200);
+
+    if (postedErr) {
+      logger.warn(`[NEWSROOM ENGINE] DB fetch notice: ${postedErr.message}`);
+    }
 
     const configPostedGuids = Array.isArray(config.posted_guids) ? config.posted_guids : [];
     const postedGuids = new Set([
@@ -508,7 +512,7 @@ async function processNewsroomCategory(client, guildId, categoryId, { forceRun =
 
         // 6. Record in Supabase database (non-blocking fallback)
         try {
-          await supabase
+          const { error: insertErr } = await supabase
             .from('newsroom_posts')
             .insert({
               guild_id: guildId,
@@ -521,6 +525,9 @@ async function processNewsroomCategory(client, guildId, categoryId, { forceRun =
               thread_id: dispatchRes.thread_id,
               message_id: dispatchRes.message_id,
             });
+          if (insertErr) {
+            logger.warn(`[NEWSROOM ENGINE] DB record notice: ${insertErr.message}`);
+          }
         } catch (dbErr) {
           logger.warn(`[NEWSROOM ENGINE] DB record notice: ${dbErr.message}`);
         }

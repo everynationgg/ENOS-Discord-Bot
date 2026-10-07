@@ -129,7 +129,7 @@ async function checkAndUpgradeUserTiers(guild, inviterId) {
 async function grantAchievementTier(guild, member, tierKey, tierConfig, currentInvites) {
   try {
     // Check if user already has this achievement unlocked in user_achievements table
-    const { data: existing } = await supabase
+    const { data: existing, error: selectErr } = await supabase
       .from('user_achievements')
       .select('id')
       .eq('user_id', member.id)
@@ -137,25 +137,36 @@ async function grantAchievementTier(guild, member, tierKey, tierConfig, currentI
       .eq('tier_key', tierKey)
       .maybeSingle();
 
+    if (selectErr) {
+      logger.warn(`[RECRUITMENT] Failed to query user_achievements (${selectErr.message}); skipping tier grant to prevent repeat awards.`);
+      return;
+    }
+
     if (existing) return; // Already awarded
 
     // Record achievement unlock in Supabase
-    await supabase.from('user_achievements').insert({
+    const { error: insertErr } = await supabase.from('user_achievements').insert({
+      guild_id: guild.id,
       user_id: member.id,
       achievement_key: 'recruitment',
       tier_key: tierKey,
       unlocked_at: new Date().toISOString(),
     });
 
+    if (insertErr) {
+      logger.error(`[RECRUITMENT] Failed to record user_achievements (${insertErr.message}); aborting reward grant.`);
+      return;
+    }
+
     // Award Vault Coins if reward_type is coins
     if (tierConfig.reward_type === 'coins' && tierConfig.reward_val) {
       const rewardCoins = parseInt(tierConfig.reward_val, 10) || 50;
-      await supabase.rpc('add_vault_coins', {
-        p_user_id: member.id,
-        p_guild_id: guild.id,
-        p_amount: rewardCoins,
-        p_reason: `Recruitment Tier ${tierKey.toUpperCase()} Unlock`,
-      }).catch(err => logger.error(`[RECRUITMENT] Failed to add Vault coins:`, err.message));
+      try {
+        const { awardCoins } = require('./vault');
+        await awardCoins(member.id, guild.id, rewardCoins, `Recruitment Tier ${tierKey.toUpperCase()} Unlock`, guild);
+      } catch (coinErr) {
+        logger.error(`[RECRUITMENT] Failed to add Vault coins:`, coinErr.message);
+      }
     }
 
     // Auto-assign Discord role if configured
@@ -200,12 +211,17 @@ async function evaluateEnoriumCrownSwap(guild, member, inviterCount, enoriumConf
 
     if (topInviterId === member.id && maxInvites >= (enoriumConfig.threshold || 100)) {
       // Check current holder in user_achievements
-      const { data: currentHolder } = await supabase
+      const { data: currentHolder, error: holderErr } = await supabase
         .from('user_achievements')
         .select('user_id')
         .eq('achievement_key', 'recruitment')
         .eq('tier_key', 'enorium')
         .maybeSingle();
+
+      if (holderErr) {
+        logger.warn(`[RECRUITMENT] Failed to query current Enorium holder: ${holderErr.message}`);
+        return;
+      }
 
       if (!currentHolder || currentHolder.user_id !== member.id) {
         // Swap Enorium title!
@@ -224,6 +240,7 @@ async function evaluateEnoriumCrownSwap(guild, member, inviterCount, enoriumConf
 
         // Record new Enorium holder
         await supabase.from('user_achievements').insert({
+          guild_id: guild.id,
           user_id: member.id,
           achievement_key: 'recruitment',
           tier_key: 'enorium',
