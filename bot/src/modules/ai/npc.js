@@ -142,6 +142,12 @@ ${conversationHistory}
 LATEST MESSAGE:
 [${authorName}]: ${triggerMessage}
 
+LANGUAGE RULE (MANDATORY — overrides any style or persona wording above):
+- Reply in the SAME language as the LATEST MESSAGE above — the one you are answering. Do NOT copy the language of older chat history or default to English.
+- If the LATEST MESSAGE mixes languages (e.g. Taglish = Tagalog + English, Spanglish, Hinglish), reply in that same mix with a similar ratio, switching languages the way the speaker does.
+- Match their register too: their slang, casual spelling, and abbreviations in that language (e.g. "taena", "anu na", "lol").
+- Only if the LATEST MESSAGE has no identifiable language (just codes, links, emoji, or a word like "lul"), use whatever language ${authorName} has mostly been using in the recent history.
+
 DELIBERATION INSTRUCTION:
 1. If the user directly mentioned you or called your name ("enos"), you are being spoken to — should_speak must be TRUE and you must provide a natural, dry-witted response.
 2. If this is ambient room chatter, evaluate whether to speak (TRUE) or remain quiet (FALSE).
