@@ -28,20 +28,104 @@ function shuffleArray(array) {
   return arr;
 }
 
+/** Question angles rotated at random so Gemini doesn't converge on the same "most obvious" fact. */
+const QUESTION_ANGLES = [
+  'a specific character, NPC, or companion',
+  'a specific weapon, item, or piece of equipment',
+  'a specific location, region, or map',
+  'a specific quest, mission, or story event',
+  'a specific gameplay mechanic, system, or stat',
+  'a specific boss, enemy, or creature',
+  'development history, studio, release date, or platform facts',
+  'a specific ability, skill, spell, or talent',
+  'a specific faction, organization, or group in the lore',
+  'music, voice cast, soundtrack, or art direction',
+  'an update, patch, expansion, DLC, or seasonal event',
+  'an achievement, record, award, or notable community milestone',
+];
+
+/**
+ * Normalizes text into a set of meaningful lowercase words for similarity checks.
+ * @param {string} text
+ * @returns {Set<string>}
+ */
+function toWordSet(text) {
+  return new Set(
+    String(text || '').toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter((w) => w.length > 3)
+  );
+}
+
+/**
+ * Returns true if a candidate question repeats a recently asked one (same answer or near-identical wording).
+ * @param {{ question: string, correct_answer: string }} candidate
+ * @param {{ question: string, correct_answer: string }[]} recent
+ * @returns {boolean}
+ */
+function isRepeatQuestion(candidate, recent) {
+  const answer = String(candidate.correct_answer).trim().toLowerCase();
+  const words = toWordSet(candidate.question);
+  return recent.some((r) => {
+    if (String(r.correct_answer || '').trim().toLowerCase() === answer) return true;
+    const other = toWordSet(r.question);
+    if (!words.size || !other.size) return false;
+    let shared = 0;
+    for (const w of words) if (other.has(w)) shared++;
+    return shared / (words.size + other.size - shared) >= 0.5;
+  });
+}
+
 /**
  * Generates a trivia question using Gemini API.
  * @param {string|null} topic
+ * @param {{ question: string, correct_answer: string }[]} [recentQuestions] Previously asked questions to avoid repeating.
  * @returns {Promise<{ question: string, correct_answer: string, incorrect_answers: string[] }>}
  */
-async function generateTriviaQuestion(topic) {
+async function generateTriviaQuestion(topic, recentQuestions = []) {
   if (!process.env.GEMINI_API_KEY) {
     throw new Error('Missing GEMINI_API_KEY environment variable.');
   }
 
+  const recent = [...recentQuestions];
+  const MAX_ATTEMPTS = 3;
+  let lastError;
+
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    const angle = QUESTION_ANGLES[Math.floor(Math.random() * QUESTION_ANGLES.length)];
+    const avoidList = recent
+      .map((r) => `- ${String(r.question).slice(0, 180)} (answer: ${String(r.correct_answer).slice(0, 80)})`)
+      .join('\n');
+
+    try {
+      const candidate = await requestTriviaFromGemini(topic, angle, avoidList);
+      if (!isRepeatQuestion(candidate, recent)) {
+        return candidate;
+      }
+      logger.warn(`[TRIVIA] Attempt ${attempt}/${MAX_ATTEMPTS} produced a repeat question (answer: "${candidate.correct_answer}"). Regenerating...`);
+      recent.push(candidate);
+      lastError = new Error('Gemini kept producing previously asked questions.');
+    } catch (err) {
+      lastError = err;
+      break; // All models failed — no point retrying immediately
+    }
+  }
+
+  throw lastError || new Error('Failed to generate a unique trivia question.');
+}
+
+/**
+ * Sends one trivia generation request to Gemini, falling back across models.
+ * @param {string|null} topic
+ * @param {string} angle
+ * @param {string} avoidList
+ * @returns {Promise<{ question: string, correct_answer: string, incorrect_answers: string[] }>}
+ */
+async function requestTriviaFromGemini(topic, angle, avoidList) {
   const prompt = `You are a precision trivia author. Generate a challenging, 100% FACTUALLY ACCURATE multiple-choice trivia question.
 If a topic is provided, it must strictly be about that topic (lore, gameplay mechanics, official release history). Otherwise, it should be about general gaming, pop culture, or tech.
 Topic: ${topic || 'Random general gaming, pop culture, or tech knowledge'}
-
+Focus this question on: ${angle}
+Request ID (ignore, for uniqueness): ${Date.now()}-${Math.random().toString(36).slice(2, 8)}
+${avoidList ? `\nNEVER REPEAT: The following questions were already asked. Your question must test a COMPLETELY DIFFERENT fact with a DIFFERENT correct answer. Do not rephrase any of these:\n${avoidList}\n` : ''}
 CRITICAL FACT-CHECKING RULES:
 1. FACTUAL ACCURACY IS MANDATORY: Every fact, name, ability, mechanic, and number in the question and answers must be 100% verifiably true in official game releases, patch notes, or lore.
 2. NEVER MIX OR CONFLATE MECHANICS: Do not combine one character's/game's ability name with another character's mechanic (e.g. do NOT mix Sion's Cannibalism with Twisted Fate's map vision).
@@ -64,7 +148,7 @@ Respond ONLY with a JSON object containing these exact keys:
       const model = genAI.getGenerativeModel({
         model: modelName,
         generationConfig: {
-          temperature: 0.2,
+          temperature: 0.8,
           responseMimeType: 'application/json',
         },
       });
@@ -160,8 +244,19 @@ async function triggerTriviaDrop(client, guildId) {
       return false;
     }
 
-    logger.info(`[TRIVIA] Generating question for topic: ${chosen.topic || 'Random'}`);
-    const questionData = await generateTriviaQuestion(chosen.topic);
+    // Load this guild's recent questions so Gemini never repeats one
+    const { data: recentDrops, error: recentErr } = await supabase
+      .from('trivia_drops')
+      .select('question, correct_answer')
+      .eq('guild_id', guildId)
+      .order('created_at', { ascending: false })
+      .limit(40);
+    if (recentErr) {
+      logger.warn(`[TRIVIA] Could not load recent questions for guild ${guildId}: ${recentErr.message}`);
+    }
+
+    logger.info(`[TRIVIA] Generating question for topic: ${chosen.topic || 'Random'} (avoiding ${recentDrops?.length || 0} recent questions)`);
+    const questionData = await generateTriviaQuestion(chosen.topic, recentDrops || []);
 
     const allAnswers = shuffleArray([questionData.correct_answer, ...questionData.incorrect_answers]);
 
