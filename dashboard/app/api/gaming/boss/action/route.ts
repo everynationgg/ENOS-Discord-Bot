@@ -323,8 +323,9 @@ export async function POST(req: NextRequest) {
             max_hp: newMaxHp,
             current_hp: targetCurrentHp,
             is_defeated: false,
-            mom_buff: false,
-            dad_debuff: false,
+            // Preserve existing triad combat buffs so live setups are not wiped during dashboard edits
+            mom_buff: existingBoss.mom_buff,
+            dad_debuff: existingBoss.dad_debuff,
             custom_image_url: newImg,
             custom_bg_url: newBg,
             last_action: '🔄 Boss Card refreshed from Admin Dashboard!',

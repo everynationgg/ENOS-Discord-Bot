@@ -523,8 +523,8 @@ async function executeCombatAction(guildId, userId, actionType) {
   let skillName = 'Basic Attack';
   let isSynergy = false;
   let synergyType = null;
-  let newMomBuff = boss.mom_buff;
-  let newDadDebuff = boss.dad_debuff;
+  let newMomBuff = Boolean(boss.mom_buff);
+  let newDadDebuff = Boolean(boss.dad_debuff);
 
   const classKey = playerState.class_key;
 
@@ -539,28 +539,33 @@ async function executeCombatAction(guildId, userId, actionType) {
       skillName = 'Guilt Trip';
       baseDmg = 23000;
       newMomBuff = true;
+      // M.O.M. only sets M.O.M. Buff; never consumes or clears D.A.D. Debuff
+      newDadDebuff = Boolean(boss.dad_debuff);
     } else if (classKey === 'dad') {
       skillName = 'Dad Joke';
       baseDmg = 23000;
       newDadDebuff = true;
+      // D.A.D. only sets D.A.D. Debuff; never consumes or clears M.O.M. Buff
+      newMomBuff = Boolean(boss.mom_buff);
     } else if (classKey === 'kid') {
       skillName = 'Grocery Meltdown';
+      // ONLY K.I.D. can use and consume the buffs for combo damage
       if (boss.mom_buff && boss.dad_debuff) {
-        // Full Triad Meltdown Combo
+        // Full Triad Meltdown Combo (K.I.D. consumes both buffs)
         baseDmg = 68000;
         isSynergy = true;
         synergyType = 'full';
         newMomBuff = false;
         newDadDebuff = false;
       } else if (boss.mom_buff || boss.dad_debuff) {
-        // 2-Class Partial Combo
+        // 2-Class Partial Combo (K.I.D. consumes whichever buff is active)
         baseDmg = 38000;
         isSynergy = true;
         synergyType = 'partial';
         if (boss.mom_buff) newMomBuff = false;
         if (boss.dad_debuff) newDadDebuff = false;
       } else {
-        // Solo Skill
+        // Solo Skill (No buffs active to consume)
         baseDmg = 23000;
       }
     }

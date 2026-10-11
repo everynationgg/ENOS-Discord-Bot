@@ -205,8 +205,8 @@ async function buildPublicBossEmbedPayload(guildId) {
       `**Lore**: ${boss.lore}\n\n` +
       `❤️ **HP Status**: ${hpBar} **${hpPct}%** (\`${Number(boss.current_hp).toLocaleString()} / ${Number(boss.max_hp).toLocaleString()} HP\`)\n` +
       `⚡ **Last Action**: ${boss.last_action || 'None'}\n` +
-      `🛡️ **M.O.M. Buff**: ${boss.mom_buff ? '✅ **ACTIVE** (Ready for Nuke)' : '❌ Inactive'}\n` +
-      `🔨 **D.A.D. Debuff**: ${boss.dad_debuff ? '✅ **ACTIVE** (Ready for Nuke)' : '❌ Inactive'}\n\n` +
+      `🛡️ **M.O.M. Buff**: ${boss.mom_buff ? '✅ **ACTIVE** (Ready for K.I.D.)' : '❌ Inactive'}\n` +
+      `🔨 **D.A.D. Debuff**: ${boss.dad_debuff ? '✅ **ACTIVE** (Ready for K.I.D.)' : '❌ Inactive'}\n\n` +
       `👥 **Class Distribution**: 🛡️ \`${classCounts.mom}\` M.O.M. | 🔨 \`${classCounts.dad}\` D.A.D. | ⚡ \`${classCounts.kid}\` K.I.D. (*${totalParticipants} Active Combatants*)\n\n` +
       `*Click a button below to join a class or engage the boss in your personal private combat panel!*`;
   }
@@ -335,7 +335,7 @@ async function buildPersonalCombatPayload(guildId, userId, combatResult = null) 
       levelUpBanner +
       `🎯 **Target**: **${boss.boss_name}**\n` +
       `❤️ **HP Status**: ${hpBar} **${hpPct}%** (\`${Number(boss.current_hp).toLocaleString()} / ${Number(boss.max_hp).toLocaleString()} HP\`)\n` +
-      `🛡️ **M.O.M. Buff**: ${boss.mom_buff ? '✅ **ACTIVE** (Ready for Nuke)' : '❌ Inactive'} | 🔨 **D.A.D. Debuff**: ${boss.dad_debuff ? '✅ **ACTIVE**' : '❌ Inactive'}\n` +
+      `🛡️ **M.O.M. Buff**: ${boss.mom_buff ? '✅ **ACTIVE** (Ready for K.I.D.)' : '❌ Inactive'} | 🔨 **D.A.D. Debuff**: ${boss.dad_debuff ? '✅ **ACTIVE** (Ready for K.I.D.)' : '❌ Inactive'}\n` +
       `⚔️ **Last Action**: ${boss.last_action || 'None'}\n\n` +
       `${apStatusText}\n` +
       `📊 **Projected Slay Reward**: \`${projectedPoints} / ${maxSlayPoints} Points (₱${projectedPoints})\` *(Spend 5 AP for full reward!)*\n\n` +
@@ -555,13 +555,13 @@ module.exports = {
           `**Combat Triad Classes & Attacks**:\n` +
           `• 🛡️ **M.O.M.**: Attack \`Guilt Trip\` (5 AP) ➔ Deals 23,000 DMG + Applies **M.O.M. Buff**\n` +
           `• 🔨 **D.A.D.**: Attack \`Dad Joke\` (5 AP) ➔ Deals 23,000 DMG + Applies **D.A.D. Debuff**\n` +
-          `• ⚡ **K.I.D.**: Attack \`Grocery Meltdown\` (5 AP) ➔ Consumes Setups for massive combo DMG\n\n` +
+          `• ⚡ **K.I.D.**: Attack \`Grocery Meltdown\` (5 AP) ➔ The only class that uses & consumes buffs for combo DMG!\n\n` +
           `**Damage Scaling Math**:\n` +
-          `• 🔥 **M.O.M. / D.A.D. Attack (5 AP)**: 23,000 DMG + applies buff/debuff\n` +
-          `• 💥 **K.I.D. Solo Attack (5 AP)**: 23,000 DMG\n` +
+          `• 🔥 **M.O.M. / D.A.D. Attack (5 AP)**: 23,000 DMG (Sets up buffs for K.I.D.; never consumes each other's buff)\n` +
+          `• 💥 **K.I.D. Solo Attack (5 AP)**: 23,000 DMG (No buffs active)\n` +
           `• ⚡ **K.I.D. 2-Class Combo (5 AP + 1 Active Buff)**: 38,000 DMG\n` +
           `• 🚀 **K.I.D. Full Triad Meltdown (5 AP + Both Buffs)**: 68,000 DMG!\n\n` +
-          `*Note: Each player gets 1 decisive strike per week! Spend all 5 AP for full Vault Coin rewards.*`
+          `*Note: Only K.I.D. can use the M.O.M. and D.A.D. buffs. When M.O.M. or D.A.D. attack, their setups remain preserved on the boss until K.I.D. strikes!*`
         );
       const replyMsg = await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral, fetchReply: true });
       setTimeout(() => replyMsg.delete().catch(() => {}), 10000);
