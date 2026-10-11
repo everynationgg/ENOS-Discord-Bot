@@ -108,6 +108,45 @@ async function getOrCreateActiveBoss(guildId) {
 
       return updatedBoss || activeBoss;
     }
+
+    // Auto-sync live configured boss overrides from guild_config to active season
+    const liveName = featureRow?.config?.override_name || featureRow?.config?.boss_name;
+    const isGeneric = activeBoss.boss_name === 'Corrupted Anomaly' || activeBoss.boss_name.startsWith('ERROR-MOD');
+    if (!activeBoss.is_overkill && !activeBoss.is_defeated && (
+      (liveName && activeBoss.boss_name !== liveName) ||
+      (isGeneric && liveName) ||
+      (featureRow?.config?.custom_image_url && activeBoss.custom_image_url !== featureRow.config.custom_image_url) ||
+      (featureRow?.config?.lore && activeBoss.lore !== featureRow.config.lore && isGeneric)
+    )) {
+      const liveTitle = featureRow?.config?.boss_title || (featureRow?.config?.game_name ? `System Threat (${featureRow.config.game_name})` : activeBoss.boss_title);
+      const liveLore = featureRow?.config?.lore || activeBoss.lore;
+      const liveHp = Number(featureRow?.config?.override_hp || featureRow?.config?.max_hp || activeBoss.max_hp);
+      const liveImg = featureRow?.config?.custom_image_url || activeBoss.custom_image_url;
+      const liveBg = featureRow?.config?.custom_bg_url || activeBoss.custom_bg_url;
+
+      const existingDamage = Math.max(0, Number(activeBoss.max_hp) - Number(activeBoss.current_hp));
+      const targetCurrentHp = Math.max(1, liveHp - existingDamage);
+
+      logger.info(`[BOSS] Auto-syncing live configured boss '${liveName}' to active season ${currentWeek}`);
+      const { data: updatedBoss } = await supabase
+        .from('boss_seasons')
+        .update({
+          boss_name: liveName || activeBoss.boss_name,
+          boss_title: liveTitle,
+          lore: liveLore,
+          max_hp: liveHp,
+          current_hp: targetCurrentHp,
+          custom_image_url: liveImg,
+          custom_bg_url: liveBg,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', activeBoss.id)
+        .select()
+        .single();
+
+      return updatedBoss || activeBoss;
+    }
+
     return activeBoss;
   }
 

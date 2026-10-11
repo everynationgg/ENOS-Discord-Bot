@@ -1654,7 +1654,7 @@ function BossCardForm({ config, setConfig }: { config: any; setConfig: (key: str
         gap: '0.5rem'
       }}>
         <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#facc15' }}>
-          ⚡ Admin Controls (Guild 1111851610474291240)
+          ⚡ Admin Controls
         </div>
         <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
           <button
