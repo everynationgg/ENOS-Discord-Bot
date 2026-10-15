@@ -176,6 +176,21 @@ Respond ONLY with a JSON object containing these exact keys:
 }
 
 /**
+ * Calculates Monday 00:00:00 (Asia/Manila GMT+8) for the current week as a UTC ISO string.
+ * @returns {string}
+ */
+function getStartOfWeekManilaIso() {
+  const now = new Date();
+  const manilaOffsetMs = 8 * 60 * 60 * 1000;
+  const manilaNow = new Date(now.getTime() + manilaOffsetMs);
+  const day = manilaNow.getUTCDay(); // 0 = Sun, 1 = Mon ... 6 = Sat
+  const diffToMonday = day === 0 ? 6 : day - 1;
+  manilaNow.setUTCDate(manilaNow.getUTCDate() - diffToMonday);
+  manilaNow.setUTCHours(0, 0, 0, 0);
+  return new Date(manilaNow.getTime() - manilaOffsetMs).toISOString();
+}
+
+/**
  * Resolves a channel using priority weighting.
  * @param {any[]} allowedChannels
  * @returns {any|null}
@@ -223,7 +238,32 @@ async function triggerTriviaDrop(client, guildId) {
     const allowedChannels = config.allowed_channels || [];
     const closeTime = config.close_time || '23:59';
 
-    let chosen = chooseWeightedChannel(allowedChannels);
+    // ─── Weekly Channel Rotation: Enforce at most 1 drop per channel per week ───
+    let eligibleChannels = [...allowedChannels];
+    try {
+      const startOfWeek = getStartOfWeekManilaIso();
+      const { data: recentDrops } = await supabase
+        .from('trivia_drops')
+        .select('channel_id')
+        .eq('guild_id', guildId)
+        .gte('created_at', startOfWeek)
+        .neq('status', 'superseded')
+        .neq('status', 'skipped');
+
+      const usedChannelIds = new Set((recentDrops || []).map((d) => d.channel_id).filter(Boolean));
+      const unserved = allowedChannels.filter((ch) => !usedChannelIds.has(ch.channel_id));
+
+      if (unserved.length > 0) {
+        eligibleChannels = unserved;
+        logger.info(`[TRIVIA ROTATION] Filtered to ${eligibleChannels.length} unused channel(s) this week (${usedChannelIds.size} already hosted).`);
+      } else {
+        logger.info(`[TRIVIA ROTATION] All ${allowedChannels.length} channels hosted a drop this week. Resetting rotation cycle.`);
+      }
+    } catch (rotErr) {
+      logger.warn('[TRIVIA ROTATION] Error querying weekly drops, falling back to full whitelist:', rotErr.message);
+    }
+
+    let chosen = chooseWeightedChannel(eligibleChannels);
     if (!chosen) {
       const fallbackChannelId = config.notification_channel_id;
       if (fallbackChannelId) {

@@ -19,6 +19,17 @@ function shuffleArray<T>(array: T[]): T[] {
   return arr;
 }
 
+function getStartOfWeekManilaIso(): string {
+  const now = new Date();
+  const manilaOffsetMs = 8 * 60 * 60 * 1000;
+  const manilaNow = new Date(now.getTime() + manilaOffsetMs);
+  const day = manilaNow.getUTCDay(); // 0 = Sun, 1 = Mon ... 6 = Sat
+  const diffToMonday = day === 0 ? 6 : day - 1;
+  manilaNow.setUTCDate(manilaNow.getUTCDate() - diffToMonday);
+  manilaNow.setUTCHours(0, 0, 0, 0);
+  return new Date(manilaNow.getTime() - manilaOffsetMs).toISOString();
+}
+
 function chooseWeightedChannel(allowedChannels: any[]) {
   if (!allowedChannels?.length) return null;
   const weights: Record<string, number> = { high: 3, medium: 2, low: 1 };
@@ -250,7 +261,29 @@ async function triggerInstantDrop(guildId: string) {
   const allowedChannels = config.allowed_channels || [];
   const closeTime = config.close_time || '22:00';
 
-  let chosen = chooseWeightedChannel(allowedChannels);
+  // Weekly Channel Rotation: Enforce at most 1 drop per channel per week
+  let eligibleChannels = [...allowedChannels];
+  try {
+    const startOfWeek = getStartOfWeekManilaIso();
+    const { data: recentDrops } = await supabaseAdmin
+      .from('trivia_drops')
+      .select('channel_id')
+      .eq('guild_id', guildId)
+      .gte('created_at', startOfWeek)
+      .neq('status', 'superseded')
+      .neq('status', 'skipped');
+
+    const usedChannelIds = new Set((recentDrops || []).map((d: any) => d.channel_id).filter(Boolean));
+    const unserved = allowedChannels.filter((ch: any) => !usedChannelIds.has(ch.channel_id));
+
+    if (unserved.length > 0) {
+      eligibleChannels = unserved;
+    }
+  } catch (rotErr: any) {
+    console.warn('[TRIVIA ROTATION] Failed to query weekly channel history, falling back:', rotErr.message);
+  }
+
+  let chosen = chooseWeightedChannel(eligibleChannels);
   if (!chosen) {
     const fallbackChannelId = config.notification_channel_id;
     if (fallbackChannelId) {
