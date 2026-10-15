@@ -442,8 +442,9 @@ async function handleTriviaStartClick(interaction) {
       interaction.deleteReply().catch(() => {});
     }, 60000);
 
-    const parts = interaction.customId.split(':');
-    const dropId = parts[1];
+    const dropId = interaction.customId.startsWith('trivia_start:')
+      ? interaction.customId.slice('trivia_start:'.length)
+      : interaction.customId.slice('trivia_start_'.length);
     const guildId = interaction.guildId || interaction.guild?.id;
 
     // Parallelize all initial DB reads to minimize time-to-reply
@@ -585,9 +586,17 @@ async function handleTriviaStartClick(interaction) {
  * @param {import('discord.js').ButtonInteraction} interaction
  */
 async function handleTriviaAnswerClick(interaction) {
-  const parts = interaction.customId.split(':');
-  const dropId = parts[1];
-  const choiceIndex = parseInt(parts[2], 10);
+  let dropId;
+  let choiceIndex;
+  if (interaction.customId.startsWith('trivia_answer:')) {
+    const parts = interaction.customId.split(':');
+    dropId = parts[1];
+    choiceIndex = parseInt(parts[2], 10);
+  } else {
+    const match = interaction.customId.match(/^trivia_answer[:_](.+?)[:_](\d+)$/);
+    dropId = match ? match[1] : null;
+    choiceIndex = match ? parseInt(match[2], 10) : -1;
+  }
   const endTime = getPreciseTime();
 
   // Defer immediately to prevent 3-second Discord interaction timeouts during DB/API calls

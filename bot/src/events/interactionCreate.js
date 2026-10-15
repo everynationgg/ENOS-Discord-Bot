@@ -121,11 +121,11 @@ module.exports = {
           const { handleTriviaLeaderboardButton } = require('../modules/gaming/trivia');
           return await handleTriviaLeaderboardButton(interaction);
         }
-        if (interaction.customId.startsWith('trivia_start:')) {
+        if (interaction.customId.startsWith('trivia_start:') || interaction.customId.startsWith('trivia_start_')) {
           const { handleTriviaStartClick } = require('../modules/gaming/trivia');
           return await handleTriviaStartClick(interaction);
         }
-        if (interaction.customId.startsWith('trivia_answer:')) {
+        if (interaction.customId.startsWith('trivia_answer:') || interaction.customId.startsWith('trivia_answer_')) {
           const { handleTriviaAnswerClick } = require('../modules/gaming/trivia');
           return await handleTriviaAnswerClick(interaction);
         }
