@@ -38,6 +38,33 @@ async function generateGlitchBossLore() {
  */
 const FALLBACK_BOSS_POOL = [
   {
+    bossName: 'ERROR-MOD: Corrupted Astravor',
+    bossTitle: 'System Threat (Palworld)',
+    gameName: 'Palworld',
+    maxHp: 150000,
+    customImageUrl: 'https://yestpyqfrhgavaxrkhcx.supabase.co/storage/v1/object/public/enos-uploads/img_1784973953028_1wmgk.png',
+    customBgUrl: null,
+    lore: 'A space-time realm rift merged Palworld data with ENOS core protocols. Astravor has manifested in the server! Coordinate your triad skills to neutralize!',
+  },
+  {
+    bossName: 'Emily Rose',
+    bossTitle: 'Legion Possessed',
+    gameName: 'Gaming Realm',
+    maxHp: 150000,
+    customImageUrl: 'https://yestpyqfrhgavaxrkhcx.supabase.co/storage/v1/object/public/enos-uploads/img_1785585649660_wi851.jpg',
+    customBgUrl: 'https://yestpyqfrhgavaxrkhcx.supabase.co/storage/v1/object/public/enos-uploads/img_1785585658211_uiwve.jpg',
+    lore: 'Every failed investigation strengthened the curse. Emily Rose now carries the souls of countless restless spirits, haunting all who dare confront her.',
+  },
+  {
+    bossName: 'ERROR-MOD: Corrupted Bangus',
+    bossTitle: 'Leviathan (Subnautica)',
+    gameName: 'Subnautica',
+    maxHp: 200000,
+    customImageUrl: 'https://yestpyqfrhgavaxrkhcx.supabase.co/storage/v1/object/public/enos-uploads/img_1786207037688_4ox66.jpg',
+    customBgUrl: 'https://yestpyqfrhgavaxrkhcx.supabase.co/storage/v1/object/public/enos-uploads/img_1786207020223_ozhth.jpg',
+    lore: 'Leviathan: Bangus was once an ordinary milkfish... until it consumed an abandoned Alterra reactor core. It now patrols the abyss, convinced every diver is trying to steal its seaweed. Harpoons bounce off its scales, submarines disappear without a trace, and somehow... it still tastes like bangus.',
+  },
+  {
     bossName: 'The Reaper',
     bossTitle: 'Extraction Failed (R.E.P.O)',
     gameName: 'R.E.P.O',
@@ -74,6 +101,15 @@ const FALLBACK_BOSS_POOL = [
     lore: 'Fatrobi, the Arbiter of Fat, stands as a grotesque judge of indulgence. He believes excess is the truest form of power, growing stronger with every feast while condemning those who dare deny their hunger. His gluttonous reign leaves nothing untouched.',
   },
   {
+    bossName: 'Snowball',
+    bossTitle: 'Arbiter of Fat',
+    gameName: 'Gaming Realm',
+    maxHp: 200000,
+    customImageUrl: 'https://yestpyqfrhgavaxrkhcx.supabase.co/storage/v1/object/public/enos-uploads/boss_calcifer_nobg_1789920952905.png',
+    customBgUrl: 'https://yestpyqfrhgavaxrkhcx.supabase.co/storage/v1/object/public/enos-uploads/img_1788661772996_phq6p.jpg',
+    lore: 'Fatrobi, the Arbiter of Fat, stands as a grotesque judge of indulgence. He believes excess is the truest form of power, growing stronger with every feast while condemning those who dare deny their hunger. His gluttonous reign leaves nothing untouched.',
+  },
+  {
     bossName: 'Queen Zyapra',
     bossTitle: 'The Voice of Forbidden Magic',
     gameName: 'Gaming Realm',
@@ -90,15 +126,6 @@ const FALLBACK_BOSS_POOL = [
     customImageUrl: 'https://yestpyqfrhgavaxrkhcx.supabase.co/storage/v1/object/public/enos-uploads/img_1791131410730_fweo1.png',
     customBgUrl: 'https://yestpyqfrhgavaxrkhcx.supabase.co/storage/v1/object/public/enos-uploads/img_1791131311576_j3rbx.png',
     lore: 'A celestial beast who abandoned judgment for indulgence. Ethandyr grows stronger with every feast, believing hunger is weakness and excess is power.\nHe now guards the shattered Celestial Gate, waiting for those foolish enough to become his next meal.',
-  },
-  {
-    bossName: 'Emily Rose',
-    bossTitle: 'Legion Possessed',
-    gameName: 'Gaming Realm',
-    maxHp: 150000,
-    customImageUrl: 'https://yestpyqfrhgavaxrkhcx.supabase.co/storage/v1/object/public/enos-uploads/img_1785585649660_wi851.jpg',
-    customBgUrl: 'https://yestpyqfrhgavaxrkhcx.supabase.co/storage/v1/object/public/enos-uploads/img_1785585658211_uiwve.jpg',
-    lore: 'Every failed investigation strengthened the curse. Emily Rose now carries the souls of countless restless spirits, haunting all who dare confront her.',
   },
   {
     bossName: 'Blocklord',
@@ -125,7 +152,7 @@ async function selectRotatedFallbackBoss(guildId) {
       .eq('guild_id', guildId)
       .eq('is_overkill', false)
       .order('created_at', { ascending: false })
-      .limit(10);
+      .limit(25);
 
     const recentBossNames = (pastSeasons || []).map((s) => s.boss_name.toLowerCase().trim());
 
