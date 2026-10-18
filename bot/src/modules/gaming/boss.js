@@ -33,6 +33,135 @@ async function generateGlitchBossLore() {
 }
 
 /**
+ * Curated archive of tested historical weekly bosses.
+ * Used as automatic fallback rotation when no new boss is staged by an admin.
+ */
+const FALLBACK_BOSS_POOL = [
+  {
+    bossName: 'The Reaper',
+    bossTitle: 'Extraction Failed (R.E.P.O)',
+    gameName: 'R.E.P.O',
+    maxHp: 200000,
+    customImageUrl: 'https://yestpyqfrhgavaxrkhcx.supabase.co/storage/v1/object/public/enos-uploads/img_1786766310176_y302j.jpg',
+    customBgUrl: 'https://yestpyqfrhgavaxrkhcx.supabase.co/storage/v1/object/public/enos-uploads/img_1786766318686_q395g.jpg',
+    lore: 'The extraction was supposed to be routine. The valuables were secured, the team was ready to leave—but something followed them back. Now the halls are silent, the cargo is scattered, and the Reaper waits among the ruins. Survival is no longer the objective. Extraction is.',
+  },
+  {
+    bossName: 'Violette',
+    bossTitle: 'Fractsidus Overseer (Wuthering Waves)',
+    gameName: 'Wuthering Waves',
+    maxHp: 180000,
+    customImageUrl: 'https://yestpyqfrhgavaxrkhcx.supabase.co/storage/v1/object/public/enos-uploads/img_1787489188733_6so1j.jpg',
+    customBgUrl: 'https://yestpyqfrhgavaxrkhcx.supabase.co/storage/v1/object/public/enos-uploads/img_1787489204040_04nx5.jpg',
+    lore: 'One of the Fractsidus Overseers, Scar is a harbinger of chaos who seeks to tear down the laws and order that bind the world. His blazing inferno leaves destruction in its wake, and beneath his charismatic cruelty lies an unwavering conviction that the old order deserves to burn. When the battle reaches its second phase, the mask of the man gives way to the monstrous Black Goat, unleashing the full fury of the chaos he embodies.\n\nThe boss officially drops Unending Destruction, and the weekly challenge is located in Qichi Village.',
+  },
+  {
+    bossName: 'Darth Nepp',
+    bossTitle: 'Domain Expansion: Blackness',
+    gameName: 'Gaming Realm',
+    maxHp: 175000,
+    customImageUrl: 'https://yestpyqfrhgavaxrkhcx.supabase.co/storage/v1/object/public/enos-uploads/img_1788107149400_hzlhm.jpg',
+    customBgUrl: 'https://yestpyqfrhgavaxrkhcx.supabase.co/storage/v1/object/public/enos-uploads/img_1788106478424_eqagu.jpg',
+    lore: "Once a frightened child rejected by everyone around him, Darth Nepp's power awakened through rage and grief. Abandoned when he needed help most, he stopped seeking acceptance and embraced destruction instead. Now, within his Domain of Blackness, he seeks to erase the world that created him.",
+  },
+  {
+    bossName: 'Fatrobi',
+    bossTitle: 'Arbiter of Fat',
+    gameName: 'Gaming Realm',
+    maxHp: 200000,
+    customImageUrl: 'https://yestpyqfrhgavaxrkhcx.supabase.co/storage/v1/object/public/enos-uploads/img_1788661757465_842hz.jpg',
+    customBgUrl: 'https://yestpyqfrhgavaxrkhcx.supabase.co/storage/v1/object/public/enos-uploads/img_1788661772996_phq6p.jpg',
+    lore: 'Fatrobi, the Arbiter of Fat, stands as a grotesque judge of indulgence. He believes excess is the truest form of power, growing stronger with every feast while condemning those who dare deny their hunger. His gluttonous reign leaves nothing untouched.',
+  },
+  {
+    bossName: 'Queen Zyapra',
+    bossTitle: 'The Voice of Forbidden Magic',
+    gameName: 'Gaming Realm',
+    maxHp: 160000,
+    customImageUrl: 'https://yestpyqfrhgavaxrkhcx.supabase.co/storage/v1/object/public/enos-uploads/img_1790493419009_5b1vd.png',
+    customBgUrl: 'https://yestpyqfrhgavaxrkhcx.supabase.co/storage/v1/object/public/enos-uploads/img_1790493425812_nb8vs.png',
+    lore: 'Born where spoken words awaken forbidden magic, Zyapra commands spells through voice alone. Every incantation bends the world to her rhythm, and those who enter her domain become part of the final performance.',
+  },
+  {
+    bossName: 'Ethandyr',
+    bossTitle: 'The Boop of All Nation',
+    gameName: 'Gaming Realm',
+    maxHp: 185000,
+    customImageUrl: 'https://yestpyqfrhgavaxrkhcx.supabase.co/storage/v1/object/public/enos-uploads/img_1791131410730_fweo1.png',
+    customBgUrl: 'https://yestpyqfrhgavaxrkhcx.supabase.co/storage/v1/object/public/enos-uploads/img_1791131311576_j3rbx.png',
+    lore: 'A celestial beast who abandoned judgment for indulgence. Ethandyr grows stronger with every feast, believing hunger is weakness and excess is power.\nHe now guards the shattered Celestial Gate, waiting for those foolish enough to become his next meal.',
+  },
+  {
+    bossName: 'Emily Rose',
+    bossTitle: 'Legion Possessed',
+    gameName: 'Gaming Realm',
+    maxHp: 150000,
+    customImageUrl: 'https://yestpyqfrhgavaxrkhcx.supabase.co/storage/v1/object/public/enos-uploads/img_1785585649660_wi851.jpg',
+    customBgUrl: 'https://yestpyqfrhgavaxrkhcx.supabase.co/storage/v1/object/public/enos-uploads/img_1785585658211_uiwve.jpg',
+    lore: 'Every failed investigation strengthened the curse. Emily Rose now carries the souls of countless restless spirits, haunting all who dare confront her.',
+  },
+  {
+    bossName: 'Blocklord',
+    bossTitle: 'Cube Sovereign (ROBLOX)',
+    gameName: 'ROBLOX',
+    maxHp: 200000,
+    customImageUrl: 'https://yestpyqfrhgavaxrkhcx.supabase.co/storage/v1/object/public/enos-uploads/img_1791737990411_7cvzy.png',
+    customBgUrl: 'https://yestpyqfrhgavaxrkhcx.supabase.co/storage/v1/object/public/enos-uploads/img_1791737980212_n3b60.png',
+    lore: 'A sovereign forged from the fragments of a thousand forgotten worlds. Blocklord commands the floating realms, bending cubes, platforms, and reality itself to his will. Every shattered block feeds his dominion, and every fallen challenger becomes another piece of his endless kingdom.\nHe awaits beneath the fractured sky, guarding the gateway between worlds. Those who challenge the Cube Sovereign may discover that the game was never theirs to control.',
+  },
+];
+
+/**
+ * Selects a boss from FALLBACK_BOSS_POOL using least-recently-fought rotation.
+ * Excludes bosses fought in recent weeks so repeats are avoided.
+ * @param {string} guildId
+ * @returns {Promise<object>}
+ */
+async function selectRotatedFallbackBoss(guildId) {
+  try {
+    const { data: pastSeasons } = await supabase
+      .from('boss_seasons')
+      .select('boss_name, week_identifier, created_at')
+      .eq('guild_id', guildId)
+      .eq('is_overkill', false)
+      .order('created_at', { ascending: false })
+      .limit(10);
+
+    const recentBossNames = (pastSeasons || []).map((s) => s.boss_name.toLowerCase().trim());
+
+    // Candidates: pool bosses not in the most recent 4 weeks
+    const topRecent = recentBossNames.slice(0, 4);
+    let eligible = FALLBACK_BOSS_POOL.filter((b) => !topRecent.includes(b.bossName.toLowerCase().trim()));
+
+    if (eligible.length === 0) {
+      // Exclude at least the immediate previous week's boss
+      const prevBoss = recentBossNames[0];
+      eligible = FALLBACK_BOSS_POOL.filter((b) => !prevBoss || b.bossName.toLowerCase().trim() !== prevBoss);
+    }
+
+    if (eligible.length === 0) {
+      eligible = FALLBACK_BOSS_POOL;
+    }
+
+    // Rank candidates by least recently fought (longest time ago)
+    eligible.sort((a, b) => {
+      const idxA = recentBossNames.indexOf(a.bossName.toLowerCase().trim());
+      const idxB = recentBossNames.indexOf(b.bossName.toLowerCase().trim());
+      const rankA = idxA === -1 ? 999 : idxA;
+      const rankB = idxB === -1 ? 999 : idxB;
+      return rankB - rankA;
+    });
+
+    const chosen = eligible[0];
+    logger.info(`[BOSS ROTATION] Selected rotated fallback boss '${chosen.bossName}' (least recently fought).`);
+    return chosen;
+  } catch (err) {
+    logger.error('[BOSS ROTATION] Failed to select rotated boss, falling back to index 0:', err.message);
+    return FALLBACK_BOSS_POOL[0];
+  }
+}
+
+/**
  * Gets or initializes the active Weekly Boss for a guild.
  * @param {string} guildId
  * @returns {Promise<any>}
@@ -210,40 +339,30 @@ async function getOrCreateActiveBoss(guildId) {
     logger.warn('[BOSS SPAWN] Adaptive HP check failed, using standard scaling:', scaleErr.message);
   }
 
-  // Generate default Boss AI Lore
-  const bossData = await generateGlitchBossLore();
+  let finalBossName;
+  let finalBossTitle;
+  let finalLore;
+  let finalMaxHp;
+  let finalCustomImageUrl;
+  let finalBgUrl;
 
-  const rawOverrideName = featureRow?.config?.override_name || featureRow?.config?.boss_name;
-  const gameLabel = featureRow?.config?.game_name || 'Gaming Realm';
-  const charName = rawOverrideName || bossData.bossName;
-
-  let finalBossName = rawOverrideName || bossData.bossName;
-  let finalBossTitle = featureRow?.config?.boss_title || `System Threat (${gameLabel})`;
-  let finalLore = featureRow?.config?.lore || (rawOverrideName ? `A space-time realm rift merged ${gameLabel} data with ENOS core protocols. ${charName} has manifested in the server! Coordinate your triad skills to neutralize!` : bossData.lore);
-  let finalMaxHp = featureRow?.config?.override_hp || featureRow?.config?.max_hp || bossHp;
-  let finalCustomImageUrl = featureRow?.config?.custom_image_url || null;
-
-  let finalBgUrl = (stagedConfig && stagedConfig.custom_bg_url) ? stagedConfig.custom_bg_url : (featureRow?.config?.custom_bg_url || null);
-
-  if (stagedConfig && (stagedConfig.enabled || stagedConfig.enabled === undefined)) {
-    const sName = stagedConfig.override_name || stagedConfig.boss_name;
-    const sTitle = stagedConfig.boss_title;
-    const sLore = stagedConfig.lore;
-    const sHp = stagedConfig.max_hp || stagedConfig.override_hp;
-    if (sName) finalBossName = sName;
-    if (sTitle) finalBossTitle = sTitle;
-    if (sLore) finalLore = sLore;
-    if (sHp) finalMaxHp = Number(sHp);
-    if (stagedConfig.custom_image_url) finalCustomImageUrl = stagedConfig.custom_image_url;
-    if (stagedConfig.custom_bg_url) finalBgUrl = stagedConfig.custom_bg_url;
+  const sName = stagedConfig?.override_name || stagedConfig?.boss_name;
+  if (sName && (stagedConfig.enabled || stagedConfig.enabled === undefined)) {
+    // ─── Case A: Admin pre-staged a boss in Dashboard ──────────────────────────
+    finalBossName = sName;
+    finalBossTitle = stagedConfig.boss_title || `System Threat (${stagedConfig.game_name || 'Gaming Realm'})`;
+    finalLore = stagedConfig.lore || (await generateGlitchBossLore()).lore;
+    finalMaxHp = Number(stagedConfig.max_hp || stagedConfig.override_hp || bossHp);
+    finalCustomImageUrl = stagedConfig.custom_image_url || null;
+    finalBgUrl = stagedConfig.custom_bg_url || featureRow?.config?.custom_bg_url || null;
 
     // Clear staged_boss_config so it doesn't re-trigger, and promote staged artwork & fields to active config
     const updatedConfig = { ...(featureRow?.config || {}) };
     if (stagedConfig.game_name) updatedConfig.game_name = stagedConfig.game_name;
     if (sName) updatedConfig.override_name = sName;
-    if (sTitle) updatedConfig.boss_title = sTitle;
-    if (sLore) updatedConfig.lore = sLore;
-    if (sHp) updatedConfig.override_hp = sHp;
+    if (stagedConfig.boss_title) updatedConfig.boss_title = stagedConfig.boss_title;
+    if (stagedConfig.lore) updatedConfig.lore = stagedConfig.lore;
+    if (stagedConfig.override_hp || stagedConfig.max_hp) updatedConfig.override_hp = finalMaxHp;
     if (stagedConfig.custom_image_url) updatedConfig.custom_image_url = stagedConfig.custom_image_url;
     if (stagedConfig.custom_bg_url) updatedConfig.custom_bg_url = stagedConfig.custom_bg_url;
     if (stagedConfig.victory_image_url) updatedConfig.victory_image_url = stagedConfig.victory_image_url;
@@ -260,6 +379,36 @@ async function getOrCreateActiveBoss(guildId) {
       updated_at: new Date().toISOString(),
     });
     logger.info(`[BOSS] Deployed pre-staged weekly boss for week ${currentWeek}: ${finalBossName}`);
+  } else {
+    // ─── Case B: Automatic Rotation Fallback from Historical Pool ─────────────
+    const rotated = await selectRotatedFallbackBoss(guildId);
+    finalBossName = rotated.bossName;
+    finalBossTitle = rotated.bossTitle;
+    finalLore = rotated.lore;
+    finalMaxHp = rotated.maxHp || bossHp;
+    finalCustomImageUrl = rotated.customImageUrl;
+    finalBgUrl = rotated.customBgUrl;
+
+    const updatedConfig = {
+      ...(featureRow?.config || {}),
+      game_name: rotated.gameName,
+      override_name: rotated.bossName,
+      boss_name: rotated.bossName,
+      boss_title: rotated.bossTitle,
+      lore: rotated.lore,
+      override_hp: finalMaxHp,
+      custom_image_url: rotated.customImageUrl,
+      custom_bg_url: rotated.customBgUrl,
+    };
+    delete updatedConfig.staged_boss_config;
+
+    await supabase.from('guild_config').upsert({
+      guild_id: guildId,
+      feature_key: 'weekly_boss',
+      config: updatedConfig,
+      updated_at: new Date().toISOString(),
+    });
+    logger.info(`[BOSS] Deployed rotated historical boss fallback for week ${currentWeek}: ${finalBossName}`);
   }
 
   // Insert new weekly boss season in Supabase
@@ -1095,6 +1244,8 @@ async function spawnAndAnnounceWeeklyBoss(client, guildId, { forceNewPost = fals
 }
 
 module.exports = {
+  FALLBACK_BOSS_POOL,
+  selectRotatedFallbackBoss,
   getWeekIdentifier,
   getOrCreateActiveBoss,
   getPlayerState,
