@@ -26,11 +26,14 @@ interface LoreItem {
 interface MemberProfile {
   id: string;
   user_id: string;
+  discord_id?: string;
   display_name: string;
   familiarity_tier: number;
   interaction_count: number;
+  interactions_count?: number;
   last_spoke_at: string;
   facts: string[];
+  memory_text?: string;
 }
 
 export default function CompanionPage() {
@@ -84,7 +87,7 @@ export default function CompanionPage() {
         const data = await membersRes.json();
         setMembersList(data.members || []);
       }
-    } catch (e) {
+    } catch (e: unknown) {
       console.error('Failed to load ENOS NPC data:', e);
     } finally {
       setLoading(false);
@@ -116,7 +119,7 @@ export default function CompanionPage() {
         setNewLoreContent('');
         setShowAddLore(false);
       }
-    } catch (err) {
+    } catch (err: unknown) {
       console.error('Failed to add lore:', err);
     }
   };
@@ -127,7 +130,7 @@ export default function CompanionPage() {
       if (res.ok) {
         setLoreList(loreList.filter((item) => item.id !== id));
       }
-    } catch (err) {
+    } catch (err: unknown) {
       console.error('Failed to delete lore:', err);
     }
   };
@@ -140,7 +143,7 @@ export default function CompanionPage() {
       if (res.ok) {
         setMembersList(membersList.filter((m) => m.user_id !== userId));
       }
-    } catch (err) {
+    } catch (err: unknown) {
       console.error('Failed to forget member:', err);
     }
   };
@@ -509,7 +512,7 @@ export default function CompanionPage() {
                         <select
                           className="form-select"
                           value={newLoreCategory}
-                          onChange={(e) => setNewLoreCategory(e.target.value as any)}
+                          onChange={(e) => setNewLoreCategory(e.target.value as LoreItem['category'])}
                         >
                           <option value="milestone">Milestone (Server History)</option>
                           <option value="tradition">Tradition (Community Habit)</option>

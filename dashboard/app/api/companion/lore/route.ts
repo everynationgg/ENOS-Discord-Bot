@@ -2,12 +2,32 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { supabaseAdmin } from '@/lib/supabase';
 
-function getGuildId(req: NextRequest, body?: any) {
+interface LorePostBody {
+  guild_id?: string;
+  id?: string;
+  title?: string;
+  content?: string;
+  category?: string;
+  topic?: string;
+  fact_text?: string;
+}
+
+function getGuildId(req: NextRequest, body?: LorePostBody): string {
   return (
     req.nextUrl.searchParams.get('guild_id') ||
+    req.cookies.get('enos_guild_id')?.value ||
     body?.guild_id ||
     process.env.DISCORD_GUILD_ID!
   );
+}
+
+interface NpcServerLoreRow {
+  id: string;
+  guild_id: string;
+  title: string;
+  content: string;
+  category: string;
+  created_at: string;
 }
 
 // GET /api/companion/lore — list all server lore
@@ -24,9 +44,17 @@ export async function GET(req: NextRequest) {
       .order('created_at', { ascending: false });
 
     if (error) throw new Error(error.message);
-    return NextResponse.json({ lore: data || [] });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+
+    const lore = ((data || []) as NpcServerLoreRow[]).map((row) => ({
+      ...row,
+      topic: row.title,
+      fact_text: row.content,
+    }));
+
+    return NextResponse.json({ lore });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
 
@@ -36,23 +64,33 @@ export async function POST(req: NextRequest) {
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   try {
-    const body = await req.json();
+    const body = (await req.json()) as LorePostBody;
     const guildId = getGuildId(req, body);
-    const { id, title, content, category } = body;
+    const category = body.category || 'general';
+    const title = (body.title || body.topic || category).trim();
+    const content = (body.content || body.fact_text || '').trim();
 
     if (!title || !content) {
       return NextResponse.json({ error: 'Title and content are required' }, { status: 400 });
     }
 
-    const payload: any = {
+    interface LoreRecord {
+      id?: string;
+      guild_id: string;
+      category: string;
+      title: string;
+      content: string;
+    }
+
+    const payload: LoreRecord = {
       guild_id: guildId,
-      title: title.trim(),
-      content: content.trim(),
-      category: category || 'general',
+      category,
+      title,
+      content,
     };
 
-    if (id) {
-      payload.id = id;
+    if (body.id) {
+      payload.id = body.id;
     }
 
     const { data, error } = await supabaseAdmin
@@ -62,9 +100,19 @@ export async function POST(req: NextRequest) {
       .single();
 
     if (error) throw new Error(error.message);
-    return NextResponse.json({ success: true, item: data });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+
+    const item = data
+      ? {
+          ...data,
+          topic: (data as NpcServerLoreRow).title,
+          fact_text: (data as NpcServerLoreRow).content,
+        }
+      : null;
+
+    return NextResponse.json({ success: true, item });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
 
@@ -90,7 +138,8 @@ export async function DELETE(req: NextRequest) {
 
     if (error) throw new Error(error.message);
     return NextResponse.json({ success: true });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

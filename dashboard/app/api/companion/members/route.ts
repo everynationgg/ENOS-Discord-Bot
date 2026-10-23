@@ -2,12 +2,36 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { supabaseAdmin } from '@/lib/supabase';
 
-function getGuildId(req: NextRequest, body?: any) {
+interface MemberQueryBody {
+  guild_id?: string;
+}
+
+function getGuildId(req: NextRequest, body?: MemberQueryBody): string {
   return (
     req.nextUrl.searchParams.get('guild_id') ||
+    req.cookies.get('enos_guild_id')?.value ||
     body?.guild_id ||
     process.env.DISCORD_GUILD_ID!
   );
+}
+
+interface NpcRelationshipRow {
+  id: string;
+  guild_id: string;
+  user_id: string;
+  display_name: string | null;
+  familiarity_tier: number;
+  interaction_count: number;
+  first_seen_at: string;
+  last_spoke_at: string;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+interface NpcMemoryRow {
+  user_id: string;
+  fact: string;
 }
 
 // GET /api/companion/members — list member relationships and learned facts
@@ -19,12 +43,12 @@ export async function GET(req: NextRequest) {
     const guildId = getGuildId(req);
     const search = req.nextUrl.searchParams.get('q')?.toLowerCase() || '';
 
-    // Fetch relationships
+    // Fetch relationships ordered by interaction_count
     let query = supabaseAdmin
       .from('npc_relationships')
       .select('*')
       .eq('guild_id', guildId)
-      .order('last_spoke_at', { ascending: false })
+      .order('interaction_count', { ascending: false })
       .limit(100);
 
     if (search) {
@@ -34,33 +58,44 @@ export async function GET(req: NextRequest) {
     const { data: relationships, error: relError } = await query;
     if (relError) throw new Error(relError.message);
 
-    // Fetch all memories for these users
-    const userIds = (relationships || []).map((r) => r.user_id);
+    const relRows = (relationships || []) as NpcRelationshipRow[];
+    const userIds = relRows.map((r) => r.user_id);
     const memoriesByUser: Record<string, string[]> = {};
 
     if (userIds.length > 0) {
-      const { data: memories } = await supabaseAdmin
+      const { data: memories, error: memError } = await supabaseAdmin
         .from('npc_member_memories')
         .select('user_id, fact')
         .eq('guild_id', guildId)
         .in('user_id', userIds);
 
+      if (memError) throw new Error(memError.message);
+
       if (memories) {
-        for (const m of memories) {
+        for (const m of (memories as NpcMemoryRow[])) {
           if (!memoriesByUser[m.user_id]) memoriesByUser[m.user_id] = [];
           memoriesByUser[m.user_id].push(m.fact);
         }
       }
     }
 
-    const combined = (relationships || []).map((r) => ({
-      ...r,
-      facts: memoriesByUser[r.user_id] || [],
-    }));
+    const combined = relRows.map((r) => {
+      const userFacts = memoriesByUser[r.user_id] || [];
+      return {
+        ...r,
+        discord_id: r.user_id,
+        user_id: r.user_id,
+        interactions_count: r.interaction_count,
+        interaction_count: r.interaction_count,
+        facts: userFacts,
+        memory_text: userFacts.join(' • '),
+      };
+    });
 
     return NextResponse.json({ members: combined });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
 
@@ -71,27 +106,32 @@ export async function DELETE(req: NextRequest) {
 
   try {
     const { searchParams } = new URL(req.url);
-    const userId = searchParams.get('user_id');
+    const discordId = searchParams.get('discord_id') || searchParams.get('user_id');
     const guildId = getGuildId(req);
 
-    if (!userId) {
-      return NextResponse.json({ error: 'User ID is required' }, { status: 400 });
+    if (!discordId) {
+      return NextResponse.json({ error: 'User ID (discord_id) is required' }, { status: 400 });
     }
 
-    await supabaseAdmin
-      .from('npc_relationships')
-      .delete()
-      .eq('guild_id', guildId)
-      .eq('user_id', userId);
-
-    await supabaseAdmin
+    const { error: memError } = await supabaseAdmin
       .from('npc_member_memories')
       .delete()
       .eq('guild_id', guildId)
-      .eq('user_id', userId);
+      .eq('user_id', discordId);
 
-    return NextResponse.json({ success: true, message: `Member ${userId} forgotten successfully` });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    if (memError) throw new Error(memError.message);
+
+    const { error: relError } = await supabaseAdmin
+      .from('npc_relationships')
+      .delete()
+      .eq('guild_id', guildId)
+      .eq('user_id', discordId);
+
+    if (relError) throw new Error(relError.message);
+
+    return NextResponse.json({ success: true, message: `Member ${discordId} forgotten successfully` });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
