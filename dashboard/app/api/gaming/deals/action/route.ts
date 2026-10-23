@@ -4,7 +4,7 @@ import { supabaseAdmin } from '@/lib/supabase';
 
 const DISCORD_TOKEN = process.env.DISCORD_TOKEN || process.env.DISCORD_BOT_TOKEN;
 
-function getGuildId(req: NextRequest, body?: any) {
+function getGuildId(req: NextRequest, body?: { guild_id?: string }) {
   return (
     req.nextUrl.searchParams.get('guild_id') ||
     body?.guild_id ||
@@ -92,61 +92,92 @@ async function fetchCheapSharkDeals(minDiscountPercent = 50) {
 }
 
 async function fetchSteamFeaturedDeals(minDiscountPercent = 50) {
-  const deals: any[] = [];
+  const deals: Array<{
+    dealId: string;
+    title: string;
+    storeName: string;
+    normalPrice: number;
+    salePrice: number;
+    savingsPercent: number;
+    isFree: boolean;
+    dealUrl: string;
+    imageUrl: string;
+    expiresAt: string;
+  }> = [];
   const seenAppIds = new Set<string>();
   const expiresAt = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString();
 
-  // 1. Scrape Steam Specials Storefront Search Pages 1..4 (captures Franchise Sales, Event Hubs like REAL-WORLD MAPS, 911/112 Operator, King's Orders)
-  for (let page = 1; page <= 4; page++) {
+  // 1. Scrape Steam Specials Storefront Search Pages 1..4 concurrently
+  const pagePromises = [1, 2, 3, 4].map(async (page) => {
     try {
       const searchRes = await fetch(`https://store.steampowered.com/search/?specials=1&cc=US&l=english&page=${page}`, {
         headers: { 'User-Agent': USER_AGENT },
       });
-      if (searchRes.ok) {
-        const html = await searchRes.text();
-        const rowRegex = /<a href="https:\/\/store\.steampowered\.com\/app\/(\d+)\/([^/?"']+)\/[^"]*"[^>]*>([\s\S]*?)<\/a>/g;
-        let match;
+      if (!searchRes.ok) return [];
 
-        while ((match = rowRegex.exec(html)) !== null) {
-          const appId = match[1];
-          if (seenAppIds.has(appId)) continue;
+      const html = await searchRes.text();
+      const rowRegex = /<a href="https:\/\/store\.steampowered\.com\/app\/(\d+)\/([^/?"']+)\/[^"]*"[^>]*>([\s\S]*?)<\/a>/g;
+      let match;
+      const parsedDeals: Array<{
+        dealId: string;
+        title: string;
+        storeName: string;
+        normalPrice: number;
+        salePrice: number;
+        savingsPercent: number;
+        isFree: boolean;
+        dealUrl: string;
+        imageUrl: string;
+        expiresAt: string;
+      }> = [];
 
-          const titleSlug = decodeURIComponent(match[2]).replace(/_/g, ' ');
-          const innerHtml = match[3];
+      while ((match = rowRegex.exec(html)) !== null) {
+        const appId = match[1];
+        const titleSlug = decodeURIComponent(match[2]).replace(/_/g, ' ');
+        const innerHtml = match[3];
 
-          const titleMatch = /<span class="title">([^<]+)<\/span>/.exec(innerHtml);
-          const title = titleMatch ? titleMatch[1].trim() : titleSlug;
+        const titleMatch = /<span class="title">([^<]+)<\/span>/.exec(innerHtml);
+        const title = titleMatch ? titleMatch[1].trim() : titleSlug;
 
-          const discountMatch = /discount_pct">([^<]+)</.exec(innerHtml);
-          const discountText = discountMatch ? discountMatch[1].replace(/[-%\s]/g, '') : '0';
-          const savingsPercent = parseInt(discountText, 10) || 0;
+        const discountMatch = /discount_pct">([^<]+)</.exec(innerHtml);
+        const discountText = discountMatch ? discountMatch[1].replace(/[-%\s]/g, '') : '0';
+        const savingsPercent = parseInt(discountText, 10) || 0;
 
-          if (savingsPercent < minDiscountPercent) continue;
-          seenAppIds.add(appId);
+        if (savingsPercent < minDiscountPercent) continue;
 
-          const origMatch = /discount_original_price">([^<]+)</.exec(innerHtml);
-          const normalPrice = origMatch ? parseFloat(origMatch[1].replace(/[^0-9.]/g, '')) || 0 : 0;
+        const origMatch = /discount_original_price">([^<]+)</.exec(innerHtml);
+        const normalPrice = origMatch ? parseFloat(origMatch[1].replace(/[^0-9.]/g, '')) || 0 : 0;
 
-          const finalMatch = /discount_final_price">([^<]+)</.exec(innerHtml);
-          const salePrice = finalMatch ? parseFloat(finalMatch[1].replace(/[^0-9.]/g, '')) || 0 : 0;
-          const isFree = salePrice === 0 || savingsPercent >= 100;
+        const finalMatch = /discount_final_price">([^<]+)</.exec(innerHtml);
+        const salePrice = finalMatch ? parseFloat(finalMatch[1].replace(/[^0-9.]/g, '')) || 0 : 0;
+        const isFree = salePrice === 0 || savingsPercent >= 100;
 
-          deals.push({
-            dealId: `steam_${appId}`,
-            title,
-            storeName: 'Steam',
-            normalPrice,
-            salePrice,
-            savingsPercent,
-            isFree,
-            dealUrl: `https://store.steampowered.com/app/${appId}`,
-            imageUrl: `https://cdn.akamai.steamstatic.com/steam/apps/${appId}/header.jpg`,
-            expiresAt,
-          });
-        }
+        parsedDeals.push({
+          dealId: `steam_${appId}`,
+          title,
+          storeName: 'Steam',
+          normalPrice,
+          salePrice,
+          savingsPercent,
+          isFree,
+          dealUrl: `https://store.steampowered.com/app/${appId}`,
+          imageUrl: `https://cdn.akamai.steamstatic.com/steam/apps/${appId}/header.jpg`,
+          expiresAt,
+        });
       }
-    } catch (err) {
-      // ignore
+      return parsedDeals;
+    } catch {
+      return [];
+    }
+  });
+
+  const pageResults = await Promise.all(pagePromises);
+  for (const pageDeals of pageResults) {
+    for (const d of pageDeals) {
+      const appId = d.dealId.replace('steam_', '');
+      if (seenAppIds.has(appId)) continue;
+      seenAppIds.add(appId);
+      deals.push(d);
     }
   }
 
@@ -314,11 +345,11 @@ export async function POST(req: NextRequest) {
           continue;
         }
 
-        if (newlyPosted >= 20) break; // Allow up to 20 deal alerts per trigger (Discord anti-spam safe)
+        if (newlyPosted >= 8) break; // Cap per-request Discord dispatch batch to 8 new deals to fit within Vercel's 10s serverless timeout
 
-        // 1.2s delay between posts to strictly comply with Discord's rate limit (5 msg / 5s)
+        // 350ms delay between posts for fast Vercel execution while respecting Discord's ratelimit
         if (newlyPosted > 0) {
-          await new Promise((r) => setTimeout(r, 1200));
+          await new Promise((r) => setTimeout(r, 350));
         }
 
         const is100Free = deal.isFree || deal.savingsPercent >= 100;
@@ -328,7 +359,7 @@ export async function POST(req: NextRequest) {
 
         const embedColor = is100Free ? 0x10B981 : 0xF59E0B;
 
-        const embed: any = {
+        const embed: Record<string, unknown> = {
           title: titleHeader,
           url: deal.dealUrl,
           description:
@@ -443,7 +474,8 @@ export async function POST(req: NextRequest) {
     }
 
     return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message || 'Internal Server Error' }, { status: 500 });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Internal Server Error';
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

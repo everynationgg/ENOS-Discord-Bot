@@ -68,7 +68,14 @@ export default function DiscordEmbedPreview({
     bodyFontWeight = 600;
   }
 
-  const selectedItem = selectedItemIndex !== null ? dropdownItems[selectedItemIndex] : null;
+  const effectiveIndex =
+    selectedItemIndex !== null && dropdownItems[selectedItemIndex]
+      ? selectedItemIndex
+      : dropdownItems.length > 0
+      ? 0
+      : null;
+
+  const selectedItem = effectiveIndex !== null ? dropdownItems[effectiveIndex] : null;
 
   return (
     <div
@@ -195,7 +202,7 @@ export default function DiscordEmbedPreview({
               padding: '0.4rem 0.6rem',
               fontSize: '0.8rem',
             }}
-            value={selectedItemIndex ?? 0}
+            value={effectiveIndex ?? 0}
             onChange={(e) => setSelectedItemIndex(Number(e.target.value))}
           >
             {dropdownItems.map((item, idx) => (

@@ -1,39 +1,49 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 
 type SaveStatus = 'idle' | 'saving' | 'saved' | 'error';
 
-interface FeatureCardProps {
+interface FeatureCardProps<T = Record<string, unknown>> {
   id: string;
   icon: string;
   title: string;
   description: string;
   featureKey: string;
   initialEnabled?: boolean;
-  initialConfig?: Record<string, any>;
-  onSave?: (config: Record<string, any>, enabled: boolean) => void;
+  initialConfig?: T;
+  onSave?: (config: T, enabled: boolean) => Promise<void> | void;
   onToggle?: (enabled: boolean) => void;
-  children?: (config: Record<string, any>, setConfig: (key: string, value: any) => void) => React.ReactNode;
+  children?: (config: T, setConfig: (key: string, value: unknown) => void) => React.ReactNode;
 }
 
-export default function FeatureCard({
+export default function FeatureCard<T = Record<string, unknown>>({
   id,
   icon,
   title,
   description,
   featureKey,
   initialEnabled = false,
-  initialConfig = {},
+  initialConfig,
   onSave,
   onToggle,
   children,
-}: FeatureCardProps) {
+}: FeatureCardProps<T>) {
   const [enabled, setEnabled] = useState(initialEnabled);
-  const [config, setConfigState] = useState<Record<string, any>>(initialConfig);
+  const [config, setConfigState] = useState<T>((initialConfig ?? {}) as T);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
 
-  const setConfig = useCallback((key: string, value: any) => {
+  useEffect(() => {
+    setEnabled(initialEnabled);
+  }, [initialEnabled]);
+
+  useEffect(() => {
+    if (initialConfig !== undefined) {
+      setConfigState(initialConfig);
+    }
+  }, [initialConfig]);
+
+  const setConfig = useCallback((key: string, value: unknown) => {
     setConfigState((prev) => ({ ...prev, [key]: value }));
     setSaveStatus('idle');
   }, []);
@@ -42,12 +52,16 @@ export default function FeatureCard({
     setEnabled(newEnabled);
     setSaveStatus('saving');
     try {
-      const res = await fetch('/api/config', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ feature_key: featureKey, enabled: newEnabled, config }),
-      });
-      if (!res.ok) throw new Error('Failed');
+      if (onSave) {
+        await onSave(config, newEnabled);
+      } else {
+        const res = await fetch('/api/config', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ feature_key: featureKey, enabled: newEnabled, config }),
+        });
+        if (!res.ok) throw new Error('Failed');
+      }
       onToggle?.(newEnabled);
       setSaveStatus('saved');
       setTimeout(() => setSaveStatus('idle'), 2500);

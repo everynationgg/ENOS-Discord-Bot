@@ -1245,7 +1245,7 @@ export default function ModerationPage() {
                           <tbody>
                             {registrations
                               .filter(r => !gameFilter || r.game_key === gameFilter)
-                              .filter(r => !searchQuery || r.discord_tag.toLowerCase().includes(searchQuery.toLowerCase()) || r.ign.toLowerCase().includes(searchQuery.toLowerCase()))
+                              .filter(r => !searchQuery || (r.discord_tag || '').toLowerCase().includes(searchQuery.toLowerCase()) || (r.ign || '').toLowerCase().includes(searchQuery.toLowerCase()))
                               .map((reg) => (
                                 <tr key={reg.id}>
                                   <td>
@@ -1577,7 +1577,7 @@ export default function ModerationPage() {
                     </div>
 
                     {dropdownItems.length === 0 ? (
-                      <div style={{ padding: '0.85rem', borderRadius: '8px', backgroundColor: 'var(--bg-secondary)', border: '1px border-color', fontSize: '0.8125rem', color: 'var(--text-muted)', textAlign: 'center' }}>
+                      <div style={{ padding: '0.85rem', borderRadius: '8px', backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-color)', fontSize: '0.8125rem', color: 'var(--text-muted)', textAlign: 'center' }}>
                         ℹ️ No dropdown options configured. The announcement will be published as a clean update without interactive dropdowns.
                       </div>
                     ) : (
