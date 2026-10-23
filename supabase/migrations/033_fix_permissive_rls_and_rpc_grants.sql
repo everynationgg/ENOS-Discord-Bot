@@ -3,39 +3,62 @@
 -- Additive & Idempotent — Safe to run on production Supabase
 -- =============================================================================
 
--- 1. Explicitly drop legacy TO PUBLIC policies that survived migration 032
--- Member Invites
+-- 1. Explicitly drop legacy TO PUBLIC policies and enforce service_role_all across all 6 tables
+DO $$
+DECLARE
+  tbl TEXT;
+  pol RECORD;
+BEGIN
+  FOREACH tbl IN ARRAY ARRAY[
+    'member_invites',
+    'temp_voice_channels',
+    'achievements',
+    'user_achievements',
+    'newsroom_posts',
+    'feature_resource_metrics'
+  ]
+  LOOP
+    IF EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = tbl) THEN
+      -- Drop any legacy/public policies
+      FOR pol IN
+        SELECT policyname
+        FROM pg_policies
+        WHERE schemaname = 'public'
+          AND tablename = tbl
+          AND (
+            policyname ILIKE '%public%'
+            OR policyname ILIKE '%allow%'
+            OR policyname ILIKE '%service role%'
+            OR policyname = 'service_role_all'
+          )
+      LOOP
+        EXECUTE format('DROP POLICY IF EXISTS %I ON public.%I;', pol.policyname, tbl);
+      END LOOP;
+
+      -- Enforce uniform service_role_all policy
+      EXECUTE format(
+        'CREATE POLICY "service_role_all" ON public.%I FOR ALL TO service_role USING (true) WITH CHECK (true);',
+        tbl
+      );
+    END IF;
+  END LOOP;
+END $$;
+
+-- Explicit drops by name for complete backward compatibility
 DROP POLICY IF EXISTS "Allow public read access on member_invites" ON public.member_invites;
 DROP POLICY IF EXISTS "Allow service role full access on member_invites" ON public.member_invites;
-
--- Temp Voice Channels
 DROP POLICY IF EXISTS "Allow public read on temp_voice_channels" ON public.temp_voice_channels;
 DROP POLICY IF EXISTS "Service role full access on temp_voice_channels" ON public.temp_voice_channels;
 DROP POLICY IF EXISTS "Allow service role full access on temp_voice_channels" ON public.temp_voice_channels;
-DROP POLICY IF EXISTS "service_role_all" ON public.temp_voice_channels;
-
-CREATE POLICY "service_role_all"
-  ON public.temp_voice_channels FOR ALL
-  TO service_role
-  USING (true)
-  WITH CHECK (true);
-
--- Achievements
 DROP POLICY IF EXISTS "Allow public read access on achievements" ON public.achievements;
 DROP POLICY IF EXISTS "Service Role Full Access Achievements" ON public.achievements;
 DROP POLICY IF EXISTS "Allow service role full access on achievements" ON public.achievements;
-
--- User Achievements
 DROP POLICY IF EXISTS "Allow public read access on user_achievements" ON public.user_achievements;
 DROP POLICY IF EXISTS "Service Role Full Access User Achievements" ON public.user_achievements;
 DROP POLICY IF EXISTS "Allow service role full access on user_achievements" ON public.user_achievements;
-
--- Newsroom Posts
 DROP POLICY IF EXISTS "Allow public read access on newsroom_posts" ON public.newsroom_posts;
 DROP POLICY IF EXISTS "Service Role Full Access Newsroom Posts" ON public.newsroom_posts;
 DROP POLICY IF EXISTS "Allow service role full access on newsroom_posts" ON public.newsroom_posts;
-
--- Feature Resource Metrics
 DROP POLICY IF EXISTS "Allow public read on feature_resource_metrics" ON public.feature_resource_metrics;
 
 -- Storage Objects: Drop public upload/update policies and recreate with TO service_role
