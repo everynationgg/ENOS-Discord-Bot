@@ -46,10 +46,11 @@ module.exports = {
 
       // ─── Button Interactions ──────────────────────────────────────────────────
       if (interaction.isButton()) {
-        const cooldownKey = `${interaction.user.id}:${interaction.customId}`;
+        const actionGroup = interaction.customId.split(':')[0];
+        const cooldownKey = `${interaction.user.id}:${actionGroup}`;
         const now = Date.now();
         const lastClick = userButtonCooldowns.get(cooldownKey) || 0;
-        if (now - lastClick < 1200) {
+        if (now - lastClick < 2000) {
           return interaction.reply({ content: '⏱️ Please wait a moment before clicking again.', flags: MessageFlags.Ephemeral }).catch(() => {});
         }
         userButtonCooldowns.set(cooldownKey, now);

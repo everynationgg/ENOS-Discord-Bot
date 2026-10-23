@@ -17,49 +17,9 @@ const {
   executeCombatAction,
   getWeekIdentifier,
 } = require('../modules/gaming/boss');
-const { renderBossImage } = require('../modules/gaming/bossCanvas');
-const { supabase } = require('../lib/supabase');
+const { renderBossImage, resolveDirectImageUrl: resolveImageUrl } = require('../modules/gaming/bossCanvas');
+const { supabase, clearFeatureConfigCache } = require('../lib/supabase');
 const logger = require('../lib/logger');
-
-/**
- * Resolves an ibb.co share page link to a direct i.ibb.co image URL.
- * Direct links (i.ibb.co) are returned as-is.
- */
-async function resolveImageUrl(url) {
-  if (!url || typeof url !== 'string') return null;
-  if (!url.startsWith('http')) return null;
-  if (url.includes('i.ibb.co/') || /\.(png|jpg|jpeg|gif|webp)(\?.*)?$/i.test(url)) return url;
-  try {
-    const controller = new AbortController();
-    const t = setTimeout(() => controller.abort(), 8000);
-    const res = await fetch(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.9',
-        'Cache-Control': 'max-age=0',
-        'Sec-Ch-Ua': '"Chromium";v="124", "Google Chrome";v="124", "Not-A.Brand";v="99"',
-        'Sec-Ch-Ua-Mobile': '?0',
-        'Sec-Ch-Ua-Platform': '"Windows"',
-        'Sec-Fetch-Dest': 'document',
-        'Sec-Fetch-Mode': 'navigate',
-        'Sec-Fetch-Site': 'none',
-        'Sec-Fetch-User': '?1',
-        'Upgrade-Insecure-Requests': '1'
-      },
-      signal: controller.signal,
-    });
-    clearTimeout(t);
-    if (res.ok) {
-      const html = await res.text();
-      const m = html.match(/<meta\s+property=["']og:image["']\s+content=["']([^"']+)["']/i) ||
-                html.match(/<img\s+src=["'](https:\/\/i\.ibb\.co\/[^"']+)["']/i) ||
-                html.match(/(https:\/\/i\.ibb\.co\/[a-zA-Z0-9_\-\.\/]+)/i);
-      if (m && m[1]) return m[1];
-    }
-  } catch (e) {}
-  return url;
-}
 
 /**
  * Determines whether the Weekly Boss battle is officially concluded.
@@ -232,8 +192,6 @@ async function buildPublicBossEmbedPayload(guildId) {
       new ButtonBuilder().setCustomId('boss_leaderboard').setLabel('Leaderboard').setStyle(ButtonStyle.Secondary).setEmoji('📊')
     );
   }
-
-  return { embeds: [embed], files: [attachment], components: [publicRow] };
 
   return { embeds: [embed], files: [attachment], components: [publicRow] };
 }
@@ -448,6 +406,7 @@ module.exports = {
             config: updatedConfig,
             updated_at: new Date().toISOString(),
           });
+        clearFeatureConfigCache(interaction.guild.id, 'weekly_boss');
       } catch (e) {}
 
       return;
@@ -548,23 +507,32 @@ module.exports = {
     }
 
     if (customId === 'boss_info') {
-      const embed = new EmbedBuilder()
-        .setColor(0x38bdf8)
-        .setTitle('📖 Weekly Boss Skill & Synergy Guide')
-        .setDescription(
-          `**Combat Triad Classes & Attacks**:\n` +
-          `• 🛡️ **M.O.M.**: Attack \`Guilt Trip\` (5 AP) ➔ Deals 23,000 DMG + Applies **M.O.M. Buff**\n` +
-          `• 🔨 **D.A.D.**: Attack \`Dad Joke\` (5 AP) ➔ Deals 23,000 DMG + Applies **D.A.D. Debuff**\n` +
-          `• ⚡ **K.I.D.**: Attack \`Grocery Meltdown\` (5 AP) ➔ The only class that uses & consumes buffs for combo DMG!\n\n` +
-          `**Damage Scaling Math**:\n` +
-          `• 🔥 **M.O.M. / D.A.D. Attack (5 AP)**: 23,000 DMG (Sets up buffs for K.I.D.; never consumes each other's buff)\n` +
-          `• 💥 **K.I.D. Solo Attack (5 AP)**: 23,000 DMG (No buffs active)\n` +
-          `• ⚡ **K.I.D. 2-Class Combo (5 AP + 1 Active Buff)**: 38,000 DMG\n` +
-          `• 🚀 **K.I.D. Full Triad Meltdown (5 AP + Both Buffs)**: 68,000 DMG!\n\n` +
-          `*Note: Only K.I.D. can use the M.O.M. and D.A.D. buffs. When M.O.M. or D.A.D. attack, their setups remain preserved on the boss until K.I.D. strikes!*`
-        );
-      const replyMsg = await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral, fetchReply: true });
-      setTimeout(() => replyMsg.delete().catch(() => {}), 10000);
+      try {
+        const embed = new EmbedBuilder()
+          .setColor(0x38bdf8)
+          .setTitle('📖 Weekly Boss Skill & Synergy Guide')
+          .setDescription(
+            `**Combat Triad Classes & Attacks**:\n` +
+            `• 🛡️ **M.O.M.**: Attack \`Guilt Trip\` (5 AP) ➔ Deals 23,000 DMG + Applies **M.O.M. Buff**\n` +
+            `• 🔨 **D.A.D.**: Attack \`Dad Joke\` (5 AP) ➔ Deals 23,000 DMG + Applies **D.A.D. Debuff**\n` +
+            `• ⚡ **K.I.D.**: Attack \`Grocery Meltdown\` (5 AP) ➔ The only class that uses & consumes buffs for combo DMG!\n\n` +
+            `**Damage Scaling Math**:\n` +
+            `• 🔥 **M.O.M. / D.A.D. Attack (5 AP)**: 23,000 DMG (Sets up buffs for K.I.D.; never consumes each other's buff)\n` +
+            `• 💥 **K.I.D. Solo Attack (5 AP)**: 23,000 DMG (No buffs active)\n` +
+            `• ⚡ **K.I.D. 2-Class Combo (5 AP + 1 Active Buff)**: 38,000 DMG\n` +
+            `• 🚀 **K.I.D. Full Triad Meltdown (5 AP + Both Buffs)**: 68,000 DMG!\n\n` +
+            `*Note: Only K.I.D. can use the M.O.M. and D.A.D. buffs. When M.O.M. or D.A.D. attack, their setups remain preserved on the boss until K.I.D. strikes!*`
+          );
+        if (!interaction.replied && !interaction.deferred) {
+          const replyMsg = await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral, fetchReply: true });
+          setTimeout(() => replyMsg.delete().catch(() => {}), 10000);
+        } else if (interaction.deferred) {
+          const replyMsg = await interaction.editReply({ embeds: [embed] });
+          setTimeout(() => replyMsg.delete().catch(() => {}), 10000);
+        }
+      } catch (err) {
+        logger.error('[BOSS BUTTON] Error in boss_info handler:', err);
+      }
       return;
     }
 
@@ -686,6 +654,7 @@ module.exports = {
                   config: { ...(featureRow?.config || {}), last_message_id: publicMsg.id, last_channel_id: channelId },
                   updated_at: new Date().toISOString(),
                 });
+                clearFeatureConfigCache(guildId, 'weekly_boss');
               }
             }
           }

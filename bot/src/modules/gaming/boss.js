@@ -1,8 +1,9 @@
-const { supabase, logBotEvent } = require('../../lib/supabase');
+const { supabase, logBotEvent, clearFeatureConfigCache } = require('../../lib/supabase');
 const logger = require('../../lib/logger');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
+const activeBossUsers = new Set();
 
 /**
  * Gets the current ISO week identifier string (e.g. "2026-W32").
@@ -261,6 +262,7 @@ async function getOrCreateActiveBoss(guildId) {
         config: updatedConfig,
         updated_at: new Date().toISOString(),
       }).eq('guild_id', guildId).eq('feature_key', 'weekly_boss');
+      clearFeatureConfigCache(guildId, 'weekly_boss');
 
       return updatedBoss || activeBoss;
     }
@@ -651,68 +653,89 @@ async function setPlayerClass(guildId, userId, classKey) {
  * Allocates stat points into RPG user profile attributes.
  */
 async function allocateStatPoint(guildId, userId, statType) {
-  const profile = await getUserProfile(guildId, userId);
-  if (!profile) return { success: false, message: 'Profile not found.' };
-
-  if (profile.unallocated_stats <= 0) {
-    return { success: false, message: '❌ You have no unallocated stat points available. Level up to earn more!' };
+  const userKey = `${guildId}:${userId}`;
+  if (activeBossUsers.has(userKey)) {
+    return { success: false, message: '⏳ Action in progress, please wait...' };
   }
+  activeBossUsers.add(userKey);
 
-  const updates = { unallocated_stats: profile.unallocated_stats - 1, updated_at: new Date().toISOString() };
+  try {
+    const profile = await getUserProfile(guildId, userId);
+    if (!profile) return { success: false, message: 'Profile not found.' };
 
-  if (statType === 'dmg') {
-    if ((profile.stat_dmg || 0) >= 35) {
-      return { success: false, message: '❌ Damage Bonus is capped at 35 points (+35% max).' };
+    if (profile.unallocated_stats <= 0) {
+      return { success: false, message: '❌ You have no unallocated stat points available. Level up to earn more!' };
     }
-    updates.stat_dmg = (profile.stat_dmg || 0) + 1;
-  } else if (statType === 'crit') {
-    if ((profile.stat_crit || 0) >= 35) {
-      return { success: false, message: '❌ Critical Strike is capped at 35 points (+35% max chance).' };
+
+    const updates = { unallocated_stats: profile.unallocated_stats - 1, updated_at: new Date().toISOString() };
+
+    if (statType === 'dmg') {
+      if ((profile.stat_dmg || 0) >= 35) {
+        return { success: false, message: '❌ Damage Bonus is capped at 35 points (+35% max).' };
+      }
+      updates.stat_dmg = (profile.stat_dmg || 0) + 1;
+    } else if (statType === 'crit') {
+      if ((profile.stat_crit || 0) >= 35) {
+        return { success: false, message: '❌ Critical Strike is capped at 35 points (+35% max chance).' };
+      }
+      updates.stat_crit = (profile.stat_crit || 0) + 1;
+    } else if (statType === 'ap_save') {
+      if ((profile.stat_ap_save || 0) >= 15) {
+        return { success: false, message: '❌ AP Conservation is capped at 15 points (+15% max chance).' };
+      }
+      updates.stat_ap_save = (profile.stat_ap_save || 0) + 1;
+    } else if (statType === 'xp_boost') {
+      if ((profile.stat_xp_boost || 0) >= 10) {
+        return { success: false, message: '❌ XP Rate Boost is capped at 10 points (+10% max boost).' };
+      }
+      updates.stat_xp_boost = (profile.stat_xp_boost || 0) + 1;
+    } else if (statType === 'loot_boost') {
+      if ((profile.stat_loot_boost || 0) >= 10) {
+        return { success: false, message: '❌ Loot Multiplier is capped at 10 points (+10% max bonus).' };
+      }
+      updates.stat_loot_boost = (profile.stat_loot_boost || 0) + 1;
+    } else {
+      return { success: false, message: 'Invalid stat type.' };
     }
-    updates.stat_crit = (profile.stat_crit || 0) + 1;
-  } else if (statType === 'ap_save') {
-    if ((profile.stat_ap_save || 0) >= 15) {
-      return { success: false, message: '❌ AP Conservation is capped at 15 points (+15% max chance).' };
+
+    const { data: updatedProfile, error } = await supabase
+      .from('boss_user_profiles')
+      .update(updates)
+      .eq('guild_id', guildId)
+      .eq('user_id', userId)
+      .eq('unallocated_stats', profile.unallocated_stats)
+      .gt('unallocated_stats', 0)
+      .select('id')
+      .maybeSingle();
+
+    if (error || !updatedProfile) {
+      return { success: false, message: 'Failed to allocate stat point.' };
     }
-    updates.stat_ap_save = (profile.stat_ap_save || 0) + 1;
-  } else if (statType === 'xp_boost') {
-    if ((profile.stat_xp_boost || 0) >= 10) {
-      return { success: false, message: '❌ XP Rate Boost is capped at 10 points (+10% max boost).' };
-    }
-    updates.stat_xp_boost = (profile.stat_xp_boost || 0) + 1;
-  } else if (statType === 'loot_boost') {
-    if ((profile.stat_loot_boost || 0) >= 10) {
-      return { success: false, message: '❌ Loot Multiplier is capped at 10 points (+10% max bonus).' };
-    }
-    updates.stat_loot_boost = (profile.stat_loot_boost || 0) + 1;
-  } else {
-    return { success: false, message: 'Invalid stat type.' };
+
+    return { success: true, message: `✅ Allocated 1 point into **${statType.toUpperCase()}**!` };
+  } finally {
+    activeBossUsers.delete(userKey);
   }
-
-  const { error } = await supabase
-    .from('boss_user_profiles')
-    .update(updates)
-    .eq('guild_id', guildId)
-    .eq('user_id', userId);
-
-  if (error) {
-    return { success: false, message: 'Failed to allocate stat point.' };
-  }
-
-  return { success: true, message: `✅ Allocated 1 point into **${statType.toUpperCase()}**!` };
 }
 
 /**
  * Executes a player combat action (basic attack or 3 AP skill).
  */
 async function executeCombatAction(guildId, userId, actionType) {
-  const boss = await getOrCreateActiveBoss(guildId);
-  const playerState = await getPlayerState(guildId, userId);
-  const profile = await getUserProfile(guildId, userId);
-
-  if (!boss || !playerState || !profile) {
-    return { success: false, message: 'Failed to load combat records.' };
+  const userKey = `${guildId}:${userId}`;
+  if (activeBossUsers.has(userKey)) {
+    return { success: false, message: '⏳ Action in progress, please wait...' };
   }
+  activeBossUsers.add(userKey);
+
+  try {
+    const boss = await getOrCreateActiveBoss(guildId);
+    const playerState = await getPlayerState(guildId, userId);
+    const profile = await getUserProfile(guildId, userId);
+
+    if (!boss || !playerState || !profile) {
+      return { success: false, message: 'Failed to load combat records.' };
+    }
 
   if (!playerState.class_key) {
     return { success: false, message: '❌ You must pick a class before performing an attack!' };
@@ -942,19 +965,22 @@ async function executeCombatAction(guildId, userId, actionType) {
     }
   }
 
-  return {
-    success: true,
-    damageDealt: totalDmg,
-    pointsEarned,
-    xpEarned,
-    apRemaining: newAp,
-    apConserved,
-    leveledUp: newLevel > profile.level,
-    newLevel,
-    isSynergy,
-    synergyType,
-    skillName,
-  };
+    return {
+      success: true,
+      damageDealt: totalDmg,
+      pointsEarned,
+      xpEarned,
+      apRemaining: newAp,
+      apConserved,
+      leveledUp: newLevel > profile.level,
+      newLevel,
+      isSynergy,
+      synergyType,
+      skillName,
+    };
+  } finally {
+    activeBossUsers.delete(userKey);
+  }
 }
 
 /**
@@ -980,18 +1006,23 @@ async function triggerOverkillRevival(guildId, boss) {
       .eq('guild_id', guildId)
       .eq('week_identifier', boss.week_identifier);
 
-    for (const p of participants || []) {
-      const apUsed = Math.max(0, 5 - (p.ap_remaining || 0));
-      if (apUsed > 0) {
-        const slayPoints = Number(((apUsed / 5) * 1.5).toFixed(2));
-        await supabase
-          .from('boss_player_states')
-          .update({ weekly_points: slayPoints })
-          .eq('id', p.id);
+    const activeParticipants = (participants || []).filter((p) => Math.max(0, 5 - (p.ap_remaining || 0)) > 0);
+    const BATCH_SIZE = 8;
+    for (let i = 0; i < activeParticipants.length; i += BATCH_SIZE) {
+      const batch = activeParticipants.slice(i, i + BATCH_SIZE);
+      await Promise.allSettled(
+        batch.map(async (p) => {
+          const apUsed = Math.max(0, 5 - (p.ap_remaining || 0));
+          const slayPoints = Number(((apUsed / 5) * 1.5).toFixed(2));
+          await supabase
+            .from('boss_player_states')
+            .update({ weekly_points: slayPoints })
+            .eq('id', p.id);
 
-        await awardCoins(p.user_id, guildId, slayPoints, 'boss_main_slay', null).catch(() => {});
-        logger.info(`[BOSS] Main Boss Defeated: Awarded ${slayPoints} points to ${p.user_id} (${apUsed}/5 AP used)`);
-      }
+          await awardCoins(p.user_id, guildId, slayPoints, 'boss_main_slay', null).catch(() => {});
+          logger.info(`[BOSS] Main Boss Defeated: Awarded ${slayPoints} points to ${p.user_id} (${apUsed}/5 AP used)`);
+        })
+      );
     }
   } catch (err) {
     logger.error('[BOSS] Error distributing Main Boss slay points:', err.message);
@@ -1049,23 +1080,28 @@ async function handleOverkillDefeat(guildId, boss) {
       .eq('guild_id', guildId)
       .eq('week_identifier', boss.week_identifier);
 
-    for (const p of participants || []) {
-      const apUsed = Math.max(0, 5 - (p.ap_remaining || 0));
-      if (apUsed > 0) {
-        const overkillPoints = Number(((apUsed / 5) * 2.5).toFixed(2));
-        const prevPoints = Number(p.weekly_points || 0);
-        const delta = Math.max(0, overkillPoints - prevPoints);
+    const activeParticipants = (participants || []).filter((p) => Math.max(0, 5 - (p.ap_remaining || 0)) > 0);
+    const BATCH_SIZE = 8;
+    for (let i = 0; i < activeParticipants.length; i += BATCH_SIZE) {
+      const batch = activeParticipants.slice(i, i + BATCH_SIZE);
+      await Promise.allSettled(
+        batch.map(async (p) => {
+          const apUsed = Math.max(0, 5 - (p.ap_remaining || 0));
+          const overkillPoints = Number(((apUsed / 5) * 2.5).toFixed(2));
+          const prevPoints = Number(p.weekly_points || 0);
+          const delta = Math.max(0, overkillPoints - prevPoints);
 
-        await supabase
-          .from('boss_player_states')
-          .update({ weekly_points: overkillPoints })
-          .eq('id', p.id);
+          await supabase
+            .from('boss_player_states')
+            .update({ weekly_points: overkillPoints })
+            .eq('id', p.id);
 
-        if (delta > 0) {
-          await awardCoins(p.user_id, guildId, delta, 'boss_overkill_slay', null).catch(() => {});
-        }
-        logger.info(`[BOSS] Overkill Boss Defeated: Updated ${p.user_id} to ${overkillPoints} points (1.5x multiplier)`);
-      }
+          if (delta > 0) {
+            await awardCoins(p.user_id, guildId, delta, 'boss_overkill_slay', null).catch(() => {});
+          }
+          logger.info(`[BOSS] Overkill Boss Defeated: Updated ${p.user_id} to ${overkillPoints} points (1.5x multiplier)`);
+        })
+      );
     }
   } catch (err) {
     logger.error('[BOSS] Error distributing Overkill Boss slay points:', err.message);
@@ -1155,14 +1191,14 @@ async function concludeWeeklyBossBattle(guildId, client = null) {
  *   boss cards in the channel and always posts a brand new message. When false (Realtime live update):
  *   edits the existing card in place, or posts if none found.
  */
-let isBossSpawnInProgress = false;
+const spawningBossGuilds = new Set();
 
 async function spawnAndAnnounceWeeklyBoss(client, guildId, { forceNewPost = false } = {}) {
-  if (isBossSpawnInProgress) {
-    logger.warn('[BOSS SPAWN] Spawn/announce already in progress, skipping concurrent call.');
+  if (spawningBossGuilds.has(guildId)) {
+    logger.warn(`[BOSS SPAWN] Spawn/announce already in progress for guild ${guildId}, skipping concurrent call.`);
     return null;
   }
-  isBossSpawnInProgress = true;
+  spawningBossGuilds.add(guildId);
 
   let boss = null;
   try {
@@ -1265,6 +1301,7 @@ async function spawnAndAnnounceWeeklyBoss(client, guildId, { forceNewPost = fals
             config: { ...(featureRow?.config || {}), last_message_id: newMsg.id, last_channel_id: channelId },
             updated_at: new Date().toISOString(),
           });
+          clearFeatureConfigCache(guildId, 'weekly_boss');
           logger.info(`[BOSS SPAWN] Posted new Weekly Boss card to channel ${channelId}`);
         }
       }
@@ -1272,7 +1309,7 @@ async function spawnAndAnnounceWeeklyBoss(client, guildId, { forceNewPost = fals
   } catch (err) {
     logger.error(`[BOSS SPAWN] Error announcing weekly boss for guild ${guildId}:`, err.message);
   } finally {
-    isBossSpawnInProgress = false;
+    spawningBossGuilds.delete(guildId);
   }
 
   return boss;
@@ -1288,6 +1325,7 @@ module.exports = {
   setPlayerClass,
   allocateStatPoint,
   executeCombatAction,
+  executeBossAction: executeCombatAction,
   generateGlitchBossLore,
   concludeWeeklyBossBattle,
   spawnAndAnnounceWeeklyBoss,
