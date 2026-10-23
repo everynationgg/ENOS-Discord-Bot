@@ -140,7 +140,7 @@ Respond ONLY with a JSON object containing these exact keys:
   "incorrect_answers": ["wrong answer 1", "wrong answer 2", "wrong answer 3"]
 }`;
 
-  const modelsToTry = ['gemini-3.6-flash', 'gemini-3.5-flash', 'gemini-3.5-flash-lite', 'gemini-flash-latest', 'gemini-2.5-flash'];
+  const modelsToTry = ['gemini-2.5-flash', 'gemini-flash-latest', 'gemini-flash-lite-latest'];
   let lastError;
 
   for (const modelName of modelsToTry) {
@@ -586,24 +586,25 @@ async function handleTriviaStartClick(interaction) {
  * @param {import('discord.js').ButtonInteraction} interaction
  */
 async function handleTriviaAnswerClick(interaction) {
-  let dropId;
-  let choiceIndex;
-  if (interaction.customId.startsWith('trivia_answer:')) {
-    const parts = interaction.customId.split(':');
-    dropId = parts[1];
-    choiceIndex = parseInt(parts[2], 10);
-  } else {
-    const match = interaction.customId.match(/^trivia_answer[:_](.+?)[:_](\d+)$/);
-    dropId = match ? match[1] : null;
-    choiceIndex = match ? parseInt(match[2], 10) : -1;
-  }
-  const endTime = getPreciseTime();
+  try {
+    let dropId;
+    let choiceIndex;
+    if (interaction.customId.startsWith('trivia_answer:')) {
+      const parts = interaction.customId.split(':');
+      dropId = parts[1];
+      choiceIndex = parseInt(parts[2], 10);
+    } else {
+      const match = interaction.customId.match(/^trivia_answer[:_](.+?)[:_](\d+)$/);
+      dropId = match ? match[1] : null;
+      choiceIndex = match ? parseInt(match[2], 10) : -1;
+    }
+    const endTime = getPreciseTime();
 
-  // Defer immediately to prevent 3-second Discord interaction timeouts during DB/API calls
-  await interaction.deferReply({ ephemeral: true });
-  setTimeout(() => {
-    interaction.deleteReply().catch(() => {});
-  }, 20000);
+    // Defer immediately to prevent 3-second Discord interaction timeouts during DB/API calls
+    await interaction.deferReply({ ephemeral: true });
+    setTimeout(() => {
+      interaction.deleteReply().catch(() => {});
+    }, 20000);
 
   // Fetch drop and participant together
   const [dropRes, partRes] = await Promise.all([
@@ -841,6 +842,12 @@ async function handleTriviaAnswerClick(interaction) {
   setTimeout(() => {
     interaction.deleteReply().catch(() => {});
   }, 30000);
+  } catch (err) {
+    logger.error('[TRIVIA] handleTriviaAnswerClick error:', err.message || err);
+    if (interaction.deferred || interaction.replied) {
+      await interaction.editReply({ content: '❌ An error occurred while processing your answer.' }).catch(() => {});
+    }
+  }
 }
 
 /**
@@ -902,20 +909,14 @@ async function updateLiveLeaderboard(client, guildId) {
     if (message) {
       await message.edit({ embeds: [embed] });
     } else {
-      // Send new message and auto-delete after 30 seconds to keep channel clean
       const sent = await channel.send({ embeds: [embed] });
       leaderboardMessageId = sent.id;
-      // Update config with new message ID
       const updatedConfig = { ...config, leaderboard_message_id: sent.id };
       await supabase
         .from('guild_config')
         .update({ config: updatedConfig })
         .eq('guild_id', guildId)
         .eq('feature_key', 'trivia');
-      // Auto-delete after 30 seconds so it doesn't permanently clutter the channel
-      setTimeout(() => {
-        sent.delete().catch(() => {});
-      }, 30000);
     }
   } catch (err) {
     logger.error('[TRIVIA] updateLiveLeaderboard error:', err.message);

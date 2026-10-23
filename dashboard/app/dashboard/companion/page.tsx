@@ -241,7 +241,7 @@ export default function CompanionPage() {
 
               <div className="overview-item">
                 <h3>👥 Privacy & Member Standing</h3>
-                <p>View familiarity levels (Stranger $\to$ Veteran) and learned facts, with one-click member forget tools.</p>
+                <p>View familiarity levels (Stranger → Veteran) and learned facts, with one-click member forget tools.</p>
               </div>
 
               <div style={{ marginTop: '2rem' }}>

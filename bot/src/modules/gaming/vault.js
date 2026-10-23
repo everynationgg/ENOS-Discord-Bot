@@ -1,5 +1,5 @@
-const { EmbedBuilder } = require('discord.js');
-const { supabase, getFeatureConfig, logBotEvent } = require('../../lib/supabase');
+const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+const { supabase, getFeatureConfig, clearFeatureConfigCache, logBotEvent } = require('../../lib/supabase');
 const logger = require('../../lib/logger');
 
 // ─── Tier Configuration (9 Official Nitro Badges) ──────────────────────────────
@@ -87,11 +87,15 @@ async function awardCoins(discordId, guildId, amount, reason, guild = null) {
     }
   }
 
-  // Enforce 2.5 Coins/day hard cap for Daily Quest rewards (Boss slay rewards are exempt)
-  const isBossReward = reason.startsWith('boss_main_slay') || reason.startsWith('boss_overkill_slay');
+  // Enforce 2.5 Coins/day hard cap for player rewards (Boss slay rewards and Admin /vault give grants are exempt)
+  const isBossOrAdminReward =
+    reason.startsWith('boss_main_slay') ||
+    reason.startsWith('boss_overkill_slay') ||
+    reason === 'admin_grant' ||
+    reason.startsWith('admin_grant:');
   let allowedAmount = finalAmount;
 
-  if (!isBossReward) {
+  if (!isBossOrAdminReward) {
     const current = await getOrCreateBalance(discordId, guildId);
     const earnedToday = Number(current?.coins_earned_today || 0);
     const maxDaily = 2.5;
@@ -168,10 +172,12 @@ async function awardMessageCoins(discordId, guildId, guild) {
 
   // Always increment daily message counter
   const newMessagesToday = (balance?.messages_today || 0) + 1;
-  const chatGoal = rates.daily_quest_chat_threshold || 5;
+  const chatGoal = rates.daily_quest_message_threshold || rates.daily_quest_chat_threshold || 5;
   let chatQuestCompleted = balance?.quest_chat_completed || false;
+  const assigned = Array.isArray(balance?.assigned_quests) ? balance.assigned_quests : [];
+  const isChatAssigned = Boolean(balance?.quest_started && assigned.includes('chat'));
 
-  if (!chatQuestCompleted && newMessagesToday >= chatGoal) {
+  if (isChatAssigned && !chatQuestCompleted && newMessagesToday >= chatGoal) {
     chatQuestCompleted = true;
     await awardCoins(discordId, guildId, rates.daily_quest_chat_bonus || 1, 'chat_quest', guild);
     // Log quest completion
@@ -183,7 +189,9 @@ async function awardMessageCoins(discordId, guildId, guild) {
         quest_key: 'chat',
         snapshot: { messages_today: newMessagesToday, goal: chatGoal },
       });
-    } catch (e) {}
+    } catch (e) {
+      logger.warn('[VAULT] Failed to log chat quest completion:', e.message);
+    }
   }
 
   await supabase
@@ -192,7 +200,6 @@ async function awardMessageCoins(discordId, guildId, guild) {
       last_message_at: new Date().toISOString(),
       messages_today: newMessagesToday,
       quest_chat_completed: chatQuestCompleted,
-      quest_started: true, // Ensure quest state is marked active
     })
     .eq('discord_id', discordId)
     .eq('guild_id', guildId);
@@ -223,8 +230,10 @@ async function handleVoiceLeave(discordId, guildId, minutesSpent, guild) {
 
   const voiceGoal = rates.daily_quest_voice_threshold || 30;
   let voiceQuestCompleted = balance?.quest_voice_completed || false;
+  const assigned = Array.isArray(balance?.assigned_quests) ? balance.assigned_quests : [];
+  const isVoiceAssigned = Boolean(balance?.quest_started && assigned.includes('voice'));
 
-  if (!voiceQuestCompleted && newVoiceToday >= voiceGoal) {
+  if (isVoiceAssigned && !voiceQuestCompleted && newVoiceToday >= voiceGoal) {
     voiceQuestCompleted = true;
     await awardCoins(discordId, guildId, rates.daily_quest_voice_bonus || 1, 'voice_quest', guild);
     try {
@@ -235,7 +244,9 @@ async function handleVoiceLeave(discordId, guildId, minutesSpent, guild) {
         quest_key: 'voice',
         snapshot: { voice_minutes_today: newVoiceToday, goal: voiceGoal },
       });
-    } catch (e) {}
+    } catch (e) {
+      logger.warn('[VAULT] Failed to log voice quest completion:', e.message);
+    }
   }
 
   await supabase
@@ -254,7 +265,8 @@ async function handleVoiceLeave(discordId, guildId, minutesSpent, guild) {
  */
 async function handleTriviaQuestCompletion(discordId, guildId, guild) {
   const balance = await getOrCreateBalance(discordId, guildId);
-  if (!balance?.quest_trivia_completed) {
+  const assigned = Array.isArray(balance?.assigned_quests) ? balance.assigned_quests : [];
+  if (balance?.quest_started && assigned.includes('trivia') && !balance?.quest_trivia_completed) {
     const vaultConfig = await getVaultConfig(guildId);
     const rates = { ...DEFAULT_RATES, ...vaultConfig.rates };
 
@@ -273,7 +285,9 @@ async function handleTriviaQuestCompletion(discordId, guildId, guild) {
         quest_key: 'trivia',
         snapshot: { quest_trivia_completed: true },
       });
-    } catch (e) {}
+    } catch (e) {
+      logger.warn('[VAULT] Failed to log trivia quest completion:', e.message);
+    }
     logger.info(`[VAULT] Trivia quest completed by ${discordId}`);
   }
 }
@@ -303,7 +317,7 @@ async function handleStartQuest(discordId, guildId) {
 
   // 1. Chat Quest check: if user already chatted enough today
   if (assigned.includes('chat') && !chatDone) {
-    const chatGoal = rates.daily_quest_chat_threshold || 5;
+    const chatGoal = rates.daily_quest_message_threshold || rates.daily_quest_chat_threshold || 5;
     if ((balance?.messages_today || 0) >= chatGoal) {
       chatDone = true;
       await awardCoins(discordId, guildId, rates.daily_quest_chat_bonus || 1, 'chat_quest', null);
@@ -470,7 +484,8 @@ async function handleAIChatQuest(discordId, guildId, guild = null) {
  */
 async function handleBossQuestCompletion(discordId, guildId, guild = null) {
   const balance = await getOrCreateBalance(discordId, guildId);
-  if (!balance?.quest_boss_done) {
+  const assigned = Array.isArray(balance?.assigned_quests) ? balance.assigned_quests : [];
+  if (balance?.quest_started && assigned.includes('boss') && !balance?.quest_boss_done) {
     const vaultConfig = await getVaultConfig(guildId);
     const rates = { ...DEFAULT_RATES, ...vaultConfig.rates };
 
@@ -622,13 +637,15 @@ async function postOrUpdateQuestLauncherChannel(client, guildId, channelId) {
   if (!channel || !channel.isTextBased()) return false;
 
   // Fetch guild config to check for existing launcher message ID
-  const { data: featureRow } = await supabase
+  const { data: featureRows } = await supabase
     .from('guild_config')
     .select('*')
     .eq('guild_id', guildId)
     .in('feature_key', ['vault', 'vault_economy'])
-    .maybeSingle();
+    .order('updated_at', { ascending: false })
+    .limit(1);
 
+  const featureRow = featureRows?.[0] || null;
   const config = featureRow?.config || {};
   const oldMessageId = config.quest_launcher_message_id;
 
@@ -700,6 +717,7 @@ async function postOrUpdateQuestLauncherChannel(client, guildId, channelId) {
           config: updatedConfig,
           updated_at: new Date().toISOString(),
         }, { onConflict: 'guild_id,feature_key' });
+      clearFeatureConfigCache(guildId, key);
     }
   }
 

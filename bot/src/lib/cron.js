@@ -172,13 +172,15 @@ function initCrons(client) {
         const { data: configs } = await supabase
           .from('guild_config')
           .select('guild_id')
+          .eq('feature_key', 'weekly_boss')
           .eq('enabled', true);
 
-        for (const c of configs || []) {
+        const uniqueGuildIds = [...new Set((configs || []).map((c) => c.guild_id))];
+        for (const gId of uniqueGuildIds) {
           try {
-            await concludeWeeklyBossBattle(c.guild_id, client);
+            await concludeWeeklyBossBattle(gId, client);
           } catch (err) {
-            logger.error(`[CRON] Weekly Boss conclude failed for guild ${c.guild_id}:`, err.message);
+            logger.error(`[CRON] Weekly Boss conclude failed for guild ${gId}:`, err.message);
           }
         }
       } catch (err) {

@@ -54,15 +54,6 @@ export async function GET(req: NextRequest) {
         icon: g.icon ? `https://cdn.discordapp.com/icons/${g.id}/${g.icon}.png` : null,
       }));
 
-    // If list is empty but default guild exists, provide default fallback
-    if (manageableGuilds.length === 0 && defaultGuildId) {
-      manageableGuilds.push({
-        id: defaultGuildId,
-        name: 'Every Nation Guild',
-        icon: null,
-      });
-    }
-
     return NextResponse.json({ guilds: manageableGuilds });
   } catch (err: any) {
     return NextResponse.json({ error: err.message || 'Failed to load guilds' }, { status: 500 });

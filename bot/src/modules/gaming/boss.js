@@ -958,16 +958,20 @@ async function executeCombatAction(guildId, userId, actionType) {
 }
 
 /**
- * Triggers Overkill Mode when the main boss HP reaches 0, awarding 10 AP-scaled fixed points to participants.
+ * Triggers Overkill Mode when the main boss HP reaches 0, awarding 1.5 AP-scaled fixed points to participants.
  */
 async function triggerOverkillRevival(guildId, boss) {
-  // Mark main boss as defeated
-  await supabase
+  // Mark main boss as defeated atomically (prevent duplicate triggers under concurrent attacks)
+  const { data: updatedBoss } = await supabase
     .from('boss_seasons')
     .update({ is_defeated: true, current_hp: 0 })
-    .eq('id', boss.id);
+    .eq('id', boss.id)
+    .eq('is_defeated', false)
+    .select('id');
 
-  // Distribute 10 AP-Scaled Fixed Slay Points (₱ PHP / Vault Coins 1:1) to all active participants
+  if (!updatedBoss || updatedBoss.length === 0) return;
+
+  // Distribute 1.5 AP-Scaled Fixed Slay Points (₱ PHP / Vault Coins 1:1) to all active participants
   try {
     const { awardCoins } = require('./vault');
     const { data: participants } = await supabase
@@ -1028,10 +1032,14 @@ async function triggerOverkillRevival(guildId, boss) {
  * Handles Overkill Boss defeat, updating participants' points to 2.5 AP-scaled fixed points.
  */
 async function handleOverkillDefeat(guildId, boss) {
-  await supabase
+  const { data: updatedBoss } = await supabase
     .from('boss_seasons')
     .update({ is_defeated: true, current_hp: 0 })
-    .eq('id', boss.id);
+    .eq('id', boss.id)
+    .eq('is_defeated', false)
+    .select('id');
+
+  if (!updatedBoss || updatedBoss.length === 0) return;
 
   try {
     const { awardCoins } = require('./vault');

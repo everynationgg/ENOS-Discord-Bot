@@ -63,15 +63,38 @@ module.exports = {
     const targetLanguage = FLAG_LANG_MAP[reaction.emoji.name];
     if (targetLanguage && message.content && message.content.trim()) {
       try {
-        const { isFeatureEnabled } = require('../lib/supabase');
-        const translatorEnabled = await isFeatureEnabled(guild.id, 'translator');
-        if (translatorEnabled) {
-          const { translateText } = require('../modules/utility/translator');
-          const translated = await translateText(message.content, targetLanguage);
-          
+        const translatorFeature = await getFeatureConfig(guild.id, 'translator');
+        if (translatorFeature?.enabled) {
+          const config = translatorFeature.config || {};
+          const { translateText, cooldowns } = require('../modules/utility/translator');
+
+          // 1. Check allowed role restriction if configured
+          const allowedRoleId = config.allowed_role_id;
+          if (allowedRoleId) {
+            const member = await guild.members.fetch(user.id).catch(() => null);
+            if (!member || !member.roles.cache.has(allowedRoleId)) {
+              return;
+            }
+          }
+
+          // 2. Enforce per-user cooldown
+          const cooldownSeconds = Number(config.cooldown_seconds) || 10;
+          const now = Date.now();
+          const lastUsed = cooldowns.get(user.id) || 0;
+          if (now - lastUsed < cooldownSeconds * 1000) {
+            return;
+          }
+          cooldowns.set(user.id, now);
+
+          // 3. Enforce character limit
+          const charLimit = Number(config.character_limit) || 1000;
+          const sourceText = message.content.trim().slice(0, charLimit);
+          const translated = await translateText(sourceText, targetLanguage);
+          const safeTranslated = String(translated || '').slice(0, 1800);
+
           // Send translation DM to user who reacted (or fallback to channel reply if DMs are closed)
-          await user.send(`🌐 **Translation to ${targetLanguage}:**\n${translated}\n\n*Source message in #${message.channel.name || 'channel'}*`).catch(async () => {
-            await message.reply({ content: `🌐 **Translation to ${targetLanguage}** (for <@${user.id}>):\n${translated}`, allowedMentions: { users: [user.id] } }).catch(() => {});
+          await user.send(`🌐 **Translation to ${targetLanguage}:**\n${safeTranslated}\n\n*Source message in #${message.channel.name || 'channel'}*`).catch(async () => {
+            await message.reply({ content: `🌐 **Translation to ${targetLanguage}** (for <@${user.id}>):\n${safeTranslated}`, allowedMentions: { users: [user.id] } }).catch(() => {});
           });
         }
       } catch (e) {

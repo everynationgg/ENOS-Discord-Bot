@@ -41,9 +41,9 @@ export async function GET(req: NextRequest) {
   }
 }
 
-async function postQuestLauncherCardToDiscord(guildId: string, channelId: string) {
+async function postQuestLauncherCardToDiscord(guildId: string, channelId: string): Promise<string | null> {
   const token = process.env.DISCORD_TOKEN || process.env.DISCORD_BOT_TOKEN;
-  if (!token || !channelId || typeof channelId !== 'string' || !channelId.trim()) return;
+  if (!token || !channelId || typeof channelId !== 'string' || !channelId.trim()) return null;
 
   const embed = {
     title: '📜 Every Nation Vault — Daily Quests Hub',
@@ -74,14 +74,23 @@ async function postQuestLauncherCardToDiscord(guildId: string, channelId: string
     },
   ];
 
-  await fetch(`https://discord.com/api/v10/channels/${channelId.trim()}/messages`, {
+  const res = await fetch(`https://discord.com/api/v10/channels/${channelId.trim()}/messages`, {
     method: 'POST',
     headers: {
       Authorization: `Bot ${token}`,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({ embeds: [embed], components }),
-  }).catch((e) => console.error('[VAULT LAUNCHER DISPATCH ERROR]:', e));
+  }).catch((e) => {
+    console.error('[VAULT LAUNCHER DISPATCH ERROR]:', e);
+    return null;
+  });
+
+  if (res && res.ok) {
+    const sent = await res.json().catch(() => null);
+    return sent?.id || null;
+  }
+  return null;
 }
 
 // POST /api/config — upsert a feature config
@@ -126,15 +135,20 @@ export async function POST(req: NextRequest) {
       mergedConfig.notification_channel_id = existingConfig.notification_channel_id;
     }
 
-    await upsertFeatureConfig(guildId, feature_key, enabled, mergedConfig);
-
-    // Automatically drop the Daily Quest Hub card to Discord when saving Vault Economy settings
+    // Automatically drop the Daily Quest Hub card to Discord only when quest_channel_id changes or has never been posted
     if (feature_key === 'vault_economy') {
       const targetChannelId = config?.quest_channel_id || config?.quest_launcher_channel_id;
-      if (targetChannelId) {
-        await postQuestLauncherCardToDiscord(guildId, targetChannelId);
+      const oldChannelId = existingConfig?.quest_channel_id || existingConfig?.quest_launcher_channel_id;
+      if (targetChannelId && (targetChannelId !== oldChannelId || !mergedConfig.quest_launcher_message_id)) {
+        const sentMessageId = await postQuestLauncherCardToDiscord(guildId, targetChannelId);
+        if (sentMessageId) {
+          mergedConfig.quest_launcher_channel_id = targetChannelId;
+          mergedConfig.quest_launcher_message_id = sentMessageId;
+        }
       }
     }
+
+    await upsertFeatureConfig(guildId, feature_key, enabled, mergedConfig);
 
     // Auto-sync configured streamers to live_alerts table for bot poller
     if (feature_key === 'live_alerts' && Array.isArray(config?.streamers)) {
@@ -183,23 +197,20 @@ export async function POST(req: NextRequest) {
         if (bossName) updatePayload.boss_name = bossName;
         if (bossTitle) updatePayload.boss_title = bossTitle;
         if (lore) updatePayload.lore = lore;
-        if (maxHp) {
-          updatePayload.max_hp = Number(maxHp);
-          updatePayload.is_defeated = false;
-        }
         if (config?.custom_image_url !== undefined) updatePayload.custom_image_url = config.custom_image_url || null;
         if (config?.custom_bg_url !== undefined) updatePayload.custom_bg_url = config.custom_bg_url || null;
 
         const { data: existing } = await supabaseAdmin
           .from('boss_seasons')
-          .select('id, max_hp, current_hp')
+          .select('id, max_hp, current_hp, is_defeated')
           .eq('guild_id', guildId)
           .eq('week_identifier', currentWeek)
           .eq('is_overkill', false)
           .maybeSingle();
 
         if (existing) {
-          if (maxHp) {
+          if (maxHp && !existing.is_defeated) {
+            updatePayload.max_hp = Number(maxHp);
             const existingDamage = Math.max(0, Number(existing.max_hp || 0) - Number(existing.current_hp || 0));
             updatePayload.current_hp = Math.max(1, Number(maxHp) - existingDamage);
           }

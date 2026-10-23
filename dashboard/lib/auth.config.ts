@@ -44,13 +44,11 @@ export default {
         });
 
         if (!res.ok) {
-          // If profile fetch fails, check environment fallback for dev guild
-          if (!process.env.DISCORD_GUILD_ID) return true;
           return '/login?error=auth_failed';
         }
 
         const userGuilds = await res.json();
-        if (!Array.isArray(userGuilds)) return true;
+        if (!Array.isArray(userGuilds)) return '/login?error=auth_failed';
 
         // Check if user is an owner or has Administrator (0x8) / Manage Guild (0x20) permission in ANY guild
         const canManageAnyGuild = userGuilds.some((g: any) => {
@@ -81,7 +79,7 @@ export default {
 
         return '/login?error=insufficient_permissions';
       } catch {
-        return true; // Allow sign in gracefully on network issues
+        return '/login?error=auth_failed';
       }
     },
   },

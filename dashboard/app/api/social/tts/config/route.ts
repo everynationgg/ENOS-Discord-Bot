@@ -42,15 +42,17 @@ export async function POST(req: NextRequest) {
     if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const body = await req.json();
-    const { guild_id, config } = body;
+    const { guild_id, config, enabled } = body;
     const guildId = guild_id || process.env.DISCORD_GUILD_ID!;
+    const isEnabled = typeof enabled === 'boolean' ? enabled : (typeof config?.enabled === 'boolean' ? config.enabled : true);
 
     const { error } = await supabaseAdmin
       .from('guild_config')
       .upsert({
         guild_id: guildId,
         feature_key: 'en_tts',
-        config,
+        enabled: isEnabled,
+        config: { ...config, enabled: isEnabled },
         updated_at: new Date().toISOString(),
       }, { onConflict: 'guild_id,feature_key' });
 

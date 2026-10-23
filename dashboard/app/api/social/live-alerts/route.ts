@@ -85,6 +85,7 @@ export async function DELETE(req: NextRequest) {
         .from('live_alerts')
         .select('handle, guild_id')
         .eq('id', id)
+        .eq('guild_id', guildId)
         .maybeSingle();
 
       if (record?.handle) {
@@ -95,7 +96,7 @@ export async function DELETE(req: NextRequest) {
           .ilike('handle', cleanHandle)
           .eq('guild_id', record.guild_id || guildId);
       }
-      await supabaseAdmin.from('live_alerts').delete().eq('id', id);
+      await supabaseAdmin.from('live_alerts').delete().eq('id', id).eq('guild_id', guildId);
     } else if (handleParam) {
       const cleanHandle = handleParam.replace(/^@/, '').trim();
       await supabaseAdmin

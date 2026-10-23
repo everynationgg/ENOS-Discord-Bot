@@ -85,25 +85,12 @@ async function handleShowcaseClaim(interaction) {
       });
     }
 
-    // Update user's Vault coins balance
-    const { data: currentVault } = await supabase
-      .from('vault_balances')
-      .select('coins')
-      .eq('guild_id', guildId)
-      .eq('discord_id', userId)
-      .maybeSingle();
-
-    const newCoins = (currentVault?.coins || 0) + rewardCoins;
-
-    await supabase.from('vault_balances').upsert(
-      {
-        guild_id: guildId,
-        discord_id: userId,
-        coins: newCoins,
-        last_active: new Date().toISOString(),
-      },
-      { onConflict: 'guild_id,discord_id' }
-    );
+    // Update user's Vault coins balance via central Vault helper
+    const { awardCoins, getOrCreateBalance } = require('../gaming/vault');
+    await awardCoins(userId, guildId, rewardCoins, 'showcase_claim', interaction.guild);
+    const updatedVault = await getOrCreateBalance(userId, guildId);
+    const newCoins = Number(updatedVault?.coins || 0);
+    showcaseOpenedTimestamps.delete(openKey);
 
     return interaction.reply({
       content: `🎁 **Reward Claimed!** You received **+${rewardCoins} Vault Coins** for reading our server update.\nYour new Vault balance is **${newCoins.toLocaleString()} coins**.`,
@@ -111,10 +98,14 @@ async function handleShowcaseClaim(interaction) {
     });
   } catch (err) {
     logger.error('[SHOWCASE CLAIM EXCEPTION]:', err);
+    const msg = '❌ An error occurred while processing your reward claim.';
+    if (interaction.deferred || interaction.replied) {
+      return interaction.editReply({ content: msg }).catch(() => {});
+    }
     return interaction.reply({
-      content: '❌ An error occurred while processing your reward claim.',
+      content: msg,
       flags: MessageFlags.Ephemeral,
-    });
+    }).catch(() => {});
   }
 }
 

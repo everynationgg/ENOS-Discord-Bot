@@ -28,7 +28,7 @@ function getTargetDates(daysAhead = 0) {
   return {
     mmDd: `${map.month}-${map.day}`,
     yyyyMmDd: `${map.year}-${map.month}-${map.day}`,
-    hour: parseInt(map.hour, 10),
+    hour: parseInt(map.hour, 10) % 24,
     minute: parseInt(map.minute, 10),
   };
 }

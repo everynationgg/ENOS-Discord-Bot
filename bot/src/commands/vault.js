@@ -44,71 +44,84 @@ module.exports = {
    * @param {import('discord.js').ChatInputCommandInteraction} interaction
    */
   async execute(interaction) {
-    const sub = interaction.options.getSubcommand();
+    try {
+      if (!interaction.guild) return;
+      const sub = interaction.options.getSubcommand();
 
-    if (sub === 'profile') {
-      await interaction.deferReply();
-      const profileData = await buildProfileEmbed(
-        interaction.user.id,
-        interaction.guild.id,
-        interaction.guild
-      );
-      if (!profileData || !profileData.embed) return interaction.editReply('❌ Could not load your Vault profile.');
-      return interaction.editReply({ embeds: [profileData.embed], components: profileData.components || [] });
-    }
-
-    if (sub === 'quest') {
-      await interaction.deferReply();
-      const { buildQuestEmbed } = require('../modules/gaming/vault');
-      const questData = await buildQuestEmbed(
-        interaction.user.id,
-        interaction.guild.id,
-        interaction.guild
-      );
-      return interaction.editReply({ embeds: [questData.embed], components: questData.components || [] });
-    }
-
-    if (sub === 'start-quest') {
-      await interaction.deferReply({ ephemeral: true });
-      const { handleStartQuest } = require('../modules/gaming/vault');
-      const res = await handleStartQuest(interaction.user.id, interaction.guild.id);
-      return interaction.editReply(res.message);
-    }
-
-    if (sub === 'leaderboard') {
-      await interaction.deferReply();
-      const embed = await buildLeaderboardEmbed(interaction.guild.id, interaction.guild);
-      if (!embed) return interaction.editReply('❌ No Vault data found yet.');
-      return interaction.editReply({ embeds: [embed] });
-    }
-
-    if (sub === 'setup-quest-channel') {
-      if (!interaction.member.permissions.has(PermissionFlagsBits.ManageGuild)) {
-        return interaction.reply({ content: '❌ You need the **Manage Server** permission to setup the quest channel.', ephemeral: true });
+      if (sub === 'profile') {
+        await interaction.deferReply();
+        const profileData = await buildProfileEmbed(
+          interaction.user.id,
+          interaction.guild.id,
+          interaction.guild
+        );
+        if (!profileData || !profileData.embed) return interaction.editReply('❌ Could not load your Vault profile.');
+        return interaction.editReply({ embeds: [profileData.embed], components: profileData.components || [] });
       }
 
-      await interaction.deferReply({ ephemeral: true });
-      const targetChannel = interaction.options.getChannel('channel');
-      const { postOrUpdateQuestLauncherChannel } = require('../modules/gaming/vault');
-      const ok = await postOrUpdateQuestLauncherChannel(interaction.client, interaction.guild.id, targetChannel.id);
-      if (!ok) return interaction.editReply('❌ Failed to deploy Quest Hub card. Ensure the channel is text-based and the bot has Send Messages permission.');
-
-      return interaction.editReply(`✅ **Daily Quest Hub deployed!** Permanent quest launcher card posted in <#${targetChannel.id}>.`);
-    }
-
-    if (sub === 'give') {
-      if (!interaction.member.permissions.has(PermissionFlagsBits.ManageGuild)) {
-        return interaction.reply({ content: '❌ You need the **Manage Server** permission to award coins.', ephemeral: true });
+      if (sub === 'quest') {
+        await interaction.deferReply();
+        const { buildQuestEmbed } = require('../modules/gaming/vault');
+        const questData = await buildQuestEmbed(
+          interaction.user.id,
+          interaction.guild.id,
+          interaction.guild
+        );
+        return interaction.editReply({ embeds: [questData.embed], components: questData.components || [] });
       }
 
-      await interaction.deferReply();
-      const { awardCoins } = require('../modules/gaming/vault');
-      const target = interaction.options.getUser('user');
-      const amount = interaction.options.getInteger('amount');
-      const reason = interaction.options.getString('reason') || 'admin_grant';
+      if (sub === 'start-quest') {
+        await interaction.deferReply({ ephemeral: true });
+        const { handleStartQuest } = require('../modules/gaming/vault');
+        const res = await handleStartQuest(interaction.user.id, interaction.guild.id);
+        return interaction.editReply(res.message);
+      }
 
-      await awardCoins(target.id, interaction.guild.id, amount, reason, interaction.guild);
-      return interaction.editReply(`✅ Awarded **${amount.toLocaleString()} coins** to <@${target.id}>!`);
+      if (sub === 'leaderboard') {
+        await interaction.deferReply();
+        const embed = await buildLeaderboardEmbed(interaction.guild.id, interaction.guild);
+        if (!embed) return interaction.editReply('❌ No Vault data found yet.');
+        return interaction.editReply({ embeds: [embed] });
+      }
+
+      if (sub === 'setup-quest-channel') {
+        if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild)) {
+          return interaction.reply({ content: '❌ You need the **Manage Server** permission to setup the quest channel.', ephemeral: true });
+        }
+
+        await interaction.deferReply({ ephemeral: true });
+        const targetChannel = interaction.options.getChannel('channel');
+        const { postOrUpdateQuestLauncherChannel } = require('../modules/gaming/vault');
+        const ok = await postOrUpdateQuestLauncherChannel(interaction.client, interaction.guild.id, targetChannel.id);
+        if (!ok) return interaction.editReply('❌ Failed to deploy Quest Hub card. Ensure the channel is text-based and the bot has Send Messages permission.');
+
+        return interaction.editReply(`✅ **Daily Quest Hub deployed!** Permanent quest launcher card posted in <#${targetChannel.id}>.`);
+      }
+
+      if (sub === 'give') {
+        if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild)) {
+          return interaction.reply({ content: '❌ You need the **Manage Server** permission to award coins.', ephemeral: true });
+        }
+
+        await interaction.deferReply();
+        const { awardCoins } = require('../modules/gaming/vault');
+        const target = interaction.options.getUser('user');
+        const amount = interaction.options.getInteger('amount');
+        const rawReason = interaction.options.getString('reason');
+        const reason = rawReason ? `admin_grant: ${rawReason}` : 'admin_grant';
+
+        await awardCoins(target.id, interaction.guild.id, amount, reason, interaction.guild);
+        return interaction.editReply(`✅ Awarded **${amount.toLocaleString()} coins** to <@${target.id}>!`);
+      }
+    } catch (err) {
+      const logger = require('../lib/logger');
+      logger.error('[VAULT COMMAND] Error:', err);
+      const msg = '❌ An error occurred while executing the Vault command.';
+      if (interaction.deferred || interaction.replied) {
+        await interaction.editReply({ content: msg }).catch(() => {});
+      } else {
+        await interaction.reply({ content: msg, ephemeral: true }).catch(() => {});
+      }
     }
   },
 };

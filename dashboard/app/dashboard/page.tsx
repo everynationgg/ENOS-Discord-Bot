@@ -124,7 +124,7 @@ export default function DashboardHome() {
                 <ul>
                   <li><strong>Bot Status</strong>: Reflected as online if the client has sent a heartbeat signal within the last 10 minutes.</li>
                   <li><strong>Active Features</strong>: The count of configuration modules currently toggled ON in your database.</li>
-                  <li><strong>Bot Version</strong>: The code version deployed and running on Railway.</li>
+                  <li><strong>Bot Version</strong>: The code version deployed and running on Fly.io.</li>
                 </ul>
                 <div className="tip-box">
                   <strong>💡 Locating your Guild ID:</strong><br />

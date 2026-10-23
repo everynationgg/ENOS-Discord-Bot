@@ -206,70 +206,74 @@ async function handleVoiceLeaveTemp(oldState, client) {
  * @param {import('discord.js').ButtonInteraction} interaction
  */
 async function showTempVoiceModal(interaction) {
-  const channelId = interaction.customId.split(':')[1];
-  const tempRecord = activeTempChannels.get(channelId);
+  try {
+    const channelId = interaction.customId.split(':')[1];
+    const tempRecord = activeTempChannels.get(channelId);
 
-  // Authorization check: Only the room owner (or guild administrator) can configure it
-  const isOwner = tempRecord && tempRecord.ownerId === interaction.user.id;
-  const isAdmin = interaction.memberPermissions?.has(PermissionFlagsBits.Administrator);
+    // Authorization check: Only the room owner (or guild administrator) can configure it
+    const isOwner = tempRecord && tempRecord.ownerId === interaction.user.id;
+    const isAdmin = interaction.memberPermissions?.has(PermissionFlagsBits.Administrator);
 
-  if (!isOwner && !isAdmin) {
-    return interaction.reply({
-      content: '❌ Only the creator of this voice channel can configure room settings.',
-      flags: MessageFlags.Ephemeral,
-    });
+    if (!isOwner && !isAdmin) {
+      return interaction.reply({
+        content: '❌ Only the creator of this voice channel can configure room settings.',
+        flags: MessageFlags.Ephemeral,
+      });
+    }
+
+    const channel = interaction.guild?.channels.cache.get(channelId);
+    const currentName = channel ? channel.name : 'Gaming Room';
+    const currentLimit = channel && channel.userLimit > 0 ? String(channel.userLimit) : '';
+
+    const modal = new ModalBuilder()
+      .setCustomId(`tempvoice_modal:${channelId}`)
+      .setTitle('Configure Voice Room');
+
+    const nameInput = new TextInputBuilder()
+      .setCustomId('room_name')
+      .setLabel('Room Name')
+      .setStyle(TextInputStyle.Short)
+      .setValue(currentName)
+      .setPlaceholder('e.g. Baldur\'s Gate 3 Squad')
+      .setMaxLength(50)
+      .setRequired(true);
+
+    const privacyInput = new TextInputBuilder()
+      .setCustomId('privacy')
+      .setLabel('Privacy (public or private)')
+      .setStyle(TextInputStyle.Short)
+      .setPlaceholder('public or private (default: public)')
+      .setMaxLength(15)
+      .setRequired(false);
+
+    const limitInput = new TextInputBuilder()
+      .setCustomId('player_limit')
+      .setLabel('Player Limit (Number or blank for unlimited)')
+      .setStyle(TextInputStyle.Short)
+      .setValue(currentLimit)
+      .setPlaceholder('e.g. 4 or leave blank')
+      .setMaxLength(2)
+      .setRequired(false);
+
+    const allowedMembersInput = new TextInputBuilder()
+      .setCustomId('allowed_members')
+      .setLabel('Invite Members (Mentions or User IDs)')
+      .setStyle(TextInputStyle.Paragraph)
+      .setPlaceholder('@friend1, @friend2 (grants access if room is private)')
+      .setMaxLength(500)
+      .setRequired(false);
+
+    modal.addComponents(
+      new ActionRowBuilder().addComponents(nameInput),
+      new ActionRowBuilder().addComponents(privacyInput),
+      new ActionRowBuilder().addComponents(limitInput),
+      new ActionRowBuilder().addComponents(allowedMembersInput)
+    );
+
+    await interaction.showModal(modal);
+  } catch (err) {
+    logger.error('[TEMP VOICE] showTempVoiceModal error:', err.message || err);
   }
-
-  const channel = interaction.guild?.channels.cache.get(channelId);
-  const currentName = channel ? channel.name : 'Gaming Room';
-  const currentLimit = channel && channel.userLimit > 0 ? String(channel.userLimit) : '';
-
-  const modal = new ModalBuilder()
-    .setCustomId(`tempvoice_modal:${channelId}`)
-    .setTitle('Configure Voice Room');
-
-  const nameInput = new TextInputBuilder()
-    .setCustomId('room_name')
-    .setLabel('Room Name')
-    .setStyle(TextInputStyle.Short)
-    .setValue(currentName)
-    .setPlaceholder('e.g. Baldur\'s Gate 3 Squad')
-    .setMaxLength(50)
-    .setRequired(true);
-
-  const privacyInput = new TextInputBuilder()
-    .setCustomId('privacy')
-    .setLabel('Privacy (public or private)')
-    .setStyle(TextInputStyle.Short)
-    .setPlaceholder('public or private (default: public)')
-    .setMaxLength(15)
-    .setRequired(false);
-
-  const limitInput = new TextInputBuilder()
-    .setCustomId('player_limit')
-    .setLabel('Player Limit (Number or blank for unlimited)')
-    .setStyle(TextInputStyle.Short)
-    .setValue(currentLimit)
-    .setPlaceholder('e.g. 4 or leave blank')
-    .setMaxLength(2)
-    .setRequired(false);
-
-  const allowedMembersInput = new TextInputBuilder()
-    .setCustomId('allowed_members')
-    .setLabel('Invite Members (Mentions or User IDs)')
-    .setStyle(TextInputStyle.Paragraph)
-    .setPlaceholder('@friend1, @friend2 (grants access if room is private)')
-    .setMaxLength(500)
-    .setRequired(false);
-
-  modal.addComponents(
-    new ActionRowBuilder().addComponents(nameInput),
-    new ActionRowBuilder().addComponents(privacyInput),
-    new ActionRowBuilder().addComponents(limitInput),
-    new ActionRowBuilder().addComponents(allowedMembersInput)
-  );
-
-  await interaction.showModal(modal);
 }
 
 /**
@@ -280,6 +284,16 @@ async function handleTempVoiceModalSubmit(interaction) {
   const channelId = interaction.customId.split(':')[1];
   const guild = interaction.guild;
   if (!guild) return;
+
+  const tempRecord = activeTempChannels.get(channelId);
+  const isOwner = tempRecord && tempRecord.ownerId === interaction.user.id;
+  const isAdmin = interaction.memberPermissions?.has(PermissionFlagsBits.Administrator);
+  if (!isOwner && !isAdmin) {
+    return interaction.reply({
+      content: '❌ Only the creator of this voice channel can configure room settings.',
+      flags: MessageFlags.Ephemeral,
+    }).catch(() => {});
+  }
 
   const channel = guild.channels.cache.get(channelId) || (await guild.channels.fetch(channelId).catch(() => null));
   if (!channel) {
@@ -488,35 +502,39 @@ async function handleTempVoiceLockToggle(interaction) {
  * @param {import('discord.js').ButtonInteraction} interaction
  */
 async function showTempVoiceRenameModal(interaction) {
-  const channelId = interaction.customId.split(':')[1];
-  const tempRecord = activeTempChannels.get(channelId);
-  const isOwner = tempRecord && tempRecord.ownerId === interaction.user.id;
-  const isAdmin = interaction.memberPermissions?.has(PermissionFlagsBits.Administrator);
+  try {
+    const channelId = interaction.customId.split(':')[1];
+    const tempRecord = activeTempChannels.get(channelId);
+    const isOwner = tempRecord && tempRecord.ownerId === interaction.user.id;
+    const isAdmin = interaction.memberPermissions?.has(PermissionFlagsBits.Administrator);
 
-  if (!isOwner && !isAdmin) {
-    return interaction.reply({
-      content: '❌ Only the creator of this voice channel can rename the room.',
-      flags: MessageFlags.Ephemeral,
-    });
+    if (!isOwner && !isAdmin) {
+      return interaction.reply({
+        content: '❌ Only the creator of this voice channel can rename the room.',
+        flags: MessageFlags.Ephemeral,
+      });
+    }
+
+    const channel = interaction.guild?.channels.cache.get(channelId);
+    const currentName = channel ? channel.name : 'Gaming Room';
+
+    const modal = new ModalBuilder()
+      .setCustomId(`tempvoice_rename_modal:${channelId}`)
+      .setTitle('Rename Voice Room');
+
+    const nameInput = new TextInputBuilder()
+      .setCustomId('new_name')
+      .setLabel('New Room Name')
+      .setStyle(TextInputStyle.Short)
+      .setValue(currentName)
+      .setMaxLength(50)
+      .setRequired(true);
+
+    modal.addComponents(new ActionRowBuilder().addComponents(nameInput));
+    await interaction.showModal(modal);
+  } catch (err) {
+    logger.error('[TEMP VOICE] showTempVoiceRenameModal error:', err.message || err);
   }
-
-  const channel = interaction.guild?.channels.cache.get(channelId);
-  const currentName = channel ? channel.name : 'Gaming Room';
-
-  const modal = new ModalBuilder()
-    .setCustomId(`tempvoice_rename_modal:${channelId}`)
-    .setTitle('Rename Voice Room');
-
-  const nameInput = new TextInputBuilder()
-    .setCustomId('new_name')
-    .setLabel('New Room Name')
-    .setStyle(TextInputStyle.Short)
-    .setValue(currentName)
-    .setMaxLength(50)
-    .setRequired(true);
-
-  modal.addComponents(new ActionRowBuilder().addComponents(nameInput));
-  await interaction.showModal(modal);
 }
 
 /**
@@ -527,6 +545,13 @@ async function handleTempVoiceRenameSubmit(interaction) {
   const channelId = interaction.customId.split(':')[1];
   const guild = interaction.guild;
   if (!guild) return;
+
+  const tempRecord = activeTempChannels.get(channelId);
+  const isOwner = tempRecord && tempRecord.ownerId === interaction.user.id;
+  const isAdmin = interaction.memberPermissions?.has(PermissionFlagsBits.Administrator);
+  if (!isOwner && !isAdmin) {
+    return interaction.reply({ content: '❌ Only the creator of this voice channel can rename the room.', flags: MessageFlags.Ephemeral }).catch(() => {});
+  }
 
   const channel = guild.channels.cache.get(channelId) || (await guild.channels.fetch(channelId).catch(() => null));
   if (!channel) {
@@ -544,7 +569,7 @@ async function handleTempVoiceRenameSubmit(interaction) {
     await interaction.editReply({ content: `✅ Renamed room to **${newName}**!` });
   } catch (err) {
     logger.error('[TEMP VOICE] Failed to rename channel:', err.message || err);
-    await interaction.editReply({ content: '❌ Discord rate limits room renames to 2 per 10 minutes. Please try again shortly.' });
+    await interaction.editReply({ content: '❌ Discord rate limits room renames to 2 per 10 minutes. Please try again shortly.' }).catch(() => {});
   }
 }
 
@@ -553,36 +578,40 @@ async function handleTempVoiceRenameSubmit(interaction) {
  * @param {import('discord.js').ButtonInteraction} interaction
  */
 async function showTempVoiceLimitModal(interaction) {
-  const channelId = interaction.customId.split(':')[1];
-  const tempRecord = activeTempChannels.get(channelId);
-  const isOwner = tempRecord && tempRecord.ownerId === interaction.user.id;
-  const isAdmin = interaction.memberPermissions?.has(PermissionFlagsBits.Administrator);
+  try {
+    const channelId = interaction.customId.split(':')[1];
+    const tempRecord = activeTempChannels.get(channelId);
+    const isOwner = tempRecord && tempRecord.ownerId === interaction.user.id;
+    const isAdmin = interaction.memberPermissions?.has(PermissionFlagsBits.Administrator);
 
-  if (!isOwner && !isAdmin) {
-    return interaction.reply({
-      content: '❌ Only the creator of this voice channel can set player limits.',
-      flags: MessageFlags.Ephemeral,
-    });
+    if (!isOwner && !isAdmin) {
+      return interaction.reply({
+        content: '❌ Only the creator of this voice channel can set player limits.',
+        flags: MessageFlags.Ephemeral,
+      });
+    }
+
+    const channel = interaction.guild?.channels.cache.get(channelId);
+    const currentLimit = channel && channel.userLimit > 0 ? String(channel.userLimit) : '';
+
+    const modal = new ModalBuilder()
+      .setCustomId(`tempvoice_limit_modal:${channelId}`)
+      .setTitle('Set Room Player Limit');
+
+    const limitInput = new TextInputBuilder()
+      .setCustomId('new_limit')
+      .setLabel('Player Limit (0 for unlimited, max 99)')
+      .setStyle(TextInputStyle.Short)
+      .setValue(currentLimit)
+      .setPlaceholder('e.g. 4 or 0 for unlimited')
+      .setMaxLength(2)
+      .setRequired(true);
+
+    modal.addComponents(new ActionRowBuilder().addComponents(limitInput));
+    await interaction.showModal(modal);
+  } catch (err) {
+    logger.error('[TEMP VOICE] showTempVoiceLimitModal error:', err.message || err);
   }
-
-  const channel = interaction.guild?.channels.cache.get(channelId);
-  const currentLimit = channel && channel.userLimit > 0 ? String(channel.userLimit) : '';
-
-  const modal = new ModalBuilder()
-    .setCustomId(`tempvoice_limit_modal:${channelId}`)
-    .setTitle('Set Room Player Limit');
-
-  const limitInput = new TextInputBuilder()
-    .setCustomId('new_limit')
-    .setLabel('Player Limit (0 for unlimited, max 99)')
-    .setStyle(TextInputStyle.Short)
-    .setValue(currentLimit)
-    .setPlaceholder('e.g. 4 or 0 for unlimited')
-    .setMaxLength(2)
-    .setRequired(true);
-
-  modal.addComponents(new ActionRowBuilder().addComponents(limitInput));
-  await interaction.showModal(modal);
 }
 
 /**
@@ -593,6 +622,13 @@ async function handleTempVoiceLimitSubmit(interaction) {
   const channelId = interaction.customId.split(':')[1];
   const guild = interaction.guild;
   if (!guild) return;
+
+  const tempRecord = activeTempChannels.get(channelId);
+  const isOwner = tempRecord && tempRecord.ownerId === interaction.user.id;
+  const isAdmin = interaction.memberPermissions?.has(PermissionFlagsBits.Administrator);
+  if (!isOwner && !isAdmin) {
+    return interaction.reply({ content: '❌ Only the creator of this voice channel can set player limits.', flags: MessageFlags.Ephemeral }).catch(() => {});
+  }
 
   const channel = guild.channels.cache.get(channelId) || (await guild.channels.fetch(channelId).catch(() => null));
   if (!channel) {
@@ -613,7 +649,7 @@ async function handleTempVoiceLimitSubmit(interaction) {
     });
   } catch (err) {
     logger.error('[TEMP VOICE] Failed to set limit:', err.message || err);
-    await interaction.editReply({ content: '❌ Failed to update player limit.' });
+    await interaction.editReply({ content: '❌ Failed to update player limit.' }).catch(() => {});
   }
 }
 

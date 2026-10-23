@@ -53,14 +53,12 @@ export default function SocialPage() {
   const [ttsIgnoredPrefixes, setTtsIgnoredPrefixes] = useState('!, //, (');
   const [ttsVoiceBotClientId, setTtsVoiceBotClientId] = useState('1531251424456081569');
   const [loadingTts, setLoadingTts] = useState(false);
-  const [saveTtsStatus, setSaveTtsStatus] = useState<SaveStatus>('idle');
 
   // Dynamic Temporary Voice Channel state
   const [tempVoiceEnabled, setTempVoiceEnabled] = useState(false);
   const [tempVoiceHubId, setTempVoiceHubId] = useState('');
   const [tempVoiceTemplate, setTempVoiceTemplate] = useState("🎮 {username}'s Room");
   const [tempVoiceLimit, setTempVoiceLimit] = useState(0);
-  const [saveTempVoiceStatus, setSaveTempVoiceStatus] = useState<SaveStatus>('idle');
 
   useEffect(() => {
     if (activeTab === 'auto_reactions') {
@@ -342,63 +340,6 @@ export default function SocialPage() {
     }
   };
 
-  const saveTtsSettings = async () => {
-    setSaveTtsStatus('saving');
-    try {
-      const res = await fetch('/api/social/tts/config', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          config: {
-            enabled: ttsEnabled,
-            default_language: ttsLanguage,
-            default_voice_model: ttsVoiceModel,
-            default_persona: ttsPersona,
-            max_characters: ttsMaxChars,
-            ignored_prefixes: ttsIgnoredPrefixes,
-          },
-        }),
-      });
-
-      if (res.ok) {
-        setSaveTtsStatus('saved');
-        setTimeout(() => setSaveTtsStatus('idle'), 2500);
-      } else {
-        setSaveTtsStatus('error');
-      }
-    } catch (e) {
-      setSaveTtsStatus('error');
-    }
-  };
-
-  const saveTempVoiceSettings = async () => {
-    setSaveTempVoiceStatus('saving');
-    try {
-      const res = await fetch('/api/config', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          feature_key: 'temp_voice',
-          enabled: tempVoiceEnabled,
-          config: {
-            hub_channel_id: tempVoiceHubId,
-            default_name_template: tempVoiceTemplate,
-            default_user_limit: Number(tempVoiceLimit) || 0,
-          },
-        }),
-      });
-
-      if (res.ok) {
-        setSaveTempVoiceStatus('saved');
-        setTimeout(() => setSaveTempVoiceStatus('idle'), 2500);
-      } else {
-        setSaveTempVoiceStatus('error');
-      }
-    } catch {
-      setSaveTempVoiceStatus('error');
-    }
-  };
-
   const toggleTempVoice = async (nextEnabled: boolean) => {
     setTempVoiceEnabled(nextEnabled);
     try {
@@ -564,144 +505,227 @@ export default function SocialPage() {
                 </div>
               </div>
 
-              <div className="feature-form-card" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-                <h3 style={{ margin: 0 }}>Register Stream Alert Target</h3>
-
-                <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr 1fr auto', gap: '0.75rem', alignItems: 'end' }}>
-                  <div className="form-group" style={{ margin: 0 }}>
-                    <label className="form-label">Platform</label>
-                    <select
-                      className="form-input"
-                      value={newAlertPlatform}
-                      onChange={(e) => setNewAlertPlatform(e.target.value as 'twitch' | 'tiktok')}
-                    >
-                      <option value="twitch">👾 Twitch</option>
-                      <option value="tiktok">🎵 TikTok</option>
-                    </select>
-                  </div>
-
-                  <div className="form-group" style={{ margin: 0 }}>
-                    <label className="form-label">Streamer Handle</label>
-                    <input
-                      className="form-input"
-                      placeholder="e.g. streamer_name"
-                      value={newAlertHandle}
-                      onChange={(e) => setNewAlertHandle(e.target.value)}
-                    />
-                  </div>
-
-                  <div className="form-group" style={{ margin: 0 }}>
-                    <label className="form-label">Target Channel</label>
-                    <select
-                      className="form-input"
-                      value={newAlertChannelId}
-                      onChange={(e) => setNewAlertChannelId(e.target.value)}
-                    >
-                      <option value="">Select channel...</option>
-                      {channels.map((ch) => (
-                        <option key={ch.id} value={ch.id}>
-                          {ch.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <button
-                    type="button"
-                    className="btn-primary"
-                    style={{ height: '38px', padding: '0 1rem' }}
-                    onClick={async () => {
-                      if (!newAlertHandle.trim() || !newAlertChannelId.trim()) {
-                        alert('Please provide streamer handle and select a target channel.');
-                        return;
-                      }
-                      try {
-                        const res = await fetch('/api/social/live-alerts', {
-                          method: 'POST',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({
-                            platform: newAlertPlatform,
-                            handle: newAlertHandle,
-                            channel_id: newAlertChannelId,
-                          }),
-                        });
-                        if (!res.ok) throw new Error('Failed to add live alert handle');
-                        const data = await res.json();
-                        if (data.alert) setLiveAlerts((prev) => [data.alert, ...prev]);
-                        setNewAlertHandle('');
-                      } catch (err: any) {
-                        alert(err.message);
-                      }
-                    }}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                <div className="feature-form-card">
+                  <FeatureCard
+                    id="live-alerts"
+                    icon="🔴"
+                    title="Social Sync — Live Alert Hub"
+                    description="Auto-posts rich embeds when creators go live on Twitch or TikTok. Updates to 'Ended' state when stream closes."
+                    featureKey="live_alerts"
+                    initialEnabled={liveConfig.enabled ?? false}
+                    initialConfig={liveConfig.config ?? {}}
                   >
-                    Add Alert
-                  </button>
-                </div>
+                    {(config, setConfig) => (
+                      <>
+                        <div className="section-divider">
+                          <div className="section-divider-line" />
+                          <span className="section-divider-text">Default Alert Settings &amp; API Credentials</span>
+                          <div className="section-divider-line" />
+                        </div>
 
-                <div className="section-divider" style={{ marginTop: '1rem' }}>
-                  <div className="section-divider-line" />
-                  <span className="section-divider-text">Configured Live Stream Alerts</span>
-                  <div className="section-divider-line" />
-                </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                          <div className="form-group">
+                            <label className="form-label">Default Alert Channel ID</label>
+                            <input
+                              id="live-alert-channel"
+                              className="form-input"
+                              placeholder="Channel for live notifications (e.g. #general-chat)"
+                              value={config.alert_channel_id || ''}
+                              onChange={(e) => setConfig('alert_channel_id', e.target.value)}
+                            />
+                          </div>
 
-                {loadingAlerts ? (
-                  <div style={{ display: 'flex', justifyContent: 'center', padding: '1rem' }}>
-                    <div className="spinner" style={{ width: 24, height: 24 }} />
-                  </div>
-                ) : liveAlerts.length === 0 ? (
-                  <p className="form-hint" style={{ textAlign: 'center', padding: '1rem' }}>
-                    No Twitch or TikTok stream alerts configured yet.
-                  </p>
-                ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: '300px', overflowY: 'auto' }}>
-                    {(liveAlerts || []).map((alertItem) => (
-                      <div
-                        key={alertItem.id}
-                        style={{
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          alignItems: 'center',
-                          padding: '0.75rem',
-                          backgroundColor: 'rgba(255,255,255,0.03)',
-                          borderRadius: '6px',
-                          border: '1px solid rgba(255,255,255,0.05)',
-                        }}
-                      >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                          <span style={{ fontSize: '1.1rem' }}>
-                            {alertItem.platform === 'twitch' ? '👾' : '🎵'}
-                          </span>
-                          <div>
-                            <strong style={{ color: 'var(--text-primary)', textTransform: 'capitalize' }}>
-                              {alertItem.platform}: @{alertItem.handle}
-                            </strong>
-                            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                              Channel: <code style={{ padding: '0 4px' }}>#{(channels || []).find((c) => c.id === alertItem.channel_id)?.name || alertItem.channel_id}</code>
-                              {alertItem.is_live ? ' · 🔴 LIVE NOW' : ' · ⚪ Offline'}
-                            </div>
+                          <div className="form-group">
+                            <label className="form-label">Ping Role ID (Optional)</label>
+                            <input
+                              id="live-ping-role"
+                              className="form-input"
+                              placeholder="Role to mention when a stream goes live"
+                              value={config.ping_role_id || ''}
+                              onChange={(e) => setConfig('ping_role_id', e.target.value)}
+                            />
                           </div>
                         </div>
 
-                        <button
-                          type="button"
-                          style={{ background: 'transparent', border: 'none', color: '#EF4444', cursor: 'pointer', fontSize: '0.8125rem' }}
-                          onClick={async () => {
-                            if (!confirm(`Delete stream alert for @${alertItem.handle}?`)) return;
-                            try {
-                              const res = await fetch(`/api/social/live-alerts?id=${alertItem.id}`, { method: 'DELETE' });
-                              if (!res.ok) throw new Error('Failed to delete alert');
-                              setLiveAlerts((prev) => prev.filter((a) => a.id !== alertItem.id));
-                            } catch (err: any) {
-                              alert(err.message);
-                            }
-                          }}
-                        >
-                          Delete
-                        </button>
-                      </div>
-                    ))}
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                          <div className="form-group">
+                            <label className="form-label">Twitch Client ID</label>
+                            <input
+                              id="twitch-client-id"
+                              className="form-input"
+                              type="password"
+                              placeholder="••••••••"
+                              value={config.twitch_client_id || ''}
+                              onChange={(e) => setConfig('twitch_client_id', e.target.value)}
+                            />
+                          </div>
+                          <div className="form-group">
+                            <label className="form-label">Twitch Client Secret</label>
+                            <input
+                              id="twitch-client-secret"
+                              className="form-input"
+                              type="password"
+                              placeholder="••••••••"
+                              value={config.twitch_client_secret || ''}
+                              onChange={(e) => setConfig('twitch_client_secret', e.target.value)}
+                            />
+                          </div>
+                        </div>
+                      </>
+                    )}
+                  </FeatureCard>
+                </div>
+
+                <div className="feature-form-card" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                  <h3 style={{ margin: 0 }}>Register Stream Alert Target</h3>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr 1fr auto', gap: '0.75rem', alignItems: 'end' }}>
+                    <div className="form-group" style={{ margin: 0 }}>
+                      <label className="form-label">Platform</label>
+                      <select
+                        className="form-input"
+                        value={newAlertPlatform}
+                        onChange={(e) => setNewAlertPlatform(e.target.value as 'twitch' | 'tiktok')}
+                      >
+                        <option value="twitch">👾 Twitch</option>
+                        <option value="tiktok">🎵 TikTok</option>
+                      </select>
+                    </div>
+
+                    <div className="form-group" style={{ margin: 0 }}>
+                      <label className="form-label">Streamer Handle</label>
+                      <input
+                        className="form-input"
+                        placeholder="e.g. streamer_name"
+                        value={newAlertHandle}
+                        onChange={(e) => setNewAlertHandle(e.target.value)}
+                      />
+                    </div>
+
+                    <div className="form-group" style={{ margin: 0 }}>
+                      <label className="form-label">Target Channel</label>
+                      <select
+                        className="form-input"
+                        value={newAlertChannelId}
+                        onChange={(e) => setNewAlertChannelId(e.target.value)}
+                      >
+                        <option value="">Select channel...</option>
+                        {channels.map((ch) => (
+                          <option key={ch.id} value={ch.id}>
+                            {ch.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <button
+                      type="button"
+                      className="btn-primary"
+                      style={{ height: '38px', padding: '0 1rem' }}
+                      onClick={async () => {
+                        if (!newAlertHandle.trim() || !newAlertChannelId.trim()) {
+                          alert('Please provide streamer handle and select a target channel.');
+                          return;
+                        }
+                        try {
+                          const res = await fetch('/api/social/live-alerts', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                              platform: newAlertPlatform,
+                              handle: newAlertHandle,
+                              channel_id: newAlertChannelId,
+                            }),
+                          });
+                          if (!res.ok) throw new Error('Failed to add live alert handle');
+                          const data = await res.json();
+                          if (data.alert) setLiveAlerts((prev) => [data.alert, ...prev]);
+                          setNewAlertHandle('');
+                        } catch (err: any) {
+                          alert(err.message);
+                        }
+                      }}
+                    >
+                      Add Alert
+                    </button>
                   </div>
-                )}
+
+                  <div className="section-divider" style={{ marginTop: '1rem' }}>
+                    <div className="section-divider-line" />
+                    <span className="section-divider-text">Configured Live Stream Alerts</span>
+                    <div className="section-divider-line" />
+                  </div>
+
+                  {loadingAlerts ? (
+                    <div style={{ display: 'flex', justifyContent: 'center', padding: '1rem' }}>
+                      <div className="spinner" style={{ width: 24, height: 24 }} />
+                    </div>
+                  ) : liveAlerts.length === 0 ? (
+                    <p className="form-hint" style={{ textAlign: 'center', padding: '1rem' }}>
+                      No Twitch or TikTok stream alerts configured yet.
+                    </p>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: '300px', overflowY: 'auto' }}>
+                      {(liveAlerts || []).map((alertItem) => {
+                        const targetChannelId = alertItem.alert_channel_id || alertItem.channel_id;
+                        const matchedChannelName = (channels || []).find((c) => c.id === targetChannelId)?.name;
+                        const channelDisplay = matchedChannelName
+                          ? matchedChannelName
+                          : targetChannelId
+                            ? `#${targetChannelId}`
+                            : 'Unassigned';
+
+                        return (
+                          <div
+                            key={alertItem.id}
+                            style={{
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              alignItems: 'center',
+                              padding: '0.75rem',
+                              backgroundColor: 'rgba(255,255,255,0.03)',
+                              borderRadius: '6px',
+                              border: '1px solid rgba(255,255,255,0.05)',
+                            }}
+                          >
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                              <span style={{ fontSize: '1.1rem' }}>
+                                {alertItem.platform === 'twitch' ? '👾' : '🎵'}
+                              </span>
+                              <div>
+                                <strong style={{ color: 'var(--text-primary)', textTransform: 'capitalize' }}>
+                                  {alertItem.platform}: @{alertItem.handle}
+                                </strong>
+                                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                                  Channel: <code style={{ padding: '0 4px' }}>{channelDisplay}</code>
+                                  {alertItem.is_live ? ' · 🔴 LIVE NOW' : ' · ⚪ Offline'}
+                                </div>
+                              </div>
+                            </div>
+
+                            <button
+                              type="button"
+                              style={{ background: 'transparent', border: 'none', color: '#EF4444', cursor: 'pointer', fontSize: '0.8125rem' }}
+                              onClick={async () => {
+                                if (!confirm(`Delete stream alert for @${alertItem.handle}?`)) return;
+                                try {
+                                  const res = await fetch(`/api/social/live-alerts?id=${alertItem.id}`, { method: 'DELETE' });
+                                  if (!res.ok) throw new Error('Failed to delete alert');
+                                  setLiveAlerts((prev) => prev.filter((a) => a.id !== alertItem.id));
+                                } catch (err: any) {
+                                  alert(err.message);
+                                }
+                              }}
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           )}
@@ -865,170 +889,6 @@ export default function SocialPage() {
                       )}
                     </>
                   )}
-                </FeatureCard>
-              </div>
-            </div>
-          )}
-
-          {activeTab === 'live_alerts' && (
-            <div className="split-layout-detail">
-              <div className="feature-instructions">
-                <h3>Live Alert Hub Guidelines</h3>
-                <p>Auto-post cards when creators start streaming. Follow these steps to configure connections:</p>
-                 <ol>
-                  <li>Enable Developer Mode in Discord, right-click the target text channel, and copy the ID into <strong>Alert Channel ID</strong>.</li>
-                  <li>Right-click your notification role under Server Settings {"->"} Roles, copy the ID, and input it into <strong>Ping Role ID</strong>.</li>
-                  <li>Register a Twitch application in the Developer Console and provide the Client ID and Secret (for Twitch streamers).</li>
-                  <li>Add streamers using their exact Twitch handle, or TikTok username (e.g. <code>@username</code>).</li>
-                </ol>
-              </div>
-
-              <div className="feature-form-card">
-                <FeatureCard
-                  id="live-alerts"
-                  icon="🔴"
-                  title="Social Sync — Live Alert Hub"
-                  description="Auto-posts rich embeds when creators go live on Twitch or TikTok. Updates to 'Ended' state when stream closes."
-                  featureKey="live_alerts"
-                  initialEnabled={liveConfig.enabled ?? false}
-                  initialConfig={liveConfig.config ?? {}}
-                >
-                  {(config, setConfig) => {
-                    const streamers: any[] = config.streamers || [];
-
-                    return (
-                      <>
-                        <div className="section-divider">
-                          <div className="section-divider-line" />
-                          <span className="section-divider-text">Alert Settings</span>
-                          <div className="section-divider-line" />
-                        </div>
-
-                        <div className="form-group">
-                          <label className="form-label">Alert Channel ID</label>
-                          <input
-                            id="live-alert-channel"
-                            className="form-input"
-                            placeholder="Channel for live notifications (e.g. #general-chat)"
-                            value={config.alert_channel_id || ''}
-                            onChange={(e) => setConfig('alert_channel_id', e.target.value)}
-                          />
-                        </div>
-
-                        <div className="form-group">
-                          <label className="form-label">Ping Role ID</label>
-                          <input
-                            id="live-ping-role"
-                            className="form-input"
-                            placeholder="Role to mention when a stream goes live"
-                            value={config.ping_role_id || ''}
-                            onChange={(e) => setConfig('ping_role_id', e.target.value)}
-                          />
-                        </div>
-
-                        <div className="section-divider">
-                          <div className="section-divider-line" />
-                          <span className="section-divider-text">API Credentials</span>
-                          <div className="section-divider-line" />
-                        </div>
-
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-                          <div className="form-group">
-                            <label className="form-label">Twitch Client ID</label>
-                            <input
-                              id="twitch-client-id"
-                              className="form-input"
-                              type="password"
-                              placeholder="••••••••"
-                              value={config.twitch_client_id || ''}
-                              onChange={(e) => setConfig('twitch_client_id', e.target.value)}
-                            />
-                          </div>
-                          <div className="form-group">
-                            <label className="form-label">Twitch Client Secret</label>
-                            <input
-                              id="twitch-client-secret"
-                              className="form-input"
-                              type="password"
-                              placeholder="••••••••"
-                              value={config.twitch_client_secret || ''}
-                              onChange={(e) => setConfig('twitch_client_secret', e.target.value)}
-                            />
-                          </div>
-                        </div>
-
-                        <div className="section-divider">
-                          <div className="section-divider-line" />
-                          <span className="section-divider-text">Streamer List</span>
-                          <div className="section-divider-line" />
-                        </div>
-
-                        <div className="streamer-row" style={{ marginBottom: '-0.25rem' }}>
-                          {['Platform', 'Handle / Username', 'Display Name', ''].map((h) => (
-                            <span key={h} style={{ fontSize: '0.6875rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-muted)' }}>{h}</span>
-                          ))}
-                        </div>
-
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                          {streamers.map((s: any, i: number) => (
-                            <div key={i} className="streamer-row">
-                              <select
-                                id={`streamer-platform-${i}`}
-                                className="form-select"
-                                value={s.platform || 'twitch'}
-                                onChange={(e) => {
-                                  const updated = [...streamers];
-                                  updated[i] = { ...s, platform: e.target.value };
-                                  setConfig('streamers', updated);
-                                }}
-                                style={{ padding: '0.375rem 2rem 0.375rem 0.625rem', fontSize: '0.8125rem' }}
-                              >
-                                <option value="twitch">🟣 Twitch</option>
-                                <option value="tiktok">🎵 TikTok</option>
-                              </select>
-                              <input
-                                id={`streamer-handle-${i}`}
-                                className="form-input"
-                                placeholder={s.platform === 'tiktok' ? '@username' : 'username'}
-                                value={s.handle || ''}
-                                onChange={(e) => {
-                                  const updated = [...streamers];
-                                  updated[i] = { ...s, handle: e.target.value };
-                                  setConfig('streamers', updated);
-                                }}
-                                style={{ padding: '0.375rem 0.625rem', fontSize: '0.8125rem' }}
-                              />
-                              <input
-                                id={`streamer-name-${i}`}
-                                className="form-input"
-                                placeholder="Display name"
-                                value={s.display_name || ''}
-                                onChange={(e) => {
-                                  const updated = [...streamers];
-                                  updated[i] = { ...s, display_name: e.target.value };
-                                  setConfig('streamers', updated);
-                                }}
-                                style={{ padding: '0.375rem 0.625rem', fontSize: '0.8125rem' }}
-                              />
-                              <button
-                                id={`remove-streamer-${i}`}
-                                className="btn btn-danger btn-icon btn-sm"
-                                onClick={() => setConfig('streamers', streamers.filter((_: any, j: number) => j !== i))}
-                              >✕</button>
-                            </div>
-                          ))}
-
-                          <button
-                            id="add-streamer-btn"
-                            className="btn btn-secondary btn-sm"
-                            onClick={() => setConfig('streamers', [...streamers, { platform: 'twitch', handle: '', display_name: '' }])}
-                          >
-                            + Add Streamer
-                          </button>
-                        </div>
-                      </>
-                    );
-                  }}
                 </FeatureCard>
               </div>
             </div>
@@ -1475,7 +1335,7 @@ export default function SocialPage() {
                     ignored_prefixes: ttsIgnoredPrefixes,
                   }}
                 >
-                  {() => (
+                  {(config, setConfig) => (
                     <>
                       <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '0.5rem', marginBottom: '0.25rem' }}>
                         <a
@@ -1501,8 +1361,11 @@ export default function SocialPage() {
                           <select
                             id="tts-default-language"
                             className="form-input"
-                            value={ttsLanguage}
-                            onChange={(e) => setTtsLanguage(e.target.value)}
+                            value={config.default_language ?? ttsLanguage}
+                            onChange={(e) => {
+                              setTtsLanguage(e.target.value);
+                              setConfig('default_language', e.target.value);
+                            }}
                             style={{ width: '100%', marginTop: '0.35rem' }}
                           >
                             <option value="en">English (US)</option>
@@ -1519,8 +1382,11 @@ export default function SocialPage() {
                           <select
                             id="tts-default-voice-model"
                             className="form-input"
-                            value={ttsVoiceModel}
-                            onChange={(e) => setTtsVoiceModel(e.target.value)}
+                            value={config.default_voice_model ?? ttsVoiceModel}
+                            onChange={(e) => {
+                              setTtsVoiceModel(e.target.value);
+                              setConfig('default_voice_model', e.target.value);
+                            }}
                             style={{ width: '100%', marginTop: '0.35rem' }}
                           >
                             <option value="female">Female Voice</option>
@@ -1535,8 +1401,11 @@ export default function SocialPage() {
                           <select
                             id="tts-default-persona"
                             className="form-input"
-                            value={ttsPersona}
-                            onChange={(e) => setTtsPersona(e.target.value)}
+                            value={config.default_persona ?? ttsPersona}
+                            onChange={(e) => {
+                              setTtsPersona(e.target.value);
+                              setConfig('default_persona', e.target.value);
+                            }}
                             style={{ width: '100%', marginTop: '0.35rem' }}
                           >
                             <option value="default">Default Natural</option>
@@ -1552,8 +1421,12 @@ export default function SocialPage() {
                             id="tts-max-chars"
                             type="number"
                             className="form-input"
-                            value={ttsMaxChars}
-                            onChange={(e) => setTtsMaxChars(Number(e.target.value))}
+                            value={config.max_characters ?? ttsMaxChars}
+                            onChange={(e) => {
+                              const val = Number(e.target.value);
+                              setTtsMaxChars(val);
+                              setConfig('max_characters', val);
+                            }}
                             style={{ width: '100%', marginTop: '0.35rem' }}
                           />
                         </div>
@@ -1565,33 +1438,17 @@ export default function SocialPage() {
                           id="tts-ignored-prefixes"
                           type="text"
                           className="form-input"
-                          value={ttsIgnoredPrefixes}
-                          onChange={(e) => setTtsIgnoredPrefixes(e.target.value)}
+                          value={config.ignored_prefixes ?? ttsIgnoredPrefixes}
+                          onChange={(e) => {
+                            setTtsIgnoredPrefixes(e.target.value);
+                            setConfig('ignored_prefixes', e.target.value);
+                          }}
                           placeholder="!, //, ("
                           style={{ width: '100%', marginTop: '0.35rem' }}
                         />
                         <span className="form-hint">
                           Messages starting with these symbols will not be spoken aloud by TTS.
                         </span>
-                      </div>
-
-                      <div className="section-divider" style={{ marginTop: '1rem' }}>
-                        <div className="section-divider-line" />
-                        <span className="section-divider-text">Save Detailed Settings</span>
-                        <div className="section-divider-line" />
-                      </div>
-
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                        <button
-                          id="save-tts-settings-btn"
-                          className="btn btn-secondary btn-sm"
-                          onClick={saveTtsSettings}
-                          disabled={saveTtsStatus === 'saving'}
-                        >
-                          {saveTtsStatus === 'saving' ? '⏳ Saving...' : '💾 Save TTS Settings'}
-                        </button>
-                        {saveTtsStatus === 'saved' && <span style={{ color: '#22c55e', fontSize: '0.875rem' }}>✓ Saved!</span>}
-                        {saveTtsStatus === 'error' && <span style={{ color: '#ef4444', fontSize: '0.875rem' }}>❌ Failed to save.</span>}
                       </div>
                     </>
                   )}
@@ -1645,15 +1502,18 @@ export default function SocialPage() {
                   }}
                   onToggle={toggleTempVoice}
                 >
-                  {() => (
+                  {(config, setConfig) => (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: '1rem' }}>
                       <div className="form-group">
                         <label className="form-label" style={{ fontWeight: 600 }}>Starter Voice Channel (Hub)</label>
                         <select
                           id="tempvoice-hub-select"
                           className="form-input"
-                          value={tempVoiceHubId}
-                          onChange={(e) => setTempVoiceHubId(e.target.value)}
+                          value={config.hub_channel_id ?? tempVoiceHubId}
+                          onChange={(e) => {
+                            setTempVoiceHubId(e.target.value);
+                            setConfig('hub_channel_id', e.target.value);
+                          }}
                           style={{ width: '100%', marginTop: '0.35rem' }}
                         >
                           <option value="">Select Starter Hub Channel...</option>
@@ -1683,8 +1543,11 @@ export default function SocialPage() {
                           id="tempvoice-template-input"
                           type="text"
                           className="form-input"
-                          value={tempVoiceTemplate}
-                          onChange={(e) => setTempVoiceTemplate(e.target.value)}
+                          value={config.default_name_template ?? tempVoiceTemplate}
+                          onChange={(e) => {
+                            setTempVoiceTemplate(e.target.value);
+                            setConfig('default_name_template', e.target.value);
+                          }}
                           placeholder="🎮 {username}'s Room"
                           style={{ width: '100%', marginTop: '0.35rem' }}
                         />
@@ -1701,33 +1564,18 @@ export default function SocialPage() {
                           min={0}
                           max={99}
                           className="form-input"
-                          value={tempVoiceLimit}
-                          onChange={(e) => setTempVoiceLimit(Number(e.target.value))}
+                          value={config.default_user_limit ?? tempVoiceLimit}
+                          onChange={(e) => {
+                            const val = Number(e.target.value);
+                            setTempVoiceLimit(val);
+                            setConfig('default_user_limit', val);
+                          }}
                           placeholder="0 for unlimited"
                           style={{ width: '100%', marginTop: '0.35rem' }}
                         />
                         <span className="form-hint">
                           Set to 0 for unlimited, or specify a default capacity (e.g. 4 or 5).
                         </span>
-                      </div>
-
-                      <div className="section-divider" style={{ marginTop: '1rem' }}>
-                        <div className="section-divider-line" />
-                        <span className="section-divider-text">Save Configuration</span>
-                        <div className="section-divider-line" />
-                      </div>
-
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                        <button
-                          id="save-tempvoice-settings-btn"
-                          className="btn btn-secondary btn-sm"
-                          onClick={saveTempVoiceSettings}
-                          disabled={saveTempVoiceStatus === 'saving'}
-                        >
-                          {saveTempVoiceStatus === 'saving' ? '⏳ Saving...' : '💾 Save Voice Settings'}
-                        </button>
-                        {saveTempVoiceStatus === 'saved' && <span style={{ color: '#22c55e', fontSize: '0.875rem' }}>✓ Saved!</span>}
-                        {saveTempVoiceStatus === 'error' && <span style={{ color: '#ef4444', fontSize: '0.875rem' }}>❌ Failed to save.</span>}
                       </div>
                     </div>
                   )}

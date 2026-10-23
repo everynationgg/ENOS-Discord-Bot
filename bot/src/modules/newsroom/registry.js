@@ -12,6 +12,9 @@ const NEWSROOM_CATEGORIES = [
       { id: 'ign_games',   name: 'IGN Games (Games Only)', feedUrl: 'https://feeds.feedburner.com/ign/games-all' },
       { id: 'gematsu',     name: 'Gematsu (Game Reveals)', feedUrl: 'https://www.gematsu.com/feed' },
       { id: 'pcgamer',     name: 'PC Gamer News',          feedUrl: 'https://www.pcgamer.com/rss/' },
+      { id: 'gamespot',    name: 'GameSpot',               feedUrl: 'https://www.gamespot.com/feeds/news/' },
+      { id: 'kotaku',      name: 'Kotaku',                 feedUrl: 'https://kotaku.com/rss' },
+      { id: 'eurogamer',   name: 'Eurogamer',              feedUrl: 'https://www.eurogamer.net/feed/news' },
       { id: 'yt_nintendo', name: 'Nintendo Trailers',      feedUrl: 'https://www.youtube.com/feeds/videos.xml?channel_id=UCgK_2VQWwigtTr_5TviGy2w' },
     ],
     fallbackImage: 'https://images.unsplash.com/photo-1550745165-9bc0b252726f?q=80&w=1200&auto=format&fit=crop',
@@ -40,12 +43,15 @@ const NEWSROOM_CATEGORIES = [
     defaultSources: [
       // YouTube studio/trailer channels — items come with direct youtube.com/watch URLs
       // All channel IDs below verified live (HTTP 200, entries confirmed)
-      { id: 'yt_movieclips',  name: 'Movieclips Trailers',    feedUrl: 'https://www.youtube.com/feeds/videos.xml?channel_id=UCi8e0iOVk1fEOogdfu4YgfA' },
-      { id: 'yt_warnerbros',  name: 'Warner Bros. Pictures',  feedUrl: 'https://www.youtube.com/feeds/videos.xml?channel_id=UCjmJDM5pRKbUlVIzDYYWb6g' },
-      { id: 'yt_universal',   name: 'Universal Pictures',     feedUrl: 'https://www.youtube.com/feeds/videos.xml?channel_id=UCq-Fj5jknLsUf-MWSy4_brA' },
-      { id: 'yt_paramount',   name: 'Paramount Pictures',     feedUrl: 'https://www.youtube.com/feeds/videos.xml?channel_id=UCF9IOB2TExg3QIBupFtBDxg' },
-      { id: 'yt_marvel',      name: 'Marvel Entertainment',   feedUrl: 'https://www.youtube.com/feeds/videos.xml?channel_id=UCvC4D8onUfXzvjTOM-dBfEA' },
-      { id: 'yt_20thcentury', name: '20th Century Studios',   feedUrl: 'https://www.youtube.com/feeds/videos.xml?channel_id=UCzWQYUVCpZqtN93H8RR44Qw' },
+      { id: 'yt_movieclips',   name: 'Movieclips Trailers',    feedUrl: 'https://www.youtube.com/feeds/videos.xml?channel_id=UCi8e0iOVk1fEOogdfu4YgfA' },
+      { id: 'yt_warnerbros',   name: 'Warner Bros. Pictures',  feedUrl: 'https://www.youtube.com/feeds/videos.xml?channel_id=UCjmJDM5pRKbUlVIzDYYWb6g' },
+      { id: 'yt_universal',    name: 'Universal Pictures',     feedUrl: 'https://www.youtube.com/feeds/videos.xml?channel_id=UCq-Fj5jknLsUf-MWSy4_brA' },
+      { id: 'yt_paramount',    name: 'Paramount Pictures',     feedUrl: 'https://www.youtube.com/feeds/videos.xml?channel_id=UCF9IOB2TExg3QIBupFtBDxg' },
+      { id: 'yt_marvel',       name: 'Marvel Entertainment',   feedUrl: 'https://www.youtube.com/feeds/videos.xml?channel_id=UCvC4D8onUfXzvjTOM-dBfEA' },
+      { id: 'yt_20thcentury',  name: '20th Century Studios',   feedUrl: 'https://www.youtube.com/feeds/videos.xml?channel_id=UCzWQYUVCpZqtN93H8RR44Qw' },
+      { id: 'variety_film',    name: 'Variety Film',           feedUrl: 'https://variety.com/v/film/feed/' },
+      { id: 'deadline_movies', name: 'Deadline Hollywood',     feedUrl: 'https://deadline.com/category/movies/feed/' },
+      { id: 'rottentomatoes',  name: 'Rotten Tomatoes News',   feedUrl: 'https://editorial.rottentomatoes.com/feed/' },
     ],
     fallbackImage: 'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?q=80&w=1200&auto=format&fit=crop',
     colorHex: 0xf59e0b, // Amber

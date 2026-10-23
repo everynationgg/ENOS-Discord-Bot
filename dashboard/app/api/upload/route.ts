@@ -1,10 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { auth } from '@/lib/auth';
 import { supabaseAdmin } from '@/lib/supabase';
 
 const BUCKET_NAME = 'enos-uploads';
+const MAX_UPLOAD_BYTES = 10 * 1024 * 1024; // 10MB
 
 export async function POST(req: NextRequest) {
   try {
+    const session = await auth();
+    if (!session) {
+      return NextResponse.json(
+        { success: false, error: 'Unauthorized' },
+        { status: 401 }
+      );
+    }
+
     const formData = await req.formData();
     const file = formData.get('file') as File | null;
 
@@ -18,6 +28,13 @@ export async function POST(req: NextRequest) {
     if (!file.type.startsWith('image/')) {
       return NextResponse.json(
         { success: false, error: 'Uploaded file must be a valid image.' },
+        { status: 400 }
+      );
+    }
+
+    if (file.size > MAX_UPLOAD_BYTES) {
+      return NextResponse.json(
+        { success: false, error: 'Uploaded image exceeds the 10MB size limit.' },
         { status: 400 }
       );
     }

@@ -108,11 +108,13 @@ async function fetchImageBuffer(url) {
       const buf = Buffer.from(arrayBuf);
       if (buf.length > 100 && !buf.toString('utf8', 0, 50).includes('<!DOCTYPE')) {
         imageBufferCache.set(url, { buffer: buf, timestamp: Date.now() });
-        imageBufferCache.set(directUrl, { buffer: buf, timestamp: Date.now() });
+        pruneImageBufferCache();
         return buf;
       }
     }
-  } catch (e) {}
+  } catch (e) {
+    logger.warn(`[BOSS CANVAS] Failed to fetch image buffer for ${url}:`, e.message);
+  }
   return null;
 }
 
@@ -260,8 +262,9 @@ async function renderBossImage(data) {
   let customBgLoaded = false;
   if (bgBuf) {
     try {
-      const bgImg = await loadImage(bgBuf);
+      let bgImg = await loadImage(bgBuf);
       ctx.drawImage(bgImg, 0, 0, width, height);
+      bgImg = null;
       customBgLoaded = true;
 
       if (isOverkill) {
@@ -272,7 +275,9 @@ async function renderBossImage(data) {
         ctx.fillStyle = perkOverlay;
         ctx.fillRect(0, 0, width, height);
       }
-    } catch (e) {}
+    } catch (e) {
+      logger.warn('[BOSS CANVAS] Background load warning:', e.message);
+    }
   }
 
   if (!customBgLoaded) {
@@ -305,9 +310,12 @@ async function renderBossImage(data) {
     const mainPicBuf = victoryBuf || bossBuf;
     if (mainPicBuf) {
       try {
-        const vicImg = await loadImage(mainPicBuf);
+        let vicImg = await loadImage(mainPicBuf);
         drawImageContain(ctx, vicImg, 0, 0, width, height, 0.5, 0.5);
-      } catch (e) {}
+        vicImg = null;
+      } catch (e) {
+        logger.warn('[BOSS CANVAS] Victory image load warning:', e.message);
+      }
     }
 
     const frameGrad = ctx.createRadialGradient(400, 210, 200, 400, 210, 420);
@@ -329,7 +337,9 @@ async function renderBossImage(data) {
     ctx.fillText('SERVER SAVED & REWARDS AWARDED', 35, 118);
 
     ctx.restore();
-    return canvas.toBuffer('image/png');
+    const out = canvas.toBuffer('image/png');
+    pruneImageBufferCache();
+    return out;
   }
 
   // ─── PHASE L: LOSS / ESCAPED VIEW ─────────────────────────────────────────
@@ -337,9 +347,12 @@ async function renderBossImage(data) {
     const mainPicBuf = lossBuf || bossBuf;
     if (mainPicBuf) {
       try {
-        const lossImg = await loadImage(mainPicBuf);
+        let lossImg = await loadImage(mainPicBuf);
         drawImageContain(ctx, lossImg, 0, 0, width, height, 0.5, 0.5);
-      } catch (e) {}
+        lossImg = null;
+      } catch (e) {
+        logger.warn('[BOSS CANVAS] Loss image load warning:', e.message);
+      }
     }
 
     const frameGrad = ctx.createRadialGradient(400, 210, 200, 400, 210, 420);
@@ -361,20 +374,25 @@ async function renderBossImage(data) {
     ctx.fillText('STAND BY FOR NEXT ANOMALY CYCLE', 35, 118);
 
     ctx.restore();
-    return canvas.toBuffer('image/png');
+    const out = canvas.toBuffer('image/png');
+    pruneImageBufferCache();
+    return out;
   }
 
   // ─── PHASE A: INITIAL BOSS SPAWN BANNER (Boss Upload Only) ─────────────────
   if (viewMode === 'spawn') {
     if (bossBuf) {
       try {
-        const bossImg = await loadImage(bossBuf);
+        let bossImg = await loadImage(bossBuf);
         if (customBgLoaded) {
           drawImageContain(ctx, bossImg, 380, 20, 380, 380, 0.5, 0.5);
         } else {
           drawImageContain(ctx, bossImg, 0, 0, width, height, 0.5, 0.5);
         }
-      } catch (e) {}
+        bossImg = null;
+      } catch (e) {
+        logger.warn('[BOSS CANVAS] Spawn boss image load warning:', e.message);
+      }
     }
 
     // Dark Vignette Frame & Title Overlay
@@ -401,7 +419,9 @@ async function renderBossImage(data) {
     }
 
     ctx.restore();
-    return canvas.toBuffer('image/png');
+    const out = canvas.toBuffer('image/png');
+    pruneImageBufferCache();
+    return out;
   }
 
   // ─── PHASE B: COMBAT ARENA VIEW (Selected Class PNG vs Boss Upload PNG) ────
@@ -409,9 +429,12 @@ async function renderBossImage(data) {
   // 1. Draw Boss Image on Right Side (Aspect-Ratio Preserved)
   if (bossBuf) {
     try {
-      const bossImg = await loadImage(bossBuf);
+      let bossImg = await loadImage(bossBuf);
       drawImageContain(ctx, bossImg, 400, 20, 380, 330, 0.5, 0.5);
-    } catch (e) {}
+      bossImg = null;
+    } catch (e) {
+      logger.warn('[BOSS CANVAS] Arena boss image load warning:', e.message);
+    }
   }
 
   // 2. Draw Selected Class Character Image on Left Side
@@ -419,10 +442,13 @@ async function renderBossImage(data) {
   let classLoaded = false;
   if (classBuf) {
     try {
-      const classImg = await loadImage(classBuf);
+      let classImg = await loadImage(classBuf);
       drawImageContain(ctx, classImg, classX, 30, 340, 320, 0.5, 0.5);
+      classImg = null;
       classLoaded = true;
-    } catch (e) {}
+    } catch (e) {
+      logger.warn('[BOSS CANVAS] Class image load warning:', e.message);
+    }
   }
 
   if (!classLoaded) {

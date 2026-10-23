@@ -1,18 +1,27 @@
-import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { NextRequest, NextResponse } from 'next/server';
+import { auth } from '@/lib/auth';
+import { supabaseAdmin as supabase } from '@/lib/supabase';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
-const supabase = createClient(supabaseUrl, supabaseKey);
-
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
-    // Fetch recruitment achievement config
-    const { data: configData } = await supabase
+    const session = await auth();
+    if (!session) {
+      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const { searchParams } = new URL(req.url);
+    const guildId = searchParams.get('guildId') || process.env.DISCORD_GUILD_ID || 'global';
+
+    // Fetch recruitment achievement config (check guildId first, fallback to 'global')
+    const { data: configRows } = await supabase
       .from('guild_config')
-      .select('enabled, config')
+      .select('guild_id, enabled, config, updated_at')
       .eq('feature_key', 'recruitment_achievement')
-      .maybeSingle();
+      .in('guild_id', [guildId, 'global'])
+      .order('updated_at', { ascending: false })
+      .limit(1);
+
+    const configData = configRows?.[0] || null;
 
     // Fetch invites list
     const { data: invites } = await supabase
@@ -34,22 +43,39 @@ export async function GET() {
 
 export async function POST(req: Request) {
   try {
+    const session = await auth();
+    if (!session) {
+      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+    }
+
     const body = await req.json();
-    const { action, inviteId, newStatus, config, enabled } = body;
+    const { action, inviteId, newStatus, config, enabled, guild_id } = body;
+    const targetGuildId = guild_id || process.env.DISCORD_GUILD_ID || 'global';
 
     if (action === 'save_config') {
+      const nowIso = new Date().toISOString();
+      const rowsToUpsert = [
+        {
+          guild_id: targetGuildId,
+          feature_key: 'recruitment_achievement',
+          enabled: enabled ?? true,
+          config,
+          updated_at: nowIso,
+        },
+      ];
+      if (targetGuildId !== 'global') {
+        rowsToUpsert.push({
+          guild_id: 'global',
+          feature_key: 'recruitment_achievement',
+          enabled: enabled ?? true,
+          config,
+          updated_at: nowIso,
+        });
+      }
+
       const { error } = await supabase
         .from('guild_config')
-        .upsert(
-          {
-            guild_id: 'global',
-            feature_key: 'recruitment_achievement',
-            enabled: enabled ?? true,
-            config,
-            updated_at: new Date().toISOString(),
-          },
-          { onConflict: 'guild_id,feature_key' }
-        );
+        .upsert(rowsToUpsert, { onConflict: 'guild_id,feature_key' });
 
       if (error) throw new Error(error.message);
       return NextResponse.json({ success: true, message: 'Configuration saved successfully!' });

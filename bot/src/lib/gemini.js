@@ -19,8 +19,6 @@ const DEFAULT_FLASH_MODELS = [
   'gemini-2.5-flash',
   'gemini-flash-latest',
   'gemini-flash-lite-latest',
-  'gemini-3.5-flash-lite',
-  'gemini-3.8-flash',
 ];
 
 // In-memory cache of model names, refreshed periodically
@@ -133,7 +131,7 @@ function invalidateModel(modelName) {
     logger.warn(`[GEMINI] Model "${modelName}" evicted from active cache. Remaining candidates: ${cachedModels.length}`);
   }
   if (cachedModels.length === 0) {
-    getAvailableFlashModels(true).catch(() => {});
+    getAvailableFlashModels(true).catch((e) => logger.warn('[GEMINI] Refresh catalog warning:', e.message));
   }
 }
 
@@ -155,17 +153,22 @@ async function generateContentWithFallback(prompt, options = {}) {
   const timeoutMs = options.timeoutMs || 5000;
 
   for (const modelName of candidateModels) {
+    let timeoutHandle = null;
     try {
       const model = genAI.getGenerativeModel({ model: modelName, ...(options.modelParams || {}) });
       const result = await Promise.race([
         model.generateContent(prompt),
-        new Promise((_, reject) => setTimeout(() => reject(new Error(`Model request timed out after ${timeoutMs}ms`)), timeoutMs)),
+        new Promise((_, reject) => {
+          timeoutHandle = setTimeout(() => reject(new Error(`Model request timed out after ${timeoutMs}ms`)), timeoutMs);
+        }),
       ]);
+      if (timeoutHandle) clearTimeout(timeoutHandle);
       const text = result?.response?.text();
       if (text) {
         return text.trim();
       }
     } catch (err) {
+      if (timeoutHandle) clearTimeout(timeoutHandle);
       lastError = err;
       const errMsg = err.message || '';
       const isQuotaExceeded = errMsg.includes('429') && (errMsg.includes('Quota exceeded') || errMsg.includes('PerDayPerProject'));
@@ -188,6 +191,7 @@ async function generateContentWithFallback(prompt, options = {}) {
   if (options.throwOnError && lastError) {
     throw lastError;
   }
+  return null;
 }
 
 module.exports = {

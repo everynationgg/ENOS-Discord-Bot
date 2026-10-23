@@ -34,14 +34,15 @@ export async function POST(req: NextRequest) {
       const targetChannelId = chId.trim();
 
       // Fetch existing config to check for old launcher message ID
-      const { data: existing } = await supabaseAdmin
+      const { data: existingRows } = await supabaseAdmin
         .from('guild_config')
-        .select('config')
+        .select('config, updated_at')
         .eq('guild_id', guildId)
         .in('feature_key', ['vault', 'vault_economy'])
-        .maybeSingle();
+        .order('updated_at', { ascending: false })
+        .limit(1);
 
-      const config = existing?.config || {};
+      const config = existingRows?.[0]?.config || {};
       if (config.quest_launcher_message_id) {
         await fetch(`https://discord.com/api/v10/channels/${targetChannelId}/messages/${config.quest_launcher_message_id}`, {
           method: 'DELETE',
@@ -128,13 +129,16 @@ export async function POST(req: NextRequest) {
       };
 
       for (const fKey of ['vault', 'vault_economy']) {
-        await supabaseAdmin.from('guild_config').upsert({
-          guild_id: guildId,
-          feature_key: fKey,
-          enabled: true,
-          config: updatedConfig,
-          updated_at: new Date().toISOString(),
-        });
+        await supabaseAdmin.from('guild_config').upsert(
+          {
+            guild_id: guildId,
+            feature_key: fKey,
+            enabled: true,
+            config: updatedConfig,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: 'guild_id,feature_key' }
+        );
       }
 
       return NextResponse.json({ success: true, message_id: sentMsg.id });

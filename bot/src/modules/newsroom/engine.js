@@ -12,6 +12,21 @@ const inMemoryPostedGuids = new Set();
 const inMemoryPostedTitles = new Set();
 const categoryLastRunMap = new Map();
 
+function trackInMemorySeen(guid, url, lowerTitle) {
+  if (guid) inMemoryPostedGuids.add(guid);
+  if (url) inMemoryPostedGuids.add(url);
+  if (lowerTitle) inMemoryPostedTitles.add(lowerTitle);
+
+  if (inMemoryPostedGuids.size > 500) {
+    const first = inMemoryPostedGuids.values().next().value;
+    if (first) inMemoryPostedGuids.delete(first);
+  }
+  if (inMemoryPostedTitles.size > 500) {
+    const first = inMemoryPostedTitles.values().next().value;
+    if (first) inMemoryPostedTitles.delete(first);
+  }
+}
+
 /**
  * Strips HTML tags and unescapes common HTML entities from RSS content.
  */
@@ -481,6 +496,9 @@ async function processNewsroomCategory(client, guildId, categoryId, { forceRun =
       const aiEval = await evaluateArticleWithAi(article, categoryId);
       if (!aiEval || !aiEval.is_relevant) {
         logger.info(`[NEWSROOM BOUNCER] Filtered out non-relevant content: "${article.title}" (${aiEval?.rejection_reason || 'Filtered by AI'})`);
+        postedGuids.add(article.guid);
+        postedGuids.add(article.url);
+        trackInMemorySeen(article.guid, article.url, lowerTitle);
         continue;
       }
 
@@ -536,9 +554,7 @@ async function processNewsroomCategory(client, guildId, categoryId, { forceRun =
         postedGuids.add(article.url);
         postedTitles.push(lowerTitle);
 
-        inMemoryPostedGuids.add(article.guid);
-        inMemoryPostedGuids.add(article.url);
-        inMemoryPostedTitles.add(lowerTitle);
+        trackInMemorySeen(article.guid, article.url, lowerTitle);
         postedCount++;
 
         // Persist updated posted_guids and last_run_at back to guild_config in Supabase

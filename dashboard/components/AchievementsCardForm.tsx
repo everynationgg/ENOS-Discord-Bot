@@ -13,7 +13,31 @@ export default function AchievementsCardForm({ config, setConfig }: { config: an
   const [loading, setLoading] = useState(true);
   const [statusMsg, setStatusMsg] = useState('');
   const [dispatching, setDispatching] = useState(false);
+  const [savingConfig, setSavingConfig] = useState(false);
   const [uploadingIndex, setUploadingIndex] = useState<number | null>(null);
+
+  const handleSaveConfig = async () => {
+    setSavingConfig(true);
+    setStatusMsg('⏳ Saving achievement configuration...');
+    try {
+      const res = await fetch('/api/gaming/achievements/action', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'save_config', enabled: true, config }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setStatusMsg('✅ Achievement configuration saved successfully!');
+      } else {
+        setStatusMsg(`❌ Error: ${data.error}`);
+      }
+    } catch {
+      setStatusMsg('❌ Failed to save achievement configuration.');
+    } finally {
+      setSavingConfig(false);
+      setTimeout(() => setStatusMsg(''), 4000);
+    }
+  };
 
   const fetchInvites = async () => {
     try {
@@ -179,10 +203,18 @@ export default function AchievementsCardForm({ config, setConfig }: { config: an
         </div>
       </div>
 
-      <div style={{ marginBottom: '1.25rem', display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+      <div style={{ marginBottom: '1.25rem', display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
         <button
           type="button"
           className="btn btn-primary btn-sm"
+          disabled={savingConfig}
+          onClick={handleSaveConfig}
+        >
+          {savingConfig ? '⏳ Saving...' : '💾 Save Achievement Config'}
+        </button>
+        <button
+          type="button"
+          className="btn btn-secondary btn-sm"
           disabled={dispatching}
           onClick={handleDispatchCard}
         >
@@ -300,6 +332,19 @@ export default function AchievementsCardForm({ config, setConfig }: { config: an
               <div style={{ background: 'var(--bg-card)', padding: '0.75rem', borderRadius: '6px' }}>
                 <h5 style={{ margin: '0 0 0.5rem 0', color: '#A78BFA', fontSize: '0.85rem' }}>🟣 Tier I — Enis</h5>
                 <input
+                  type="number"
+                  min={1}
+                  className="form-input"
+                  placeholder="Required Count (e.g. 5)"
+                  style={{ marginBottom: '0.4rem', fontSize: '0.8rem' }}
+                  value={item.tiers?.enis?.threshold ?? 5}
+                  onChange={(e) => {
+                    const list = [...customAchievements];
+                    list[idx] = { ...list[idx], tiers: { ...list[idx].tiers, enis: { ...list[idx].tiers?.enis, threshold: parseInt(e.target.value, 10) || 1 } } };
+                    setConfig('custom_achievements', list);
+                  }}
+                />
+                <input
                   className="form-input"
                   placeholder="Title Phrase"
                   style={{ marginBottom: '0.4rem', fontSize: '0.8rem' }}
@@ -327,6 +372,19 @@ export default function AchievementsCardForm({ config, setConfig }: { config: an
               <div style={{ background: 'var(--bg-card)', padding: '0.75rem', borderRadius: '6px' }}>
                 <h5 style={{ margin: '0 0 0.5rem 0', color: '#F97316', fontSize: '0.85rem' }}>🔥 Tier II — Enara</h5>
                 <input
+                  type="number"
+                  min={1}
+                  className="form-input"
+                  placeholder="Required Count (e.g. 50)"
+                  style={{ marginBottom: '0.4rem', fontSize: '0.8rem' }}
+                  value={item.tiers?.enara?.threshold ?? 50}
+                  onChange={(e) => {
+                    const list = [...customAchievements];
+                    list[idx] = { ...list[idx], tiers: { ...list[idx].tiers, enara: { ...list[idx].tiers?.enara, threshold: parseInt(e.target.value, 10) || 1 } } };
+                    setConfig('custom_achievements', list);
+                  }}
+                />
+                <input
                   className="form-input"
                   placeholder="Title Phrase"
                   style={{ marginBottom: '0.4rem', fontSize: '0.8rem' }}
@@ -353,6 +411,19 @@ export default function AchievementsCardForm({ config, setConfig }: { config: an
               {/* Enorium Tier */}
               <div style={{ background: 'var(--bg-card)', padding: '0.75rem', borderRadius: '6px' }}>
                 <h5 style={{ margin: '0 0 0.5rem 0', color: '#EAB308', fontSize: '0.85rem' }}>👑 Tier III — Enorium</h5>
+                <input
+                  type="number"
+                  min={1}
+                  className="form-input"
+                  placeholder="Required Count (e.g. 100)"
+                  style={{ marginBottom: '0.4rem', fontSize: '0.8rem' }}
+                  value={item.tiers?.enorium?.threshold ?? 100}
+                  onChange={(e) => {
+                    const list = [...customAchievements];
+                    list[idx] = { ...list[idx], tiers: { ...list[idx].tiers, enorium: { ...list[idx].tiers?.enorium, threshold: parseInt(e.target.value, 10) || 1 } } };
+                    setConfig('custom_achievements', list);
+                  }}
+                />
                 <input
                   className="form-input"
                   placeholder="Title Phrase"

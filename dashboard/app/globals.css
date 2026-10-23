@@ -1251,3 +1251,80 @@ p  { color: var(--text-secondary); }
   border-color: var(--success);
 }
 
+
+/* ─── Design Token Aliases & Utility Extensions ───────────────── */
+:root {
+  --border-color:     var(--border-subtle);
+  --bg-secondary:     var(--bg-surface);
+  --bg-primary:       var(--bg-base);
+  --bg-tertiary:      var(--bg-elevated);
+  --bg-input:         var(--bg-surface);
+  --surface-elevated: var(--bg-elevated);
+  --color-success:    var(--success);
+  --color-error:      var(--danger);
+  --text-danger:      var(--danger);
+}
+
+.btn-xs {
+  padding: 0.25rem 0.55rem;
+  font-size: 0.75rem;
+  border-radius: var(--radius-sm);
+}
+
+.btn-ghost {
+  background: transparent;
+  color: var(--text-secondary);
+  border: 1px solid transparent;
+}
+.btn-ghost:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-primary);
+}
+
+.btn-warning {
+  background: rgba(245, 158, 11, 0.15);
+  color: var(--warning);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+}
+.btn-warning:hover:not(:disabled) {
+  background: rgba(245, 158, 11, 0.25);
+}
+
+.badge-success {
+  background: rgba(34, 197, 94, 0.15);
+  color: var(--success);
+  border: 1px solid rgba(34, 197, 94, 0.3);
+}
+
+.badge-danger {
+  background: rgba(239, 68, 68, 0.15);
+  color: var(--danger);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.input-field {
+  width: 100%;
+  padding: 0.625rem 0.875rem;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-size: 0.875rem;
+  font-family: inherit;
+  transition: var(--transition);
+}
+.input-field:focus {
+  outline: none;
+  border-color: var(--accent-primary);
+}
+
+.code-box {
+  padding: 0.875rem 1rem;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  font-family: monospace;
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+  overflow-x: auto;
+}

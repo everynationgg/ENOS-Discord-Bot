@@ -191,7 +191,7 @@ function generateTtsAudioFile(text, langCode) {
   const gttsLangMap = {
     en: 'en',
     ja: 'ja',
-    tl: 'es',
+    tl: 'tl',
     es: 'es',
     fr: 'fr',
     de: 'de',
@@ -518,21 +518,24 @@ async function relocateControlPanel(guildId, textChannel) {
 /**
  * Leaves the Voice Channel and deletes the Control Panel card (/leave)
  */
-async function leaveVoiceSession(guildId) {
+async function leaveVoiceSession(guildId, mainClient = null) {
   const session = activeSessions.get(guildId);
   if (!session) return { success: false, message: '❌ No active EN TTS voice session in this server.' };
 
-  // Delete control panel card
+  // Delete control panel card (sent by mainClient or voiceBotClient)
   if (session.textChannelId && session.controlMessageId) {
     try {
-      if (voiceBotClient) {
-        const ch = await voiceBotClient.channels.fetch(session.textChannelId).catch(() => null);
+      const clientToUse = mainClient || voiceBotClient;
+      if (clientToUse) {
+        const ch = await clientToUse.channels.fetch(session.textChannelId).catch(() => null);
         if (ch) {
           const msg = await ch.messages.fetch(session.controlMessageId).catch(() => null);
           if (msg) await msg.delete().catch(() => {});
         }
       }
-    } catch (e) {}
+    } catch (e) {
+      logger.warn('[TTS] Could not delete control panel message on leave:', e.message);
+    }
   }
 
   // Disconnect voice connection

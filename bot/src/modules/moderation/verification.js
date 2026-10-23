@@ -47,6 +47,11 @@ const MONTHS = [
 const DAYS_1_15 = Array.from({ length: 15 }, (_, i) => String(i + 1).padStart(2, '0'));
 const DAYS_16_31 = Array.from({ length: 16 }, (_, i) => String(i + 16).padStart(2, '0'));
 
+const MAX_DAYS_BY_MONTH = {
+  '01': 31, '02': 29, '03': 31, '04': 30, '05': 31, '06': 30,
+  '07': 31, '08': 31, '09': 30, '10': 31, '11': 30, '12': 31,
+};
+
 function getMonthName(value) {
   return MONTHS.find(m => m.value === value)?.name || value;
 }
@@ -60,47 +65,51 @@ const pendingVerifications = new Map();
  * @param {import('discord.js').ButtonInteraction} interaction
  */
 async function handleVerifyButton(interaction) {
-  // Check if already verified in Discord (checks if they have the verified role)
-  const featureConfig = await getFeatureConfig(interaction.guild.id, 'gatekeeper');
-  const config = featureConfig?.config || {};
-  const verifiedRoleId = config.verified_role_id;
+  try {
+    // Check if already verified in Discord (checks if they have the verified role)
+    const featureConfig = await getFeatureConfig(interaction.guild.id, 'gatekeeper');
+    const config = featureConfig?.config || {};
+    const verifiedRoleId = config.verified_role_id;
 
-  const hasVerifiedRole = verifiedRoleId && interaction.member.roles.cache.has(verifiedRoleId);
+    const hasVerifiedRole = verifiedRoleId && interaction.member.roles.cache.has(verifiedRoleId);
 
-  if (hasVerifiedRole) {
-    // Check if they are registered in the database
-    const { data: dbUser } = await supabase
-      .from('verified_members')
-      .select('discord_id')
-      .eq('discord_id', interaction.user.id)
-      .eq('guild_id', interaction.guild.id)
-      .maybeSingle();
+    if (hasVerifiedRole) {
+      // Check if they are registered in the database
+      const { data: dbUser } = await supabase
+        .from('verified_members')
+        .select('discord_id')
+        .eq('discord_id', interaction.user.id)
+        .eq('guild_id', interaction.guild.id)
+        .maybeSingle();
 
-    if (dbUser) {
-      return interaction.reply({
-        content: '✅ You are already verified! If you need to change your registered IGNs or birthday, please contact an administrator.',
-        ephemeral: true,
-      });
+      if (dbUser) {
+        return interaction.reply({
+          content: '✅ You are already verified! If you need to change your registered IGNs or birthday, please contact an administrator.',
+          ephemeral: true,
+        });
+      }
     }
+
+    const modal = new ModalBuilder()
+      .setCustomId('verify_modal')
+      .setTitle(`${interaction.guild.name.slice(0, 45)} — Member Registration`);
+
+    const indianNameInput = new TextInputBuilder()
+      .setCustomId('indian_name')
+      .setLabel('Discord Nickname *')
+      .setStyle(TextInputStyle.Short)
+      .setPlaceholder('Enter your preferred server nickname')
+      .setRequired(true)
+      .setMaxLength(32);
+
+    modal.addComponents(
+      new ActionRowBuilder().addComponents(indianNameInput)
+    );
+
+    await interaction.showModal(modal);
+  } catch (err) {
+    logger.error('[VERIFICATION] handleVerifyButton error:', err.message || err);
   }
-
-  const modal = new ModalBuilder()
-    .setCustomId('verify_modal')
-    .setTitle(`${interaction.guild.name.slice(0, 45)} — Member Registration`);
-
-  const indianNameInput = new TextInputBuilder()
-    .setCustomId('indian_name')
-    .setLabel('Discord Nickname *')
-    .setStyle(TextInputStyle.Short)
-    .setPlaceholder('Enter your preferred server nickname')
-    .setRequired(true)
-    .setMaxLength(32);
-
-  modal.addComponents(
-    new ActionRowBuilder().addComponents(indianNameInput)
-  );
-
-  await interaction.showModal(modal);
 }
 
 /**
@@ -108,22 +117,26 @@ async function handleVerifyButton(interaction) {
  * @param {import('discord.js').ModalSubmitInteraction} interaction
  */
 async function handleVerifyModalSubmit(interaction) {
-  const indianName = interaction.fields.getTextInputValue('indian_name').trim();
+  try {
+    const indianName = interaction.fields.getTextInputValue('indian_name').trim();
 
-  // Store partial data, starting with IGN setup step
-  const pending = {
-    indianName,
-    ignList: [],
-    ign: null,
-    birthday: null,
-    birthMonth: null,
-    birthDayGroup: null,
-    birthDay: null,
-    step: 'ign',
-  };
-  pendingVerifications.set(interaction.user.id, pending);
+    // Store partial data, starting with IGN setup step
+    const pending = {
+      indianName,
+      ignList: [],
+      ign: null,
+      birthday: null,
+      birthMonth: null,
+      birthDayGroup: null,
+      birthDay: null,
+      step: 'ign',
+    };
+    pendingVerifications.set(interaction.user.id, pending);
 
-  await sendIGNStep(interaction, pending);
+    await sendIGNStep(interaction, pending);
+  } catch (err) {
+    logger.error('[VERIFICATION] handleVerifyModalSubmit error:', err.message || err);
+  }
 }
 
 /**
@@ -169,73 +182,90 @@ ${listContent}`;
  * Responds to "Add Game IGN" button click by showing the IGN modal
  */
 async function handleIGNAddClick(interaction) {
-  const modal = new ModalBuilder()
-    .setCustomId('verify_ign_modal')
-    .setTitle('Add In-Game Name (IGN)');
+  try {
+    const modal = new ModalBuilder()
+      .setCustomId('verify_ign_modal')
+      .setTitle('Add In-Game Name (IGN)');
 
-  const gameInput = new TextInputBuilder()
-    .setCustomId('ign_game')
-    .setLabel('Game Name *')
-    .setStyle(TextInputStyle.Short)
-    .setPlaceholder('e.g. Valorant, Wuwa, Minecraft')
-    .setRequired(true)
-    .setMaxLength(32);
+    const gameInput = new TextInputBuilder()
+      .setCustomId('ign_game')
+      .setLabel('Game Name *')
+      .setStyle(TextInputStyle.Short)
+      .setPlaceholder('e.g. Valorant, Wuwa, Minecraft')
+      .setRequired(true)
+      .setMaxLength(32);
 
-  const ignInput = new TextInputBuilder()
-    .setCustomId('ign_name')
-    .setLabel('In-Game Name (IGN) *')
-    .setStyle(TextInputStyle.Short)
-    .setPlaceholder('e.g. Player#1234, MyName')
-    .setRequired(true)
-    .setMaxLength(64);
+    const ignInput = new TextInputBuilder()
+      .setCustomId('ign_name')
+      .setLabel('In-Game Name (IGN) *')
+      .setStyle(TextInputStyle.Short)
+      .setPlaceholder('e.g. Player#1234, MyName')
+      .setRequired(true)
+      .setMaxLength(64);
 
-  modal.addComponents(
-    new ActionRowBuilder().addComponents(gameInput),
-    new ActionRowBuilder().addComponents(ignInput)
-  );
+    modal.addComponents(
+      new ActionRowBuilder().addComponents(gameInput),
+      new ActionRowBuilder().addComponents(ignInput)
+    );
 
-  await interaction.showModal(modal);
+    await interaction.showModal(modal);
+  } catch (err) {
+    logger.error('[VERIFICATION] handleIGNAddClick error:', err.message || err);
+  }
 }
 
 /**
  * Handles adding the new IGN from the modal and refreshes the step message
  */
 async function handleIGNModalSubmit(interaction) {
-  const game = interaction.fields.getTextInputValue('ign_game').trim();
-  const ign = interaction.fields.getTextInputValue('ign_name').trim();
+  try {
+    const game = interaction.fields.getTextInputValue('ign_game').trim();
+    const ign = interaction.fields.getTextInputValue('ign_name').trim();
 
-  const pending = pendingVerifications.get(interaction.user.id);
-  if (!pending) {
-    return interaction.reply({ content: '❌ Session expired. Please click Verify Here again.', ephemeral: true });
+    const pending = pendingVerifications.get(interaction.user.id);
+    if (!pending) {
+      return interaction.reply({ content: '❌ Session expired. Please click Verify Here again.', ephemeral: true });
+    }
+
+    pending.ignList.push({ game, ign });
+    pendingVerifications.set(interaction.user.id, pending);
+
+    await sendIGNStep(interaction, pending);
+  } catch (err) {
+    logger.error('[VERIFICATION] handleIGNModalSubmit error:', err.message || err);
   }
-
-  pending.ignList.push({ game, ign });
-  pendingVerifications.set(interaction.user.id, pending);
-
-  await sendIGNStep(interaction, pending);
 }
 
 /**
  * Processes completed IGN list and moves to the birthday step
  */
 async function handleIGNNext(interaction) {
-  const pending = pendingVerifications.get(interaction.user.id);
-  if (!pending) {
-    return interaction.reply({ content: '❌ Session expired. Please click Verify Here again.', ephemeral: true });
+  try {
+    const pending = pendingVerifications.get(interaction.user.id);
+    if (!pending) {
+      return interaction.reply({ content: '❌ Session expired. Please click Verify Here again.', ephemeral: true });
+    }
+
+    // Format IGN list into string for database storage
+    pending.ign = pending.ignList.map(item => `${item.game}: ${item.ign}`).join('\n') || null;
+    pending.step = 'birthday';
+    pendingVerifications.set(interaction.user.id, pending);
+
+    await sendBirthdayStep(interaction, pending);
+  } catch (err) {
+    logger.error('[VERIFICATION] handleIGNNext error:', err.message || err);
   }
-
-  // Format IGN list into string for database storage
-  pending.ign = pending.ignList.map(item => `${item.game}: ${item.ign}`).join('\n') || null;
-  pending.step = 'birthday';
-  pendingVerifications.set(interaction.user.id, pending);
-
-  await sendBirthdayStep(interaction, pending);
 }
 
 /**
  * Renders the birthday selection step (ephemeral message with dynamic select menus)
  */
 async function sendBirthdayStep(interaction, pending) {
+  const maxDayForMonth = pending.birthMonth ? (MAX_DAYS_BY_MONTH[pending.birthMonth] || 31) : 31;
+  if (pending.birthDay && parseInt(pending.birthDay, 10) > maxDayForMonth) {
+    pending.birthDay = null;
+  }
+
   const monthSelect = new StringSelectMenuBuilder()
     .setCustomId('verify_birth_month')
     .setPlaceholder(pending.birthMonth ? `Month: ${getMonthName(pending.birthMonth)}` : '📅 Select Month')
@@ -243,12 +273,13 @@ async function sendBirthdayStep(interaction, pending) {
       MONTHS.map(m => new StringSelectMenuOptionBuilder().setLabel(m.name).setValue(m.value))
     );
 
+  const upperRangeLabel = `Days 16-${maxDayForMonth}`;
   const dayGroupSelect = new StringSelectMenuBuilder()
     .setCustomId('verify_birth_day_group')
-    .setPlaceholder(pending.birthDayGroup ? `Day Range: ${pending.birthDayGroup}` : '📅 Select Day Range')
+    .setPlaceholder(pending.birthDayGroup ? `Day Range: ${pending.birthDayGroup === '16-31' ? `16-${maxDayForMonth}` : pending.birthDayGroup}` : '📅 Select Day Range')
     .addOptions([
       new StringSelectMenuOptionBuilder().setLabel('Days 1-15').setValue('1-15'),
-      new StringSelectMenuOptionBuilder().setLabel('Days 16-31').setValue('16-31'),
+      new StringSelectMenuOptionBuilder().setLabel(upperRangeLabel).setValue('16-31'),
     ]);
 
   const rows = [];
@@ -257,10 +288,11 @@ async function sendBirthdayStep(interaction, pending) {
 
   // Dynamically show the specific day selector only when a range group is selected
   if (pending.birthDayGroup) {
-    const days = pending.birthDayGroup === '1-15' ? DAYS_1_15 : DAYS_16_31;
+    const rawDays = pending.birthDayGroup === '1-15' ? DAYS_1_15 : DAYS_16_31;
+    const days = rawDays.filter(d => parseInt(d, 10) <= maxDayForMonth);
     const daySelect = new StringSelectMenuBuilder()
       .setCustomId('verify_birth_day')
-      .setPlaceholder(pending.birthDay ? `Day: ${pending.birthDay}` : `📅 Select Day (${pending.birthDayGroup})`)
+      .setPlaceholder(pending.birthDay ? `Day: ${pending.birthDay}` : `📅 Select Day (${pending.birthDayGroup === '16-31' ? `16-${maxDayForMonth}` : pending.birthDayGroup})`)
       .addOptions(
         days.map(d => new StringSelectMenuOptionBuilder().setLabel(`Day ${d}`).setValue(d))
       );
@@ -282,7 +314,7 @@ async function sendBirthdayStep(interaction, pending) {
 
   const content = `📅 **Step 3 of 5** — Please select your Birthday (Month & Day):
 ${pending.birthMonth ? `• **Month**: ${getMonthName(pending.birthMonth)}` : '• *Month not selected*'}
-${pending.birthDayGroup ? `• **Day Range**: ${pending.birthDayGroup}` : '• *Day range not selected*'}
+${pending.birthDayGroup ? `• **Day Range**: ${pending.birthDayGroup === '16-31' ? `16-${maxDayForMonth}` : pending.birthDayGroup}` : '• *Day range not selected*'}
 ${pending.birthDay ? `• **Day**: ${pending.birthDay}` : '• *Day not selected*'}`;
 
   await interaction.update({
@@ -292,69 +324,89 @@ ${pending.birthDay ? `• **Day**: ${pending.birthDay}` : '• *Day not selected
 }
 
 async function handleBirthMonthSelect(interaction) {
-  const pending = pendingVerifications.get(interaction.user.id);
-  if (!pending) {
-    return interaction.reply({ content: '❌ Session expired. Please click Verify Here again.', ephemeral: true });
+  try {
+    const pending = pendingVerifications.get(interaction.user.id);
+    if (!pending) {
+      return interaction.reply({ content: '❌ Session expired. Please click Verify Here again.', ephemeral: true });
+    }
+
+    pending.birthMonth = interaction.values[0];
+    pendingVerifications.set(interaction.user.id, pending);
+
+    await sendBirthdayStep(interaction, pending);
+  } catch (err) {
+    logger.error('[VERIFICATION] handleBirthMonthSelect error:', err.message || err);
   }
-
-  pending.birthMonth = interaction.values[0];
-  pendingVerifications.set(interaction.user.id, pending);
-
-  await sendBirthdayStep(interaction, pending);
 }
 
 async function handleBirthDayGroupSelect(interaction) {
-  const pending = pendingVerifications.get(interaction.user.id);
-  if (!pending) {
-    return interaction.reply({ content: '❌ Session expired. Please click Verify Here again.', ephemeral: true });
-  }
+  try {
+    const pending = pendingVerifications.get(interaction.user.id);
+    if (!pending) {
+      return interaction.reply({ content: '❌ Session expired. Please click Verify Here again.', ephemeral: true });
+    }
 
-  const newGroup = interaction.values[0];
-  if (pending.birthDayGroup !== newGroup) {
-    pending.birthDayGroup = newGroup;
-    pending.birthDay = null; // Clear day if switching groups
-  }
-  pendingVerifications.set(interaction.user.id, pending);
+    const newGroup = interaction.values[0];
+    if (pending.birthDayGroup !== newGroup) {
+      pending.birthDayGroup = newGroup;
+      pending.birthDay = null; // Clear day if switching groups
+    }
+    pendingVerifications.set(interaction.user.id, pending);
 
-  await sendBirthdayStep(interaction, pending);
+    await sendBirthdayStep(interaction, pending);
+  } catch (err) {
+    logger.error('[VERIFICATION] handleBirthDayGroupSelect error:', err.message || err);
+  }
 }
 
 async function handleBirthDaySelect(interaction) {
-  const pending = pendingVerifications.get(interaction.user.id);
-  if (!pending) {
-    return interaction.reply({ content: '❌ Session expired. Please click Verify Here again.', ephemeral: true });
+  try {
+    const pending = pendingVerifications.get(interaction.user.id);
+    if (!pending) {
+      return interaction.reply({ content: '❌ Session expired. Please click Verify Here again.', ephemeral: true });
+    }
+
+    pending.birthDay = interaction.values[0];
+    pendingVerifications.set(interaction.user.id, pending);
+
+    await sendBirthdayStep(interaction, pending);
+  } catch (err) {
+    logger.error('[VERIFICATION] handleBirthDaySelect error:', err.message || err);
   }
-
-  pending.birthDay = interaction.values[0];
-  pendingVerifications.set(interaction.user.id, pending);
-
-  await sendBirthdayStep(interaction, pending);
 }
 
 async function handleBirthdayConfirm(interaction) {
-  const pending = pendingVerifications.get(interaction.user.id);
-  if (!pending) {
-    return interaction.reply({ content: '❌ Session expired. Please click Verify Here again.', ephemeral: true });
+  try {
+    const pending = pendingVerifications.get(interaction.user.id);
+    if (!pending) {
+      return interaction.reply({ content: '❌ Session expired. Please click Verify Here again.', ephemeral: true });
+    }
+
+    pending.birthday = `${pending.birthMonth}/${pending.birthDay}`;
+    pending.step = 'discovery';
+    pendingVerifications.set(interaction.user.id, pending);
+
+    await sendDiscoveryStep(interaction);
+  } catch (err) {
+    logger.error('[VERIFICATION] handleBirthdayConfirm error:', err.message || err);
   }
-
-  pending.birthday = `${pending.birthMonth}/${pending.birthDay}`;
-  pending.step = 'discovery';
-  pendingVerifications.set(interaction.user.id, pending);
-
-  await sendDiscoveryStep(interaction);
 }
 
 async function handleBirthdaySkip(interaction) {
-  const pending = pendingVerifications.get(interaction.user.id);
-  if (!pending) {
-    return interaction.reply({ content: '❌ Session expired. Please click Verify Here again.', ephemeral: true });
+  try {
+    const pending = pendingVerifications.get(interaction.user.id);
+    if (!pending) {
+      return interaction.reply({ content: '❌ Session expired. Please click Verify Here again.', ephemeral: true });
+    }
+
+    pending.birthday = null;
+    pending.step = 'discovery';
+    pendingVerifications.set(interaction.user.id, pending);
+
+    await sendDiscoveryStep(interaction);
+  } catch (err) {
+    logger.error('[VERIFICATION] handleBirthdaySkip error:', err.message || err);
   }
-
-  pending.birthday = null;
-  pending.step = 'discovery';
-  pendingVerifications.set(interaction.user.id, pending);
-
-  await sendDiscoveryStep(interaction);
 }
 
 /**
@@ -381,28 +433,32 @@ async function sendDiscoveryStep(interaction) {
  * @param {import('discord.js').StringSelectMenuInteraction} interaction
  */
 async function handleDiscoverySelect(interaction) {
-  const pending = pendingVerifications.get(interaction.user.id);
-  if (!pending) {
-    return interaction.reply({ content: '❌ Session expired. Please click Verify Here again.', ephemeral: true });
+  try {
+    const pending = pendingVerifications.get(interaction.user.id);
+    if (!pending) {
+      return interaction.reply({ content: '❌ Session expired. Please click Verify Here again.', ephemeral: true });
+    }
+
+    pending.discoverySource = interaction.values[0];
+    pending.step = 'game_branch';
+    pendingVerifications.set(interaction.user.id, pending);
+
+    const gameBranchSelect = new StringSelectMenuBuilder()
+      .setCustomId('verify_game_branch')
+      .setPlaceholder('Select your Primary Game Branch *')
+      .addOptions(
+        GAME_BRANCHES.map(game =>
+          new StringSelectMenuOptionBuilder().setLabel(game).setValue(game)
+        )
+      );
+
+    await interaction.update({
+      content: '🌿 **Step 5 of 5** — Select your Primary Game Branch:',
+      components: [new ActionRowBuilder().addComponents(gameBranchSelect)],
+    });
+  } catch (err) {
+    logger.error('[VERIFICATION] handleDiscoverySelect error:', err.message || err);
   }
-
-  pending.discoverySource = interaction.values[0];
-  pending.step = 'game_branch';
-  pendingVerifications.set(interaction.user.id, pending);
-
-  const gameBranchSelect = new StringSelectMenuBuilder()
-    .setCustomId('verify_game_branch')
-    .setPlaceholder('Select your Primary Game Branch *')
-    .addOptions(
-      GAME_BRANCHES.map(game =>
-        new StringSelectMenuOptionBuilder().setLabel(game).setValue(game)
-      )
-    );
-
-  await interaction.update({
-    content: '🌿 **Step 5 of 5** — Select your Primary Game Branch:',
-    components: [new ActionRowBuilder().addComponents(gameBranchSelect)],
-  });
 }
 
 /**

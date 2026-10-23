@@ -230,6 +230,15 @@ async function handleLFGModalSubmit(interaction) {
       return editEphemeralAndAutoDelete(interaction, `❌ Role **"${roleInput}"** not found on this server. Please enter a valid role name, role mention, or role ID.`);
     }
 
+    if (
+      resolvedRole.id === interaction.guild.id ||
+      resolvedRole.name === '@everyone' ||
+      resolvedRole.name.toLowerCase() === 'everyone' ||
+      resolvedRole.name.toLowerCase() === 'here'
+    ) {
+      return editEphemeralAndAutoDelete(interaction, '❌ Mentioning `@everyone` or `@here` is not allowed in LFG posts.');
+    }
+
     // Check configured role mapping for this matched game
     const allowedRoleId = roleMappings[matchedGame];
     if (allowedRoleId) {
@@ -239,9 +248,7 @@ async function handleLFGModalSubmit(interaction) {
     } else {
       // If not configured, ensure the role contains the game name
       const isMatched = resolvedRole.name.toLowerCase().includes(matchedGame.toLowerCase()) || 
-                        matchedGame.toLowerCase().includes(resolvedRole.name.toLowerCase()) ||
-                        resolvedRole.name.toLowerCase() === 'everyone' || 
-                        resolvedRole.name.toLowerCase() === 'here';
+                        matchedGame.toLowerCase().includes(resolvedRole.name.toLowerCase());
       if (!isMatched) {
         return editEphemeralAndAutoDelete(interaction, `❌ You can only mention a role that matches the game **${matchedGame}** (the role name must contain **${matchedGame}**).`);
       }

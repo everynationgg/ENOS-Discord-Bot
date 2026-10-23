@@ -315,8 +315,8 @@ async function buildPersonalCombatPayload(guildId, userId, combatResult = null) 
   }
 
   const apUsed = Math.max(0, 5 - (playerState.ap_remaining || 0));
-  const maxSlayPoints = boss.is_overkill ? 15 : 10;
-  const projectedPoints = Math.round((apUsed / 5) * maxSlayPoints);
+  const maxSlayPoints = boss.is_overkill ? 2.5 : 1.5;
+  const projectedPoints = Number(((apUsed / 5) * maxSlayPoints).toFixed(2));
 
   const apRemaining = playerState.ap_remaining ?? 0;
   let apStatusText = `⚡ **Your AP Remaining**: \`${apRemaining}/5 AP\` ${playerState.is_locked ? '*(Class locked for week)*' : '*(Can swap class)*'}`;

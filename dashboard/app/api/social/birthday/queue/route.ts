@@ -32,6 +32,9 @@ function getTargetDatesForOffset(daysAhead = 0) {
 
 // GET /api/social/birthday/queue — Fetch unsent birthday queue items
 export async function GET(req: NextRequest) {
+  const session = await auth();
+  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
   try {
     const guildId = getGuildId(req);
 
@@ -58,6 +61,7 @@ export async function GET(req: NextRequest) {
       const { data: bdays } = await supabaseAdmin
         .from('member_birthdays')
         .select('user_id, ign, guild_id')
+        .eq('guild_id', guildId)
         .in('birth_date', possibleFormats);
 
       if (bdays && bdays.length > 0) {
@@ -88,6 +92,7 @@ export async function GET(req: NextRequest) {
     const { data, error } = await supabaseAdmin
       .from('birthday_queue')
       .select('*')
+      .eq('guild_id', guildId)
       .eq('is_sent', false)
       .or('is_dismissed.is.null,is_dismissed.eq.false')
       .gte('target_date', todayDate)
