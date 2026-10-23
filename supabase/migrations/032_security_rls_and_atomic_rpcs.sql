@@ -1,7 +1,13 @@
 -- =============================================================================
--- Migration 032: Atomic Vault Coin RPC, RLS Policy Hardening & Index Optimization
+-- Migration 032: Atomic Vault Coin RPC, NUMERIC Columns, RLS Hardening & Indexes
 -- Additive & Idempotent — Safe to run on production Supabase
 -- =============================================================================
+
+-- 0. Ensure Vault & Boss coin/point columns are NUMERIC (prevents integer truncation/22P02 errors on decimal awards like 0.5 or 1.5)
+ALTER TABLE IF EXISTS public.vault_balances ALTER COLUMN coins TYPE NUMERIC USING coins::NUMERIC;
+ALTER TABLE IF EXISTS public.vault_transactions ALTER COLUMN delta TYPE NUMERIC USING delta::NUMERIC;
+ALTER TABLE IF EXISTS public.boss_player_states ALTER COLUMN weekly_points TYPE NUMERIC USING weekly_points::NUMERIC;
+ALTER TABLE IF EXISTS public.boss_transactions ALTER COLUMN points_earned TYPE NUMERIC USING points_earned::NUMERIC;
 
 -- 1. Create atomic increment_coins RPC expected by bot/src/modules/gaming/vault.js
 CREATE OR REPLACE FUNCTION public.increment_coins(
@@ -16,12 +22,13 @@ AS $$
 DECLARE
   v_new_balance NUMERIC;
 BEGIN
-  INSERT INTO public.vault_balances (discord_id, guild_id, coins, xp, tier, updated_at)
-  VALUES (p_discord_id, p_guild_id, GREATEST(0, ROUND(p_delta, 2)), 0, 'starter', NOW())
+  INSERT INTO public.vault_balances (discord_id, guild_id, coins, xp, tier, updated_at, last_active)
+  VALUES (p_discord_id, p_guild_id, GREATEST(0, ROUND(p_delta, 2)), 0, 'starter', NOW(), NOW())
   ON CONFLICT (discord_id, guild_id)
   DO UPDATE SET
     coins = GREATEST(0, ROUND(COALESCE(public.vault_balances.coins, 0) + p_delta, 2)),
-    updated_at = NOW()
+    updated_at = NOW(),
+    last_active = NOW()
   RETURNING coins INTO v_new_balance;
 
   RETURN v_new_balance;
@@ -34,7 +41,12 @@ ALTER TABLE IF EXISTS public.trivia_points ENABLE ROW LEVEL SECURITY;
 ALTER TABLE IF EXISTS public.guild_settings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE IF EXISTS public.member_birthdays ENABLE ROW LEVEL SECURITY;
 ALTER TABLE IF EXISTS public.birthday_queue ENABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS public.temp_voice_channels ENABLE ROW LEVEL SECURITY;
 ALTER TABLE IF EXISTS public.bot_temp_voice_channels ENABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS public.npc_relationships ENABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS public.npc_member_memories ENABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS public.npc_server_lore ENABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS public.npc_deliberation_logs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE IF EXISTS public.npc_user_memories ENABLE ROW LEVEL SECURITY;
 ALTER TABLE IF EXISTS public.npc_lore_entries ENABLE ROW LEVEL SECURITY;
 ALTER TABLE IF EXISTS public.npc_channel_state ENABLE ROW LEVEL SECURITY;
@@ -51,7 +63,12 @@ BEGIN
     'guild_settings',
     'member_birthdays',
     'birthday_queue',
+    'temp_voice_channels',
     'bot_temp_voice_channels',
+    'npc_relationships',
+    'npc_member_memories',
+    'npc_server_lore',
+    'npc_deliberation_logs',
     'npc_user_memories',
     'npc_lore_entries',
     'npc_channel_state',
@@ -114,17 +131,27 @@ CREATE INDEX IF NOT EXISTS idx_birthday_queue_guild_target_sent
 CREATE INDEX IF NOT EXISTS idx_trivia_drops_guild_status_created
   ON public.trivia_drops (guild_id, status, created_at DESC);
 
--- 6. Expand prune_old_records() to clean up stale logs and expired sessions
+-- 6. Expand prune_old_records() to clean up stale logs and expired sessions safely
 CREATE OR REPLACE FUNCTION public.prune_old_records()
 RETURNS void
 LANGUAGE plpgsql
 SECURITY DEFINER
 AS $$
 BEGIN
-  DELETE FROM public.bot_events WHERE created_at < NOW() - INTERVAL '30 days';
-  DELETE FROM public.lfg_sessions WHERE expires_at < NOW() - INTERVAL '1 day';
-  DELETE FROM public.system_logs WHERE created_at < NOW() - INTERVAL '7 days';
-  DELETE FROM public.npc_activity_logs WHERE created_at < NOW() - INTERVAL '30 days';
-  DELETE FROM public.newsroom_posts WHERE posted_at < NOW() - INTERVAL '60 days';
+  IF EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'bot_event_logs') THEN
+    DELETE FROM public.bot_event_logs WHERE created_at < NOW() - INTERVAL '30 days';
+  END IF;
+  IF EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'lfg_sessions') THEN
+    DELETE FROM public.lfg_sessions WHERE expires_at < NOW() - INTERVAL '1 day';
+  END IF;
+  IF EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'system_logs') THEN
+    DELETE FROM public.system_logs WHERE created_at < NOW() - INTERVAL '7 days';
+  END IF;
+  IF EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'npc_deliberation_logs') THEN
+    DELETE FROM public.npc_deliberation_logs WHERE created_at < NOW() - INTERVAL '30 days';
+  END IF;
+  IF EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'newsroom_posts') THEN
+    DELETE FROM public.newsroom_posts WHERE posted_at < NOW() - INTERVAL '60 days';
+  END IF;
 END;
 $$;

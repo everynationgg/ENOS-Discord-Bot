@@ -118,34 +118,48 @@ async function awardCoins(discordId, guildId, amount, reason, guild = null) {
       .eq('guild_id', guildId);
   }
 
-  // Update balance
+  // Update balance atomically
   const { error: rpcErr } = await supabase.rpc('increment_coins', {
     p_discord_id: discordId,
     p_guild_id: guildId,
     p_delta: allowedAmount,
   });
 
+  let txAlreadyLogged = false;
   if (rpcErr) {
-    // Fallback if RPC not set up: manual update
-    const current = await getOrCreateBalance(discordId, guildId);
-    await supabase
-      .from('vault_balances')
-      .update({
-        coins: (Number(current?.coins) || 0) + allowedAmount,
-        updated_at: new Date().toISOString(),
-        last_active: new Date().toISOString(),
-      })
-      .eq('discord_id', discordId)
-      .eq('guild_id', guildId);
+    // Secondary atomic fallback: add_vault_coins RPC (also logs transaction)
+    const { error: altRpcErr } = await supabase.rpc('add_vault_coins', {
+      p_user_id: discordId,
+      p_guild_id: guildId,
+      p_amount: allowedAmount,
+      p_reason: reason,
+    });
+    if (!altRpcErr) {
+      txAlreadyLogged = true;
+    } else {
+      // Final fallback if neither RPC is available: manual update
+      const current = await getOrCreateBalance(discordId, guildId);
+      await supabase
+        .from('vault_balances')
+        .update({
+          coins: (Number(current?.coins) || 0) + allowedAmount,
+          updated_at: new Date().toISOString(),
+          last_active: new Date().toISOString(),
+        })
+        .eq('discord_id', discordId)
+        .eq('guild_id', guildId);
+    }
   }
 
-  // Log transaction
-  await supabase.from('vault_transactions').insert({
-    guild_id: guildId,
-    discord_id: discordId,
-    delta: allowedAmount,
-    reason,
-  });
+  // Log transaction (unless add_vault_coins already logged it)
+  if (!txAlreadyLogged) {
+    await supabase.from('vault_transactions').insert({
+      guild_id: guildId,
+      discord_id: discordId,
+      delta: allowedAmount,
+      reason,
+    });
+  }
 
   // Check for tier promotion
   if (guild) {
