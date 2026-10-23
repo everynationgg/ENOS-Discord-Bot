@@ -2,7 +2,10 @@ const { createCanvas, loadImage } = require('@napi-rs/canvas');
 const logger = require('../../lib/logger');
 
 const imageBufferCache = new Map();
+const resolvedUrlCache = new Map();
 const CACHE_TTL_MS = 2 * 60 * 1000; // 2 minutes cache to protect Fly.io 256MB memory cap
+const MAX_IMAGE_CACHE_SIZE = 5;
+const MAX_CACHE_BUFFER_BYTES = 2 * 1024 * 1024; // 2MB
 
 /**
  * Evicts expired image buffers and strictly enforces a 5-entry limit to prevent memory creep.
@@ -15,21 +18,29 @@ function pruneImageBufferCache() {
     }
   }
 
-  // Cap max entries at 5 to protect Fly.io 256MB memory limit
-  if (imageBufferCache.size > 5) {
+  // Cap max entries at MAX_IMAGE_CACHE_SIZE to protect Fly.io 256MB memory limit
+  if (imageBufferCache.size > MAX_IMAGE_CACHE_SIZE) {
     const oldestKeys = Array.from(imageBufferCache.entries())
       .sort((a, b) => a[1].timestamp - b[1].timestamp)
-      .slice(0, imageBufferCache.size - 5)
+      .slice(0, imageBufferCache.size - MAX_IMAGE_CACHE_SIZE)
       .map(([k]) => k);
     for (const key of oldestKeys) {
       imageBufferCache.delete(key);
     }
   }
+
+  if (resolvedUrlCache.size > 100) {
+    resolvedUrlCache.clear();
+  }
 }
 
 async function resolveDirectImageUrl(url) {
   if (!url || typeof url !== 'string' || !url.startsWith('http')) return url;
-  if (url.includes('i.ibb.co/') || /\.(png|jpg|jpeg|gif|webp)(\?.*)?$/i.test(url)) return url;
+  if (resolvedUrlCache.has(url)) return resolvedUrlCache.get(url);
+  if (url.includes('i.ibb.co/') || /\.(png|jpg|jpeg|gif|webp)(\?.*)?$/i.test(url)) {
+    resolvedUrlCache.set(url, url);
+    return url;
+  }
 
   try {
     const controller = new AbortController();
@@ -59,12 +70,14 @@ async function resolveDirectImageUrl(url) {
                       html.match(/<img\s+src=["'](https:\/\/i\.ibb\.co\/[^"']+)["']/i) ||
                       html.match(/(https:\/\/i\.ibb\.co\/[a-zA-Z0-9_\-\.\/]+)/i);
       if (ogMatch && ogMatch[1]) {
+        resolvedUrlCache.set(url, ogMatch[1]);
         return ogMatch[1];
       }
     }
   } catch (e) {
     // ignore
   }
+  resolvedUrlCache.set(url, url);
   return url;
 }
 
@@ -107,8 +120,13 @@ async function fetchImageBuffer(url) {
       const arrayBuf = await res.arrayBuffer();
       const buf = Buffer.from(arrayBuf);
       if (buf.length > 100 && !buf.toString('utf8', 0, 50).includes('<!DOCTYPE')) {
-        imageBufferCache.set(url, { buffer: buf, timestamp: Date.now() });
-        pruneImageBufferCache();
+        if (buf.length <= MAX_CACHE_BUFFER_BYTES) {
+          imageBufferCache.set(directUrl, { buffer: buf, timestamp: Date.now() });
+          if (directUrl !== url) {
+            imageBufferCache.set(url, { buffer: buf, timestamp: Date.now() });
+          }
+          pruneImageBufferCache();
+        }
         return buf;
       }
     }
@@ -212,6 +230,12 @@ async function renderBossImage(data) {
   const canvas = createCanvas(width, height);
   const ctx = canvas.getContext('2d');
 
+  let bgImg = null;
+  let bossImg = null;
+  let classImg = null;
+  let stampImg = null;
+
+  try {
   const {
     bossName = 'ERROR-MOD: Corrupted Boss',
     customImageUrl = null,
@@ -262,9 +286,8 @@ async function renderBossImage(data) {
   let customBgLoaded = false;
   if (bgBuf) {
     try {
-      let bgImg = await loadImage(bgBuf);
+      bgImg = await loadImage(bgBuf);
       ctx.drawImage(bgImg, 0, 0, width, height);
-      bgImg = null;
       customBgLoaded = true;
 
       if (isOverkill) {
@@ -429,9 +452,8 @@ async function renderBossImage(data) {
   // 1. Draw Boss Image on Right Side (Aspect-Ratio Preserved)
   if (bossBuf) {
     try {
-      let bossImg = await loadImage(bossBuf);
+      bossImg = await loadImage(bossBuf);
       drawImageContain(ctx, bossImg, 400, 20, 380, 330, 0.5, 0.5);
-      bossImg = null;
     } catch (e) {
       logger.warn('[BOSS CANVAS] Arena boss image load warning:', e.message);
     }
@@ -442,9 +464,8 @@ async function renderBossImage(data) {
   let classLoaded = false;
   if (classBuf) {
     try {
-      let classImg = await loadImage(classBuf);
+      classImg = await loadImage(classBuf);
       drawImageContain(ctx, classImg, classX, 30, 340, 320, 0.5, 0.5);
-      classImg = null;
       classLoaded = true;
     } catch (e) {
       logger.warn('[BOSS CANVAS] Class image load warning:', e.message);
@@ -493,8 +514,16 @@ async function renderBossImage(data) {
 
   ctx.restore();
   const outBuffer = canvas.toBuffer('image/png');
-  pruneImageBufferCache();
   return outBuffer;
+  } finally {
+    canvas.width = 0;
+    canvas.height = 0;
+    bgImg = null;
+    bossImg = null;
+    classImg = null;
+    stampImg = null;
+    pruneImageBufferCache();
+  }
 }
 
-module.exports = { renderBossImage };
+module.exports = { renderBossImage, resolveDirectImageUrl };

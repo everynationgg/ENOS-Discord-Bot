@@ -185,11 +185,14 @@ async function grantAchievementTier(guild, member, tierKey, tierConfig, currentI
  */
 async function evaluateEnoriumCrownSwap(guild, member, inviterCount, enoriumConfig) {
   try {
+    const guildId = guild.id;
     // Query max count holder
     const { data: allInvites } = await supabase
       .from('member_invites')
       .select('inviter_id')
-      .eq('status', 'valid');
+      .eq('guild_id', guildId)
+      .eq('status', 'valid')
+      .limit(5000);
 
     if (!allInvites || allInvites.length === 0) return;
 
@@ -323,6 +326,34 @@ async function getRecruitmentProgressEmbed(guild, userId) {
     .setTimestamp();
 
   return embed;
+}
+
+/**
+ * Generates Master Achievement Card graphic via Canvas with Skia memory guardrails
+ * @param {object} [item]
+ * @returns {Promise<Buffer|null>}
+ */
+async function generateMasterAchievementCard(item = {}) {
+  let canvas = null;
+  try {
+    const { createCanvas } = require('@napi-rs/canvas');
+    canvas = createCanvas(800, 420);
+    const ctx = canvas.getContext('2d');
+
+    ctx.fillStyle = '#0f172a';
+    ctx.fillRect(0, 0, 800, 420);
+
+    const outBuffer = canvas.toBuffer('image/png');
+    return outBuffer;
+  } catch (err) {
+    logger.warn('[RECRUITMENT] Canvas card generation warning:', err?.message);
+    return null;
+  } finally {
+    if (canvas) {
+      canvas.width = 0;
+      canvas.height = 0;
+    }
+  }
 }
 
 /**
@@ -606,4 +637,5 @@ module.exports = {
   getRecruitmentRulesEmbed,
   handleRecruitmentInteraction,
   postMasterAchievementCard,
+  generateMasterAchievementCard,
 };

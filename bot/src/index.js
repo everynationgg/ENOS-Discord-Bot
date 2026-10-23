@@ -1,5 +1,5 @@
 require('dotenv').config();
-const { Client, GatewayIntentBits, Partials, Collection, Events } = require('discord.js');
+const { Client, GatewayIntentBits, Partials, Collection, Events, Options } = require('discord.js');
 const { loadEvents } = require('./lib/loader');
 const { loadCommands } = require('./lib/loader');
 /**
@@ -26,6 +26,20 @@ const client = new Client({
     Partials.Reaction,
     Partials.User,
   ],
+  makeCache: Options.cacheWithLimits({
+    MessageManager: 50,
+    ReactionManager: 0,
+    GuildMemberManager: {
+      maxSize: 200,
+      keepOverLimit: (m) => m.id === m.client.user?.id,
+    },
+  }),
+  sweepers: {
+    messages: {
+      interval: 300,
+      lifetime: 600,
+    },
+  },
 });
 
 // ─── Command & Event Collections ──────────────────────────────────────────────
@@ -77,7 +91,11 @@ client.once(Events.ClientReady, async () => {
           logger.info('[REALTIME BOSS] Detected boss season change:', payload.new?.boss_name);
           const guildId = payload.new?.guild_id || process.env.DISCORD_GUILD_ID;
           if (guildId) {
-            await spawnAndAnnounceWeeklyBoss(client, guildId);
+            try {
+              await spawnAndAnnounceWeeklyBoss(client, guildId);
+            } catch (err) {
+              console.error('[REALTIME BOSS] Error handling boss season update:', err);
+            }
           }
         }
       )

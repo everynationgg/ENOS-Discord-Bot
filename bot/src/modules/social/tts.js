@@ -1,4 +1,4 @@
-const { Client, GatewayIntentBits, EmbedBuilder, ActionRowBuilder, StringSelectMenuBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+const { Client, GatewayIntentBits, EmbedBuilder, ActionRowBuilder, StringSelectMenuBuilder, ButtonBuilder, ButtonStyle, Options } = require('discord.js');
 const { joinVoiceChannel, createAudioPlayer, createAudioResource, AudioPlayerStatus, getVoiceConnection } = require('@discordjs/voice');
 const { generateContentWithFallback } = require('../../lib/gemini');
 const gTTS = require('gtts');
@@ -63,9 +63,13 @@ function initVoiceBot(mainClient) {
     intents: [
       GatewayIntentBits.Guilds,
       GatewayIntentBits.GuildVoiceStates,
-      GatewayIntentBits.GuildMessages,
-      GatewayIntentBits.MessageContent,
     ],
+    makeCache: Options.cacheWithLimits({
+      MessageManager: 0,
+      ReactionManager: 0,
+      GuildMemberManager: 25,
+      UserManager: 25,
+    }),
   });
 
   voiceBotClient.on('ready', () => {
@@ -439,6 +443,17 @@ async function joinVoiceSession(guild, voiceChannel, textChannel, mainClient) {
   const guildId = guild.id;
   let session = activeSessions.get(guildId);
 
+  // Query guild_settings for TTS preferences and enabled status
+  const { data: settings } = await supabase
+    .from('guild_settings')
+    .select('tts_enabled, tts_default_language, tts_default_voice, tts_default_persona')
+    .eq('guild_id', guildId)
+    .maybeSingle();
+
+  if (settings && settings.tts_enabled === false) {
+    return { success: false, message: '❌ Voice Herald (TTS) is disabled in this server’s settings.' };
+  }
+
   if (!voiceBotClient || !voiceBotClient.isReady()) {
     return { success: false, message: '❌ Voice Herald Sub-Bot is not online or token is missing.' };
   }
@@ -459,15 +474,19 @@ async function joinVoiceSession(guild, voiceChannel, textChannel, mainClient) {
   const player = createAudioPlayer();
   connection.subscribe(player);
 
+  const initialLanguage = settings?.tts_default_language || DEFAULT_SETTINGS.language;
+  const initialVoiceModel = settings?.tts_default_voice || DEFAULT_SETTINGS.voiceModel;
+  const initialPersona = settings?.tts_default_persona || DEFAULT_SETTINGS.persona;
+
   if (!session) {
     session = {
       guildId,
       voiceChannelId: voiceChannel.id,
       textChannelId: textChannel.id,
       controlMessageId: null,
-      language: DEFAULT_SETTINGS.language,
-      voiceModel: DEFAULT_SETTINGS.voiceModel,
-      persona: DEFAULT_SETTINGS.persona,
+      language: initialLanguage,
+      voiceModel: initialVoiceModel,
+      persona: initialPersona,
       connection,
       player,
       queue: [],
