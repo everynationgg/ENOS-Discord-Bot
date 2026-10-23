@@ -46,9 +46,13 @@ export default auth((req) => {
     }
 
     return NextResponse.next();
-  } catch (err) {
+  } catch (err: unknown) {
     console.error('[MIDDLEWARE ERROR]', err);
-    return NextResponse.next();
+    const { pathname } = req.nextUrl;
+    if (pathname.startsWith('/api/')) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    return NextResponse.redirect(new URL('/login', req.url));
   }
 });
 
