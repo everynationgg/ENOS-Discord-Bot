@@ -232,6 +232,16 @@ async function handleShowcaseSelectMenu(interaction) {
     const userId = interaction.user.id;
     const guildId = interaction.guildId || process.env.DISCORD_GUILD_ID;
 
+    // Prune entries older than 10 minutes if cache exceeds 200 items to prevent memory leaks
+    if (showcaseOpenedTimestamps.size > 200) {
+      const now = Date.now();
+      for (const [k, ts] of showcaseOpenedTimestamps.entries()) {
+        if (now - ts > 600000) {
+          showcaseOpenedTimestamps.delete(k);
+        }
+      }
+    }
+
     // Record time when member opened/rerolled this update for 10s anti-farm timer
     showcaseOpenedTimestamps.set(`${userId}:${showcaseId}`, Date.now());
 

@@ -2,7 +2,7 @@ const { Events, EmbedBuilder, ChannelType, PermissionFlagsBits } = require('disc
 const { supabase } = require('../lib/supabase');
 const logger = require('../lib/logger');
 const { registerCommandsForGuild } = require('../lib/deployHelper');
-const { getCurrentWeekIdentifier = require('../modules/gaming/boss').getWeekIdentifier } = require('../modules/gaming/boss');
+const { getWeekIdentifier } = require('../modules/gaming/boss');
 
 module.exports = {
   name: Events.GuildCreate,
@@ -36,15 +36,14 @@ module.exports = {
         .from('boss_seasons')
         .select('id')
         .eq('guild_id', guildId)
-        .eq('week_identifier', getCurrentWeekIdentifier())
+        .eq('week_identifier', getWeekIdentifier())
         .maybeSingle();
 
       if (!existingBoss) {
         await supabase.from('boss_seasons').insert({
           guild_id: guildId,
-          week_identifier: getCurrentWeekIdentifier(),
+          week_identifier: getWeekIdentifier(),
           boss_name: 'The Iron Enforcer',
-          boss_lore: 'A mechanical sentinel awakened to test the server.',
           lore: 'A mechanical sentinel awakened to test the server.',
           max_hp: 5000,
           current_hp: 5000,

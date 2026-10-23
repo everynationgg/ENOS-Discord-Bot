@@ -9,20 +9,34 @@ DROP POLICY IF EXISTS "Allow public read access on member_invites" ON public.mem
 DROP POLICY IF EXISTS "Allow service role full access on member_invites" ON public.member_invites;
 
 -- Temp Voice Channels
+DROP POLICY IF EXISTS "Allow public read on temp_voice_channels" ON public.temp_voice_channels;
 DROP POLICY IF EXISTS "Service role full access on temp_voice_channels" ON public.temp_voice_channels;
 DROP POLICY IF EXISTS "Allow service role full access on temp_voice_channels" ON public.temp_voice_channels;
+DROP POLICY IF EXISTS "service_role_all" ON public.temp_voice_channels;
+
+CREATE POLICY "service_role_all"
+  ON public.temp_voice_channels FOR ALL
+  TO service_role
+  USING (true)
+  WITH CHECK (true);
 
 -- Achievements
+DROP POLICY IF EXISTS "Allow public read access on achievements" ON public.achievements;
 DROP POLICY IF EXISTS "Service Role Full Access Achievements" ON public.achievements;
 DROP POLICY IF EXISTS "Allow service role full access on achievements" ON public.achievements;
 
 -- User Achievements
+DROP POLICY IF EXISTS "Allow public read access on user_achievements" ON public.user_achievements;
 DROP POLICY IF EXISTS "Service Role Full Access User Achievements" ON public.user_achievements;
 DROP POLICY IF EXISTS "Allow service role full access on user_achievements" ON public.user_achievements;
 
 -- Newsroom Posts
+DROP POLICY IF EXISTS "Allow public read access on newsroom_posts" ON public.newsroom_posts;
 DROP POLICY IF EXISTS "Service Role Full Access Newsroom Posts" ON public.newsroom_posts;
 DROP POLICY IF EXISTS "Allow service role full access on newsroom_posts" ON public.newsroom_posts;
+
+-- Feature Resource Metrics
+DROP POLICY IF EXISTS "Allow public read on feature_resource_metrics" ON public.feature_resource_metrics;
 
 -- Storage Objects: Drop public upload/update policies and recreate with TO service_role
 DROP POLICY IF EXISTS "Service role can upload boss images" ON storage.objects;
@@ -90,6 +104,9 @@ GRANT EXECUTE ON FUNCTION public.prune_old_records() TO service_role;
 
 REVOKE EXECUTE ON FUNCTION public.prune_old_newsroom_posts() FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.prune_old_newsroom_posts() TO service_role;
+
+REVOKE EXECUTE ON FUNCTION public.add_vault_coins(TEXT, TEXT, NUMERIC, TEXT) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.add_vault_coins(TEXT, TEXT, NUMERIC, TEXT) TO service_role;
 
 -- Revoke and grant on all overloads of apply_boss_attack_result
 DO $$

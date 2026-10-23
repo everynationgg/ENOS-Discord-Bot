@@ -190,7 +190,6 @@ async function evaluateEnoriumCrownSwap(guild, member, inviterCount, enoriumConf
     const { data: allInvites } = await supabase
       .from('member_invites')
       .select('inviter_id')
-      .eq('guild_id', guildId)
       .eq('status', 'valid')
       .limit(5000);
 

@@ -8,7 +8,7 @@ const os = require('os');
 const ffmpegPath = require('ffmpeg-static');
 const { execFile } = require('child_process');
 const logger = require('../../lib/logger');
-const { supabase } = require('../../lib/supabase');
+const { supabase, getFeatureConfig } = require('../../lib/supabase');
 
 // Dedicated Voice Herald Client Instance
 let voiceBotClient = null;
@@ -443,14 +443,10 @@ async function joinVoiceSession(guild, voiceChannel, textChannel, mainClient) {
   const guildId = guild.id;
   let session = activeSessions.get(guildId);
 
-  // Query guild_settings for TTS preferences and enabled status
-  const { data: settings } = await supabase
-    .from('guild_settings')
-    .select('tts_enabled, tts_default_language, tts_default_voice, tts_default_persona')
-    .eq('guild_id', guildId)
-    .maybeSingle();
+  // Query guild_config for TTS preferences and enabled status
+  const ttsCfg = await getFeatureConfig(guildId, 'en_tts');
 
-  if (settings && settings.tts_enabled === false) {
+  if (ttsCfg && ttsCfg.enabled === false) {
     return { success: false, message: '❌ Voice Herald (TTS) is disabled in this server’s settings.' };
   }
 
@@ -474,9 +470,9 @@ async function joinVoiceSession(guild, voiceChannel, textChannel, mainClient) {
   const player = createAudioPlayer();
   connection.subscribe(player);
 
-  const initialLanguage = settings?.tts_default_language || DEFAULT_SETTINGS.language;
-  const initialVoiceModel = settings?.tts_default_voice || DEFAULT_SETTINGS.voiceModel;
-  const initialPersona = settings?.tts_default_persona || DEFAULT_SETTINGS.persona;
+  const initialLanguage = ttsCfg?.config?.default_language || DEFAULT_SETTINGS.language;
+  const initialVoiceModel = ttsCfg?.config?.default_voice_model || DEFAULT_SETTINGS.voiceModel;
+  const initialPersona = ttsCfg?.config?.default_persona || DEFAULT_SETTINGS.persona;
 
   if (!session) {
     session = {
