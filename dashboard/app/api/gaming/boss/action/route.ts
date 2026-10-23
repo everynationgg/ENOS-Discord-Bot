@@ -2,9 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { supabaseAdmin } from '@/lib/supabase';
 
-function getGuildId(req: NextRequest, body?: any) {
+function getGuildId(req: NextRequest, body?: { guild_id?: string }): string {
   return (
     req.nextUrl.searchParams.get('guild_id') ||
+    req.cookies.get('enos_guild_id')?.value ||
     body?.guild_id ||
     process.env.DISCORD_GUILD_ID!
   );
@@ -48,7 +49,7 @@ export async function POST(req: NextRequest) {
       // Check if Guild Admin pre-staged next week's boss config in guild_config or passed in body
       const { data: featureRow } = await supabaseAdmin
         .from('guild_config')
-        .select('config')
+        .select('config, enabled')
         .eq('guild_id', guildId)
         .eq('feature_key', 'weekly_boss')
         .maybeSingle();
@@ -93,12 +94,16 @@ export async function POST(req: NextRequest) {
         if (stagedConfig?.kid_image_url) updatedCfg.kid_image_url = stagedConfig.kid_image_url;
 
         delete updatedCfg.staged_boss_config;
-        await supabaseAdmin.from('guild_config').upsert({
-          guild_id: guildId,
-          feature_key: 'weekly_boss',
-          config: updatedCfg,
-          updated_at: new Date().toISOString(),
-        });
+        await supabaseAdmin.from('guild_config').upsert(
+          {
+            guild_id: guildId,
+            feature_key: 'weekly_boss',
+            enabled: featureRow?.enabled ?? true,
+            config: updatedCfg,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: 'guild_id,feature_key' }
+        );
       }
 
       // Check for existing active normal boss row for current week for THIS guild
@@ -259,7 +264,7 @@ export async function POST(req: NextRequest) {
     if (action === 'refresh' || action === 'push_live') {
       const { data: featureRow } = await supabaseAdmin
         .from('guild_config')
-        .select('config')
+        .select('config, enabled')
         .eq('guild_id', guildId)
         .eq('feature_key', 'weekly_boss')
         .maybeSingle();
@@ -303,12 +308,16 @@ export async function POST(req: NextRequest) {
       if (newImg) mergedConfig.custom_image_url = newImg;
       if (newBg) mergedConfig.custom_bg_url = newBg;
 
-      await supabaseAdmin.from('guild_config').upsert({
-        guild_id: guildId,
-        feature_key: 'weekly_boss',
-        config: mergedConfig,
-        updated_at: new Date().toISOString(),
-      });
+      await supabaseAdmin.from('guild_config').upsert(
+        {
+          guild_id: guildId,
+          feature_key: 'weekly_boss',
+          enabled: featureRow?.enabled ?? true,
+          config: mergedConfig,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'guild_id,feature_key' }
+      );
 
       if (existingBoss) {
         const existingDamage = Math.max(0, Number(existingBoss.max_hp || 0) - Number(existingBoss.current_hp || 0));
@@ -498,7 +507,8 @@ export async function POST(req: NextRequest) {
     }
 
     return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message || 'Internal Server Error' }, { status: 500 });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Internal Server Error';
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

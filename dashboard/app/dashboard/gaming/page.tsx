@@ -579,10 +579,10 @@ function TriviaCardForm({ config, setConfig, setTriviaRefreshKey }: { config: an
             <select
               id={`trivia-weight-${i}`}
               className="form-input"
-              value={item.weight || 'medium'}
+              value={item.priority || item.weight || 'medium'}
               onChange={(e) => {
                 const updated = [...allowedChannels];
-                updated[i] = { ...item, weight: e.target.value };
+                updated[i] = { ...item, priority: e.target.value, weight: e.target.value };
                 setConfig('allowed_channels', updated);
               }}
             >
@@ -604,14 +604,14 @@ function TriviaCardForm({ config, setConfig, setTriviaRefreshKey }: { config: an
             <button
               id={`remove-trivia-chan-${i}`}
               className="btn btn-danger btn-icon btn-sm"
-              onClick={() => setConfig('allowed_channels', allowedChannels.filter((_: any, j: number) => j !== i))}
+              onClick={() => setConfig('allowed_channels', allowedChannels.filter((_, j: number) => j !== i))}
             >✕</button>
           </div>
         ))}
         <button
           id="add-trivia-channel-btn"
           className="btn btn-secondary btn-sm"
-          onClick={() => setConfig('allowed_channels', [...allowedChannels, { channel_id: '', weight: 'medium', topic: '' }])}
+          onClick={() => setConfig('allowed_channels', [...allowedChannels, { channel_id: '', priority: 'medium', weight: 'medium', topic: '' }])}
         >
           + Add Channel Whitelist
         </button>

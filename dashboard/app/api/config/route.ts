@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { upsertFeatureConfig, getGuildConfigs, supabaseAdmin } from '@/lib/supabase';
 
-function getGuildId(req: NextRequest, body?: any) {
+function getGuildId(req: NextRequest, body?: { guild_id?: string }): string {
   return (
     req.nextUrl.searchParams.get('guild_id') ||
     body?.guild_id ||
@@ -22,6 +22,13 @@ function getWeekIdentifier(date = new Date()) {
   return `${d.getUTCFullYear()}-W${String(weekNo).padStart(2, '0')}`;
 }
 
+interface ConfigRow {
+  feature_key: string;
+  enabled: boolean;
+  config: Record<string, unknown>;
+  updated_at?: string;
+}
+
 // GET /api/config — fetch all feature configs for the guild
 export async function GET(req: NextRequest) {
   const session = await auth();
@@ -29,15 +36,26 @@ export async function GET(req: NextRequest) {
 
   try {
     const guildId = getGuildId(req);
-    const configs = await getGuildConfigs(guildId);
+    const configs = (await getGuildConfigs(guildId)) as ConfigRow[];
     // Convert to a keyed map for easy frontend access
-    const configMap = configs.reduce((acc: Record<string, any>, row: any) => {
+    const configMap = configs.reduce((acc: Record<string, { enabled: boolean; config: Record<string, unknown>; updated_at?: string }>, row: ConfigRow) => {
       acc[row.feature_key] = { enabled: row.enabled, config: row.config, updated_at: row.updated_at };
       return acc;
     }, {});
+
+    // In GET /api/config, alias 'trivia' to 'daily_trivia' if 'daily_trivia' is missing or older
+    if (configMap['trivia']) {
+      const triviaRow = configMap['trivia'];
+      const dtRow = configMap['daily_trivia'];
+      if (!dtRow || !dtRow.updated_at || (triviaRow.updated_at && new Date(triviaRow.updated_at) > new Date(dtRow.updated_at))) {
+        configMap['daily_trivia'] = { ...triviaRow };
+      }
+    }
+
     return NextResponse.json(configMap);
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
 
@@ -121,13 +139,19 @@ export async function POST(req: NextRequest) {
     // Merge incoming with existing
     const mergedConfig: Record<string, any> = { ...existingConfig, ...incomingConfig };
 
-    // Guard: If incoming config is missing or has empty allowed_channels, retain existing allowed_channels
-    if (
-      (!Array.isArray(incomingConfig.allowed_channels) || incomingConfig.allowed_channels.length === 0) &&
-      Array.isArray(existingConfig.allowed_channels) &&
-      existingConfig.allowed_channels.length > 0
-    ) {
+    // Guard: Only preserve existing allowed_channels when incoming is not provided (not an array), allowing intentional empty []
+    if (!Array.isArray(incomingConfig.allowed_channels) && Array.isArray(existingConfig.allowed_channels)) {
       mergedConfig.allowed_channels = existingConfig.allowed_channels;
+    }
+
+    // Normalize trivia allowed_channels items so both priority and weight are set
+    if (feature_key === 'daily_trivia' || feature_key === 'trivia') {
+      if (Array.isArray(mergedConfig.allowed_channels)) {
+        mergedConfig.allowed_channels = mergedConfig.allowed_channels.map((ch: Record<string, unknown>) => {
+          const p = (ch.priority as string) || (ch.weight as string) || 'medium';
+          return { ...ch, priority: p, weight: p };
+        });
+      }
     }
 
     // Retain notification_channel_id if incoming omitted it
@@ -136,7 +160,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Automatically drop the Daily Quest Hub card to Discord only when quest_channel_id changes or has never been posted
-    if (feature_key === 'vault_economy') {
+    if (feature_key === 'vault' || feature_key === 'vault_economy') {
       const targetChannelId = config?.quest_channel_id || config?.quest_launcher_channel_id;
       const oldChannelId = existingConfig?.quest_channel_id || existingConfig?.quest_launcher_channel_id;
       if (targetChannelId && (targetChannelId !== oldChannelId || !mergedConfig.quest_launcher_message_id)) {
@@ -149,6 +173,13 @@ export async function POST(req: NextRequest) {
     }
 
     await upsertFeatureConfig(guildId, feature_key, enabled, mergedConfig);
+
+    // Keep 'trivia' (read by bot) and 'daily_trivia' (used by dashboard) in sync
+    if (feature_key === 'daily_trivia') {
+      await upsertFeatureConfig(guildId, 'trivia', enabled, mergedConfig);
+    } else if (feature_key === 'trivia') {
+      await upsertFeatureConfig(guildId, 'daily_trivia', enabled, mergedConfig);
+    }
 
     // Auto-sync configured streamers to live_alerts table for bot poller
     if (feature_key === 'live_alerts' && Array.isArray(config?.streamers)) {
@@ -254,7 +285,8 @@ export async function POST(req: NextRequest) {
     }
 
     return NextResponse.json({ success: true });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

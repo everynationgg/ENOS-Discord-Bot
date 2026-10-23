@@ -10,7 +10,12 @@ export async function GET(req: NextRequest) {
     }
 
     const { searchParams } = new URL(req.url);
-    const guildId = searchParams.get('guildId') || process.env.DISCORD_GUILD_ID || 'global';
+    const guildId =
+      searchParams.get('guild_id') ||
+      searchParams.get('guildId') ||
+      req.cookies.get('enos_guild_id')?.value ||
+      process.env.DISCORD_GUILD_ID ||
+      'global';
 
     // Fetch recruitment achievement config (check guildId first, fallback to 'global')
     const { data: configRows } = await supabase
@@ -23,10 +28,11 @@ export async function GET(req: NextRequest) {
 
     const configData = configRows?.[0] || null;
 
-    // Fetch invites list
+    // Fetch invites list filtered by guild_id
     const { data: invites } = await supabase
       .from('member_invites')
       .select('*')
+      .eq('guild_id', guildId)
       .order('created_at', { ascending: false })
       .limit(100);
 
@@ -36,12 +42,13 @@ export async function GET(req: NextRequest) {
       enabled: configData?.enabled ?? true,
       invites: invites || [],
     });
-  } catch (error: any) {
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    return NextResponse.json({ success: false, error: message }, { status: 500 });
   }
 }
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
   try {
     const session = await auth();
     if (!session) {
@@ -49,8 +56,13 @@ export async function POST(req: Request) {
     }
 
     const body = await req.json();
-    const { action, inviteId, newStatus, config, enabled, guild_id } = body;
-    const targetGuildId = guild_id || process.env.DISCORD_GUILD_ID || 'global';
+    const { action, inviteId, newStatus, config, enabled } = body;
+    const targetGuildId =
+      body.guild_id ||
+      body.guildId ||
+      req.cookies.get('enos_guild_id')?.value ||
+      process.env.DISCORD_GUILD_ID ||
+      'global';
 
     if (action === 'save_config') {
       const nowIso = new Date().toISOString();
@@ -112,6 +124,7 @@ export async function POST(req: Request) {
           const { data: configData } = await supabase
             .from('guild_config')
             .select('config')
+            .eq('guild_id', targetGuildId)
             .eq('feature_key', 'recruitment_achievement')
             .maybeSingle();
 
@@ -135,7 +148,7 @@ export async function POST(req: Request) {
               '👑 **Enorium (100 Invites)** → Title: **"The One Who Ordains the Nation"** | *1 Year Discord Nitro + Boost*';
           }
 
-          const embed: any = {
+          const embed: Record<string, unknown> = {
             title,
             description: `${description}\n\n${tierDesc}`,
             color: 0x8b5cf6,
@@ -179,7 +192,8 @@ export async function POST(req: Request) {
     }
 
     return NextResponse.json({ success: false, error: 'Invalid action' }, { status: 400 });
-  } catch (error: any) {
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    return NextResponse.json({ success: false, error: message }, { status: 500 });
   }
 }

@@ -2,9 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { supabaseAdmin } from '@/lib/supabase';
 
-function getGuildId(req: NextRequest, body?: any) {
+function getGuildId(req: NextRequest, body?: { guild_id?: string }): string {
   return (
     req.nextUrl.searchParams.get('guild_id') ||
+    req.cookies.get('enos_guild_id')?.value ||
     body?.guild_id ||
     process.env.DISCORD_GUILD_ID!
   );
@@ -30,13 +31,21 @@ function getStartOfWeekManilaIso(): string {
   return new Date(manilaNow.getTime() - manilaOffsetMs).toISOString();
 }
 
-function chooseWeightedChannel(allowedChannels: any[]) {
+interface TriviaChannelItem {
+  channel_id?: string;
+  priority?: string;
+  weight?: string;
+  topic?: string;
+}
+
+function chooseWeightedChannel(allowedChannels: TriviaChannelItem[]) {
   if (!allowedChannels?.length) return null;
   const weights: Record<string, number> = { high: 3, medium: 2, low: 1 };
-  const pool: any[] = [];
+  const pool: TriviaChannelItem[] = [];
   for (const ch of allowedChannels) {
     if (!ch.channel_id) continue;
-    const w = weights[ch.priority?.toLowerCase()] || 1;
+    const priorityKey = (ch.priority || ch.weight)?.toLowerCase() || 'medium';
+    const w = weights[priorityKey] || 1;
     for (let i = 0; i < w; i++) pool.push(ch);
   }
   if (pool.length === 0) return null;
@@ -180,7 +189,9 @@ async function closeActiveDrop(guildId: string, status: 'completed' | 'skipped' 
         .from('guild_config')
         .select('config')
         .eq('guild_id', guildId)
-        .eq('feature_key', 'trivia')
+        .in('feature_key', ['trivia', 'daily_trivia'])
+        .order('updated_at', { ascending: false })
+        .limit(1)
         .maybeSingle();
 
       if (featureRow?.config) {
@@ -250,7 +261,9 @@ async function triggerInstantDrop(guildId: string) {
     .from('guild_config')
     .select('*')
     .eq('guild_id', guildId)
-    .eq('feature_key', 'trivia')
+    .in('feature_key', ['trivia', 'daily_trivia'])
+    .order('updated_at', { ascending: false })
+    .limit(1)
     .maybeSingle();
 
   if (!featureRow || !featureRow.enabled) {
@@ -294,7 +307,7 @@ async function triggerInstantDrop(guildId: string) {
   }
 
   // Generate question via Gemini AI
-  const questionData = await generateTriviaQuestion(chosen.topic);
+  const questionData = await generateTriviaQuestion(chosen.topic || null);
   const allAnswers = shuffleArray([questionData.correct_answer, ...questionData.incorrect_answers]);
 
   // Insert drop in Supabase
@@ -464,7 +477,8 @@ export async function POST(req: NextRequest) {
     }
 
     return NextResponse.json({ error: 'Unknown action' }, { status: 400 });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
