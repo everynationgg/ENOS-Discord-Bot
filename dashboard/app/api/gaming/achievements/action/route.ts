@@ -28,11 +28,10 @@ export async function GET(req: NextRequest) {
 
     const configData = configRows?.[0] || null;
 
-    // Fetch invites list filtered by guild_id
+    // Fetch invites list
     const { data: invites } = await supabase
       .from('member_invites')
       .select('*')
-      .eq('guild_id', guildId)
       .order('created_at', { ascending: false })
       .limit(100);
 

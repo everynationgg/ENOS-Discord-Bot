@@ -59,7 +59,11 @@ export async function GET(req: NextRequest) {
     }
 
     const { searchParams } = new URL(req.url);
-    const guildId = searchParams.get('guild_id') || process.env.DISCORD_GUILD_ID || '';
+    const guildId =
+      searchParams.get('guild_id') ||
+      req.cookies.get('enos_guild_id')?.value ||
+      process.env.DISCORD_GUILD_ID ||
+      '';
     const currentWeek = getWeekIdentifier();
 
     // Run 5 independent Supabase queries concurrently in Promise.all
@@ -93,7 +97,6 @@ export async function GET(req: NextRequest) {
       supabaseAdmin
         .from('member_invites')
         .select('inviter_id')
-        .eq('guild_id', guildId)
         .eq('status', 'valid')
         .limit(500),
 

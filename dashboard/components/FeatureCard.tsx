@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 
 type SaveStatus = 'idle' | 'saving' | 'saved' | 'error';
 
@@ -32,6 +32,7 @@ export default function FeatureCard<T = Record<string, unknown>>({
   const [enabled, setEnabled] = useState(initialEnabled);
   const [config, setConfigState] = useState<T>((initialConfig ?? {}) as T);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
+  const prevConfigStrRef = useRef<string>(JSON.stringify(initialConfig));
 
   useEffect(() => {
     setEnabled(initialEnabled);
@@ -39,7 +40,11 @@ export default function FeatureCard<T = Record<string, unknown>>({
 
   useEffect(() => {
     if (initialConfig !== undefined) {
-      setConfigState(initialConfig);
+      const currentStr = JSON.stringify(initialConfig);
+      if (currentStr !== prevConfigStrRef.current) {
+        prevConfigStrRef.current = currentStr;
+        setConfigState(initialConfig);
+      }
     }
   }, [initialConfig]);
 
@@ -52,16 +57,13 @@ export default function FeatureCard<T = Record<string, unknown>>({
     setEnabled(newEnabled);
     setSaveStatus('saving');
     try {
-      if (onSave) {
-        await onSave(config, newEnabled);
-      } else {
-        const res = await fetch('/api/config', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ feature_key: featureKey, enabled: newEnabled, config }),
-        });
-        if (!res.ok) throw new Error('Failed');
-      }
+      const res = await fetch('/api/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ feature_key: featureKey, enabled: newEnabled, config }),
+      });
+      if (!res.ok) throw new Error('Failed');
+      await onSave?.(config, newEnabled);
       onToggle?.(newEnabled);
       setSaveStatus('saved');
       setTimeout(() => setSaveStatus('idle'), 2500);
