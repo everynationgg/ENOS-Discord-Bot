@@ -53,16 +53,68 @@ ALL_FEATURES.forEach(f => {
   weeklyCounters.set(f.key, f.defaultWeight * 7);
 });
 
+let currentDay = new Date().toISOString().slice(0, 10);
+
+function getUtcIsoWeek(d = new Date()) {
+  const date = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+  const dayNum = date.getUTCDay() || 7;
+  date.setUTCDate(date.getUTCDate() + 4 - dayNum);
+  const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
+  const weekNo = Math.ceil((((date.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
+  return `${date.getUTCFullYear()}-W${String(weekNo).padStart(2, '0')}`;
+}
+
+let currentIsoWeek = getUtcIsoWeek();
+
+function checkRollover() {
+  const now = new Date();
+  const today = now.toISOString().slice(0, 10);
+  if (today !== currentDay) {
+    currentDay = today;
+    dailyCounters.clear();
+    ALL_FEATURES.forEach(f => {
+      dailyCounters.set(f.key, f.defaultWeight);
+    });
+  }
+
+  const thisWeek = getUtcIsoWeek(now);
+  if (thisWeek !== currentIsoWeek) {
+    currentIsoWeek = thisWeek;
+    weeklyCounters.clear();
+    ALL_FEATURES.forEach(f => {
+      weeklyCounters.set(f.key, f.defaultWeight * 7);
+    });
+  }
+}
+
 /**
- * Record resource consumption weight for a feature.
+ * Increment resource consumption counter for a feature.
+ * Automatically handles UTC day and ISO week rollovers and caps entries in RAM.
  * @param {string} featureKey
  * @param {number} weight
  */
-function recordActivity(featureKey, weight = 1) {
-  if (!dailyCounters.has(featureKey)) return;
+function incrementCounter(featureKey, weight = 1) {
+  checkRollover();
+
+  // Cap dynamic entries to prevent memory leaks if non-standard keys are passed
+  if (dailyCounters.size > 200) {
+    const validKeys = new Set(ALL_FEATURES.map(f => f.key));
+    for (const k of dailyCounters.keys()) {
+      if (!validKeys.has(k)) dailyCounters.delete(k);
+    }
+  }
+  if (weeklyCounters.size > 200) {
+    const validKeys = new Set(ALL_FEATURES.map(f => f.key));
+    for (const k of weeklyCounters.keys()) {
+      if (!validKeys.has(k)) weeklyCounters.delete(k);
+    }
+  }
+
   dailyCounters.set(featureKey, (dailyCounters.get(featureKey) || 0) + weight);
   weeklyCounters.set(featureKey, (weeklyCounters.get(featureKey) || 0) + weight);
 }
+
+const recordActivity = incrementCounter;
 
 /**
  * Get container memory load relative to Fly.io 256MB limit.
@@ -172,6 +224,7 @@ async function syncTelemetry(guildId, supabaseClient) {
 module.exports = {
   ALL_FEATURES,
   recordActivity,
+  incrementCounter,
   getContainerMemoryStats,
   calculateFeaturePercentages,
   syncTelemetry,

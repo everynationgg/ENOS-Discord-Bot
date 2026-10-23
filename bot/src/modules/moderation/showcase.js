@@ -21,6 +21,15 @@ async function handleShowcaseClaim(interaction) {
     const openedAt = showcaseOpenedTimestamps.get(openedKey);
 
     if (!openedAt) {
+      // Prune entries older than 10 minutes if cache exceeds 200 items to prevent memory leaks
+      if (showcaseOpenedTimestamps.size > 200) {
+        const now = Date.now();
+        for (const [k, ts] of showcaseOpenedTimestamps.entries()) {
+          if (now - ts > 600000) {
+            showcaseOpenedTimestamps.delete(k);
+          }
+        }
+      }
       // Mark current time if not set, and prompt user to read for 10s
       showcaseOpenedTimestamps.set(openedKey, Date.now());
       return interaction.reply({
@@ -90,7 +99,7 @@ async function handleShowcaseClaim(interaction) {
     await awardCoins(userId, guildId, rewardCoins, 'showcase_claim', interaction.guild);
     const updatedVault = await getOrCreateBalance(userId, guildId);
     const newCoins = Number(updatedVault?.coins || 0);
-    showcaseOpenedTimestamps.delete(openKey);
+    showcaseOpenedTimestamps.delete(openedKey);
 
     return interaction.reply({
       content: `🎁 **Reward Claimed!** You received **+${rewardCoins} Vault Coins** for reading our server update.\nYour new Vault balance is **${newCoins.toLocaleString()} coins**.`,

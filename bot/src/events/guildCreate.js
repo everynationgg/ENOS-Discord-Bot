@@ -2,6 +2,7 @@ const { Events, EmbedBuilder, ChannelType, PermissionFlagsBits } = require('disc
 const { supabase } = require('../lib/supabase');
 const logger = require('../lib/logger');
 const { registerCommandsForGuild } = require('../lib/deployHelper');
+const { getCurrentWeekIdentifier = require('../modules/gaming/boss').getWeekIdentifier } = require('../modules/gaming/boss');
 
 module.exports = {
   name: Events.GuildCreate,
@@ -30,26 +31,26 @@ module.exports = {
 
     // 2. Auto-seed initial active Weekly Boss Season row if none exists
     try {
+      const guildId = guild.id;
       const { data: existingBoss } = await supabase
         .from('boss_seasons')
         .select('id')
-        .eq('guild_id', guild.id)
-        .eq('is_active', true)
+        .eq('guild_id', guildId)
+        .eq('week_identifier', getCurrentWeekIdentifier())
         .maybeSingle();
 
       if (!existingBoss) {
         await supabase.from('boss_seasons').insert({
-          guild_id: guild.id,
-          season_number: 1,
-          boss_name: 'Shadow Monarch',
-          boss_title: 'S-Rank Gate Lord',
-          max_hp: 1000,
-          current_hp: 1000,
-          is_active: true,
-          lore: 'A towering dark monarch emerging from the abyss gate. Stand together to claim victory!',
-          spawned_at: new Date().toISOString(),
+          guild_id: guildId,
+          week_identifier: getCurrentWeekIdentifier(),
+          boss_name: 'The Iron Enforcer',
+          boss_lore: 'A mechanical sentinel awakened to test the server.',
+          lore: 'A mechanical sentinel awakened to test the server.',
+          max_hp: 5000,
+          current_hp: 5000,
+          is_concluded: false,
         });
-        logger.info(`[GUILD_CREATE] Seeded default initial boss season for guild ${guild.id}`);
+        logger.info(`[GUILD_CREATE] Seeded default initial boss season for guild ${guildId}`);
       }
     } catch (bossErr) {
       logger.error(`[GUILD_CREATE] Boss season seed error for guild ${guild.id}:`, bossErr.message);

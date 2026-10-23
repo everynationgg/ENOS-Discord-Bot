@@ -8,9 +8,26 @@ const logger = require('../../lib/logger');
  */
 async function pruneOldRecords() {
   const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+  const cutoff30d = cutoff;
   const weekCutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
 
   const results = {};
+
+  // Invoke database-level prune RPC (system_logs, npc_deliberation_logs, newsroom_posts, bot_event_logs, lfg_sessions)
+  try {
+    const { error: rpcError } = await supabase.rpc('prune_old_records');
+    results.rpc_prune = rpcError ? `error: ${rpcError.message}` : 'success';
+  } catch (rpcErr) {
+    results.rpc_prune = `error: ${rpcErr.message}`;
+  }
+
+  // Vault quest log retention (30 days) to protect 500MB free tier
+  const { count: questCount, error: questError } = await supabase
+    .from('vault_quest_log')
+    .delete({ count: 'exact' })
+    .lt('created_at', cutoff30d);
+
+  results.vault_quest_log = questError ? 'error' : questCount;
 
   // Vault transactions
   const { count: txCount, error: txError } = await supabase

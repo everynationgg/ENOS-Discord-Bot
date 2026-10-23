@@ -1,5 +1,5 @@
 const { GoogleGenerativeAI } = require('@google/generative-ai');
-const { supabase, getFeatureConfig, logBotEvent } = require('../../lib/supabase');
+const { supabase, getFeatureConfig, logBotEvent, clearFeatureConfigCache } = require('../../lib/supabase');
 const logger = require('../../lib/logger');
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlags } = require('discord.js');
 const { performance } = require('perf_hooks');
@@ -212,7 +212,7 @@ function chooseWeightedChannel(allowedChannels) {
   return pool[Math.floor(Math.random() * pool.length)];
 }
 
-let isTriviaDropInProgress = false;
+const activeTriviaDrops = new Set();
 
 /**
  * Triggers a trivia drop for a guild.
@@ -221,11 +221,11 @@ let isTriviaDropInProgress = false;
  * @returns {Promise<boolean>}
  */
 async function triggerTriviaDrop(client, guildId) {
-  if (isTriviaDropInProgress) {
-    logger.warn('[TRIVIA] Drop trigger already in progress, skipping concurrent call.');
+  if (activeTriviaDrops.has(guildId)) {
+    logger.warn(`[TRIVIA] Drop trigger already in progress for guild ${guildId}, skipping concurrent call.`);
     return false;
   }
-  isTriviaDropInProgress = true;
+  activeTriviaDrops.add(guildId);
 
   try {
     const featureConfig = await getFeatureConfig(guildId, 'trivia');
@@ -411,6 +411,7 @@ async function triggerTriviaDrop(client, guildId) {
             .update({ config })
             .eq('guild_id', guildId)
             .eq('feature_key', 'trivia');
+          clearFeatureConfigCache(guildId, 'trivia');
         }
       }
     }
@@ -420,7 +421,7 @@ async function triggerTriviaDrop(client, guildId) {
     logger.error('[TRIVIA] Error in triggerTriviaDrop:', err.message);
     return false;
   } finally {
-    isTriviaDropInProgress = false;
+    activeTriviaDrops.delete(guildId);
   }
 }
 
@@ -917,6 +918,7 @@ async function updateLiveLeaderboard(client, guildId) {
         .update({ config: updatedConfig })
         .eq('guild_id', guildId)
         .eq('feature_key', 'trivia');
+      clearFeatureConfigCache(guildId, 'trivia');
     }
   } catch (err) {
     logger.error('[TRIVIA] updateLiveLeaderboard error:', err.message);
@@ -1078,7 +1080,14 @@ async function checkAndProcessTrivia(client) {
       const currentTimeStr = local.timeStr;
 
       // Query actual drops from database created today (using exact timezone offset)
-      const tzOffsetStr = tz === 'Asia/Manila' || tz === 'Manila' ? '+08:00' : '+08:00';
+      let tzOffsetStr = '+08:00';
+      try {
+        const formatted = new Intl.DateTimeFormat('en-US', { timeZone: tz, timeZoneName: 'longOffset' }).format(new Date());
+        const match = formatted.match(/GMT([+-]\d{2}:\d{2})/);
+        if (match) tzOffsetStr = match[1];
+      } catch (e) {
+        tzOffsetStr = '+08:00';
+      }
       const startOfDayUtc = new Date(`${today}T00:00:00${tzOffsetStr}`).toISOString();
       const endOfDayUtc = new Date(`${today}T23:59:59${tzOffsetStr}`).toISOString();
 
@@ -1150,6 +1159,7 @@ async function checkAndProcessTrivia(client) {
                   .update({ config })
                   .eq('guild_id', guildId)
                   .eq('feature_key', 'trivia');
+                clearFeatureConfigCache(guildId, 'trivia');
                 isConfigDirty = false;
               }
 
@@ -1186,6 +1196,7 @@ async function checkAndProcessTrivia(client) {
           .update({ config })
           .eq('guild_id', guildId)
           .eq('feature_key', 'trivia');
+        clearFeatureConfigCache(guildId, 'trivia');
       }
     }
 
@@ -1334,6 +1345,7 @@ async function deleteActiveTriviaNotification(guild, config) {
         .update({ config })
         .eq('guild_id', guild.id)
         .eq('feature_key', 'trivia');
+      clearFeatureConfigCache(guild.id, 'trivia');
     }
   } catch (err) {
     logger.error('[TRIVIA] deleteActiveTriviaNotification error:', err.message);
