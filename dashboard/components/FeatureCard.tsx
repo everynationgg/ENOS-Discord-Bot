@@ -49,7 +49,13 @@ export default function FeatureCard<T = Record<string, unknown>>({
   }, [initialConfig]);
 
   const setConfig = useCallback((key: string, value: unknown) => {
-    setConfigState((prev) => ({ ...prev, [key]: value }));
+    setConfigState((prev) => {
+      const prevRecord = (prev ?? {}) as Record<string, unknown>;
+      const nextVal = typeof value === 'function'
+        ? (value as (oldVal: unknown) => unknown)(prevRecord[key])
+        : value;
+      return { ...prevRecord, [key]: nextVal } as T;
+    });
     setSaveStatus('idle');
   }, []);
 

@@ -80,14 +80,18 @@ async function buildPublicBossEmbedPayload(guildId) {
     .eq('feature_key', 'weekly_boss')
     .maybeSingle();
 
+  const liveMatchesActive = (featureRow?.config?.override_name || featureRow?.config?.boss_name) === boss.boss_name;
+  const liveBg = liveMatchesActive ? featureRow?.config?.custom_bg_url : null;
+  const liveImg = liveMatchesActive ? featureRow?.config?.custom_image_url : null;
+
   const [momUrl, dadUrl, kidUrl, victoryUrl, lossUrl, bgUrl, mainImgUrl] = await Promise.all([
     resolveImageUrl(featureRow?.config?.mom_image_url || null),
     resolveImageUrl(featureRow?.config?.dad_image_url || null),
     resolveImageUrl(featureRow?.config?.kid_image_url || null),
     resolveImageUrl(featureRow?.config?.victory_image_url || null),
     resolveImageUrl(featureRow?.config?.loss_image_url || null),
-    resolveImageUrl(boss.custom_bg_url || featureRow?.config?.custom_bg_url || null),
-    resolveImageUrl(boss.custom_image_url || featureRow?.config?.custom_image_url || null),
+    resolveImageUrl(boss.custom_bg_url || liveBg || null),
+    resolveImageUrl(boss.custom_image_url || liveImg || null),
   ]);
   const classImageUrls = { mom: momUrl, dad: dadUrl, kid: kidUrl };
 
@@ -223,12 +227,16 @@ async function buildPersonalCombatPayload(guildId, userId, combatResult = null) 
     .eq('feature_key', 'weekly_boss')
     .maybeSingle();
 
+  const liveMatchesActive2 = (featureRow?.config?.override_name || featureRow?.config?.boss_name) === boss.boss_name;
+  const liveBg2 = liveMatchesActive2 ? featureRow?.config?.custom_bg_url : null;
+  const liveImg2 = liveMatchesActive2 ? featureRow?.config?.custom_image_url : null;
+
   const [momUrl2, dadUrl2, kidUrl2, bgUrl2, mainImgUrl2] = await Promise.all([
     resolveImageUrl(featureRow?.config?.mom_image_url || null),
     resolveImageUrl(featureRow?.config?.dad_image_url || null),
     resolveImageUrl(featureRow?.config?.kid_image_url || null),
-    resolveImageUrl(boss.custom_bg_url || featureRow?.config?.custom_bg_url || null),
-    resolveImageUrl(boss.custom_image_url || featureRow?.config?.custom_image_url || null),
+    resolveImageUrl(boss.custom_bg_url || liveBg2 || null),
+    resolveImageUrl(boss.custom_image_url || liveImg2 || null),
   ]);
   const classImageUrls = { mom: momUrl2, dad: dadUrl2, kid: kidUrl2 };
 

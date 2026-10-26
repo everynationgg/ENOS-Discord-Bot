@@ -2,7 +2,7 @@
 
 import FeatureCard from '@/components/FeatureCard';
 import ImageUploader from '@/components/ImageUploader';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 
 const GAME_BRANCHES = [
   'Where Winds Meet', 'Palworld', 'Wuwa', 'Hoyoverse', 'Enfi',
@@ -785,6 +785,13 @@ function BossCardForm({ config, setConfig }: { config: any; setConfig: (key: str
 
   const staged = config.staged_boss_config || {};
 
+  const updateStaged = useCallback((patch: Record<string, unknown>) => {
+    setConfig('staged_boss_config', (prev: unknown) => {
+      const prevStaged = (prev && typeof prev === 'object' ? prev : {}) as Record<string, unknown>;
+      return { ...prevStaged, ...patch };
+    });
+  }, [setConfig]);
+
   const handleBossAction = async (action: string) => {
     if (!confirm(`Confirm action: ${action}?`)) return;
     setActionLoading(action);
@@ -1066,7 +1073,7 @@ function BossCardForm({ config, setConfig }: { config: any; setConfig: (key: str
                 className="form-input"
                 placeholder="e.g. Palworld"
                 value={staged.game_name || ''}
-                onChange={(e) => setConfig('staged_boss_config', { ...staged, game_name: e.target.value })}
+                onChange={(e) => updateStaged({ game_name: e.target.value })}
               />
             </div>
             <div className="form-group">
@@ -1076,7 +1083,7 @@ function BossCardForm({ config, setConfig }: { config: any; setConfig: (key: str
                 className="form-input"
                 placeholder="e.g. Jetragon Corruptor"
                 value={staged.override_name || staged.boss_name || ''}
-                onChange={(e) => setConfig('staged_boss_config', { ...staged, override_name: e.target.value, boss_name: e.target.value })}
+                onChange={(e) => updateStaged({ override_name: e.target.value, boss_name: e.target.value })}
               />
             </div>
             <div className="form-group">
@@ -1086,7 +1093,7 @@ function BossCardForm({ config, setConfig }: { config: any; setConfig: (key: str
                 className="form-input"
                 placeholder="e.g. System Threat (Palworld)"
                 value={staged.boss_title || ''}
-                onChange={(e) => setConfig('staged_boss_config', { ...staged, boss_title: e.target.value })}
+                onChange={(e) => updateStaged({ boss_title: e.target.value })}
               />
             </div>
             <div className="form-group">
@@ -1097,7 +1104,7 @@ function BossCardForm({ config, setConfig }: { config: any; setConfig: (key: str
                 className="form-input"
                 placeholder="e.g. 600000"
                 value={staged.override_hp || ''}
-                onChange={(e) => setConfig('staged_boss_config', { ...staged, override_hp: parseInt(e.target.value) || '' })}
+                onChange={(e) => updateStaged({ override_hp: parseInt(e.target.value) || '' })}
               />
             </div>
             <div className="form-group" style={{ gridColumn: 'span 2' }}>
@@ -1108,7 +1115,7 @@ function BossCardForm({ config, setConfig }: { config: any; setConfig: (key: str
                 rows={3}
                 placeholder="Describe next week's boss lore..."
                 value={staged.lore || ''}
-                onChange={(e) => setConfig('staged_boss_config', { ...staged, lore: e.target.value })}
+                onChange={(e) => updateStaged({ lore: e.target.value })}
               />
             </div>
           </div>
@@ -1118,28 +1125,28 @@ function BossCardForm({ config, setConfig }: { config: any; setConfig: (key: str
               id="staged-boss-image"
               label="Staged Boss Banner Image URL"
               value={staged.custom_image_url || ''}
-              onChange={(url) => setConfig('staged_boss_config', { ...staged, custom_image_url: url })}
+              onChange={(url) => updateStaged({ custom_image_url: url })}
               previewHeight="120px"
             />
             <ImageUploader
               id="staged-boss-bg-image"
               label="Staged Arena Background Image URL"
               value={staged.custom_bg_url || ''}
-              onChange={(url) => setConfig('staged_boss_config', { ...staged, custom_bg_url: url })}
+              onChange={(url) => updateStaged({ custom_bg_url: url })}
               previewHeight="120px"
             />
             <ImageUploader
               id="staged-boss-victory-image"
               label="Staged Victory Background Image URL"
               value={staged.victory_image_url || ''}
-              onChange={(url) => setConfig('staged_boss_config', { ...staged, victory_image_url: url })}
+              onChange={(url) => updateStaged({ victory_image_url: url })}
               previewHeight="120px"
             />
             <ImageUploader
               id="staged-boss-loss-image"
               label="Staged Loss / Defeat Image URL"
               value={staged.loss_image_url || ''}
-              onChange={(url) => setConfig('staged_boss_config', { ...staged, loss_image_url: url })}
+              onChange={(url) => updateStaged({ loss_image_url: url })}
               previewHeight="120px"
             />
           </div>

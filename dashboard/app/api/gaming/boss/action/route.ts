@@ -56,6 +56,10 @@ export async function POST(req: NextRequest) {
 
       const stagedConfig = body.stagedConfig || featureRow?.config?.staged_boss_config;
 
+      if (action === 'deploy_staged' && !stagedConfig) {
+        return NextResponse.json({ error: 'No staged boss configuration found to deploy.' }, { status: 400 });
+      }
+
       const charName = customName && customName.trim() ? customName.trim() : 'Corrupted Anomaly';
       const gameLabel = gameName && gameName.trim() ? gameName.trim() : 'Gaming Realm';
 
@@ -63,10 +67,14 @@ export async function POST(req: NextRequest) {
       let bossTitle = `System Threat (${gameLabel})`;
       let lore = `A space-time realm rift merged ${gameLabel} data with ENOS core protocols. ${charName} has manifested in the server! Coordinate your triad skills to neutralize!`;
       let hp = customHp ? parseInt(customHp, 10) : 150000;
-      let finalImageUrl = resolvedImageUrl || null;
-      let finalBgUrl = resolvedBgUrl || featureRow?.config?.custom_bg_url || null;
+      let finalImageUrl = (action === 'deploy_staged' || action === 'spawn_staged')
+        ? (stagedConfig?.custom_image_url ? await resolveDirectImageUrl(stagedConfig.custom_image_url) : null)
+        : (resolvedImageUrl || null);
+      let finalBgUrl = (action === 'deploy_staged' || action === 'spawn_staged')
+        ? (stagedConfig?.custom_bg_url ? await resolveDirectImageUrl(stagedConfig.custom_bg_url) : null)
+        : (resolvedBgUrl || featureRow?.config?.custom_bg_url || null);
 
-      if (action === 'spawn_staged' || stagedConfig) {
+      if (action === 'spawn_staged' || action === 'deploy_staged' || stagedConfig) {
         const sName = stagedConfig?.override_name || stagedConfig?.boss_name;
         const sTitle = stagedConfig?.boss_title;
         const sLore = stagedConfig?.lore;
@@ -75,8 +83,8 @@ export async function POST(req: NextRequest) {
         if (sTitle) bossTitle = sTitle;
         if (sLore) lore = sLore;
         if (sHp) hp = Number(sHp);
-        if (stagedConfig?.custom_image_url) finalImageUrl = await resolveDirectImageUrl(stagedConfig.custom_image_url);
-        if (stagedConfig?.custom_bg_url) finalBgUrl = await resolveDirectImageUrl(stagedConfig.custom_bg_url);
+        if (stagedConfig?.custom_image_url !== undefined) finalImageUrl = await resolveDirectImageUrl(stagedConfig.custom_image_url);
+        if (stagedConfig?.custom_bg_url !== undefined) finalBgUrl = await resolveDirectImageUrl(stagedConfig.custom_bg_url);
 
         // Promote staged artwork & fields into active config and clear staged_boss_config
         const updatedCfg = { ...(featureRow?.config || {}) };
@@ -85,8 +93,8 @@ export async function POST(req: NextRequest) {
         if (sTitle) updatedCfg.boss_title = sTitle;
         if (sLore) updatedCfg.lore = sLore;
         if (sHp) updatedCfg.override_hp = sHp;
-        if (stagedConfig?.custom_image_url) updatedCfg.custom_image_url = stagedConfig.custom_image_url;
-        if (stagedConfig?.custom_bg_url) updatedCfg.custom_bg_url = stagedConfig.custom_bg_url;
+        updatedCfg.custom_image_url = stagedConfig?.custom_image_url || null;
+        updatedCfg.custom_bg_url = stagedConfig?.custom_bg_url || null;
         if (stagedConfig?.victory_image_url) updatedCfg.victory_image_url = stagedConfig.victory_image_url;
         if (stagedConfig?.loss_image_url) updatedCfg.loss_image_url = stagedConfig.loss_image_url;
         if (stagedConfig?.mom_image_url) updatedCfg.mom_image_url = stagedConfig.mom_image_url;

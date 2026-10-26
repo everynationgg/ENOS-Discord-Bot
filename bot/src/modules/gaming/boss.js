@@ -270,17 +270,18 @@ async function getOrCreateActiveBoss(guildId) {
     // Auto-sync live configured boss overrides from guild_config to active season
     const liveName = featureRow?.config?.override_name || featureRow?.config?.boss_name;
     const isGeneric = activeBoss.boss_name === 'Corrupted Anomaly' || activeBoss.boss_name.startsWith('ERROR-MOD');
+    const liveMatchesActive = Boolean(liveName && activeBoss.boss_name === liveName);
     if (!activeBoss.is_overkill && !activeBoss.is_defeated && (
       (liveName && activeBoss.boss_name !== liveName) ||
       (isGeneric && liveName) ||
-      (featureRow?.config?.custom_image_url && activeBoss.custom_image_url !== featureRow.config.custom_image_url) ||
+      (liveMatchesActive && featureRow?.config?.custom_image_url && activeBoss.custom_image_url !== featureRow.config.custom_image_url) ||
       (featureRow?.config?.lore && activeBoss.lore !== featureRow.config.lore && isGeneric)
     )) {
       const liveTitle = featureRow?.config?.boss_title || (featureRow?.config?.game_name ? `System Threat (${featureRow.config.game_name})` : activeBoss.boss_title);
       const liveLore = featureRow?.config?.lore || activeBoss.lore;
       const liveHp = Number(featureRow?.config?.override_hp || featureRow?.config?.max_hp || activeBoss.max_hp);
-      const liveImg = featureRow?.config?.custom_image_url || activeBoss.custom_image_url;
-      const liveBg = featureRow?.config?.custom_bg_url || activeBoss.custom_bg_url;
+      const liveImg = liveMatchesActive ? (featureRow?.config?.custom_image_url || activeBoss.custom_image_url) : activeBoss.custom_image_url;
+      const liveBg = liveMatchesActive ? (featureRow?.config?.custom_bg_url || activeBoss.custom_bg_url) : activeBoss.custom_bg_url;
 
       const existingDamage = Math.max(0, Number(activeBoss.max_hp) - Number(activeBoss.current_hp));
       const targetCurrentHp = Math.max(1, liveHp - existingDamage);
@@ -392,8 +393,8 @@ async function getOrCreateActiveBoss(guildId) {
     if (stagedConfig.boss_title) updatedConfig.boss_title = stagedConfig.boss_title;
     if (stagedConfig.lore) updatedConfig.lore = stagedConfig.lore;
     if (stagedConfig.override_hp || stagedConfig.max_hp) updatedConfig.override_hp = finalMaxHp;
-    if (stagedConfig.custom_image_url) updatedConfig.custom_image_url = stagedConfig.custom_image_url;
-    if (stagedConfig.custom_bg_url) updatedConfig.custom_bg_url = stagedConfig.custom_bg_url;
+    updatedConfig.custom_image_url = stagedConfig.custom_image_url || null;
+    updatedConfig.custom_bg_url = stagedConfig.custom_bg_url || null;
     if (stagedConfig.victory_image_url) updatedConfig.victory_image_url = stagedConfig.victory_image_url;
     if (stagedConfig.loss_image_url) updatedConfig.loss_image_url = stagedConfig.loss_image_url;
     if (stagedConfig.mom_image_url) updatedConfig.mom_image_url = stagedConfig.mom_image_url;
